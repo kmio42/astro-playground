@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sternzeit und Erdposition</title>
+    <style>
+        canvas {
+            background-color: white;
+            display: block;
+            margin: 0 auto;
+        }
+        button {
+            width:150px;
+        }
+    </style>
+    <script>
+
+        const aeTokm = 149597870.7;
+        const e = 0.016708634; // Exzentrizität der Erdbahn
+        const a = 1.000001018;  // Halbe große Achse in AE
+        const epsilon = 23.439292; // Mittlere Neigung Erdachse
+
+        const rad2deg = 180/Math.PI;
+        const deg2rad = Math.PI/180;
+
+        //Grafik-Ausgabe
+        var canvas,ctx;
+
+        let intervalId; // Variable für das Intervall
+        let addTimeOffset;
+
+        const sun = {
+            x: 0,
+            y: 0,
+            radius: 20,
+            color: 'yellow'
+        };
+
+        const earth = {
+            radius: 10,
+            color: 'blue',
+            orbit: {
+                radius: 280,
+                color: 'gray'
+            },
+            indicator: {
+                width: 2,
+                length: 300,
+                color: 'red'
+            }
+        };
+
+        function drawSun() {
+            ctx.beginPath();
+            ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = sun.color;
+            ctx.fill();
+            ctx.closePath();
+        };
+
+        function drawOrbit() {
+
+            //sun is in one focal point, so calculating center:
+            const centerX = sun.x - e * earth.orbit.radius;
+            const centerY = sun.y;
+
+            //ecliptic axis:
+            const a = earth.orbit.radius;
+            const b = Math.sqrt(1-e*e)*a;
+
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY, a, b, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = earth.orbit.color;
+            ctx.stroke();
+            ctx.closePath();
+
+            //draw focal points
+            ctx.beginPath();
+            ctx.arc(sun.x, centerY, 1, 0, Math.PI * 2,false);
+            ctx.arc(2*centerX, centerY, 1, 0, Math.PI * 2,false);
+            ctx.fillStyle = earth.orbit.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawEarthWithIndicator(radius, eclipticalLength, vernalPoint, indicatorDirection) {
+            // Position der Erde um die Umlaufbahn
+            const earthX = sun.x + radius*earth.orbit.radius * Math.cos(eclipticalLength);
+            const earthY = sun.y - radius*earth.orbit.radius * Math.sin(eclipticalLength);
+
+            /*
+            Erdachse ist geneigt gegenüber Ekliptikebene.
+            Äquator und parallele Ebenen erscheinen daher elliptisch auf der Ekliptikebene.
+            Zum Frühlingspunkt steht die Erdachse senkrecht zur Verbindungslinie Erde-Sonne (Ekliptikale Länge). Das entspricht der kleinen Halbachse der Ellipse. Die Richtung der Ekliptikalen Länge zum Frühlingspunkt zählt als Nullpunkt für das äquatoriale Koordinatensystem (Rektazension).
+            */
+
+            ctx.save();
+            ctx.translate(earthX, earthY);
+            ctx.rotate(-vernalPoint);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(epsilon*deg2rad), Math.PI/2, 0, Math.PI * 2);
+            //ctx.arc(0, 0, earth.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = earth.color;
+            ctx.fill();
+            ctx.closePath();
+
+            //Indikator
+            indicatorDirection = siderealDirectionCorrection(indicatorDirection);
+            IndicatorX = -earth.indicator.length*Math.cos(indicatorDirection);
+            IndicatorY = earth.indicator.length*Math.sin(indicatorDirection);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(IndicatorX, IndicatorY);
+            ctx.strokeStyle = earth.indicator.color;
+            ctx.lineWidth = earth.indicator.width;
+            ctx.stroke();
+            ctx.closePath();
+
+            ctx.restore();
+        }
+
+        function drawFullLineWithText(eclipticalLength,text) {
+            const radius = calculateOrbitRadiusEarth(eclipticalLength);
+
+            // Position der Erde basierend auf dem Orbit um die Sonne
+            const startx = sun.x;
+            const starty = sun.y;
+            const endx = sun.x + radius * earth.orbit.radius * Math.cos(eclipticalLength);
+            const endy = sun.y - radius * earth.orbit.radius * Math.sin(eclipticalLength);
+
+            ctx.save();
+            ctx.rotate(-eclipticalLength);
+            ctx.font= "15px arial";
+            ctx.fillStyle="black";
+            ctx.textAlign = "center";
+            ctx.fillText(text, radius * earth.orbit.radius/2,-8);
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.moveTo(startx, starty);
+            ctx.lineTo(endx, endy);
+            ctx.strokeStyle = 'gray';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+
+        var datetime = new Date();
+
+        function changeJD() {
+            const jdInput = parseFloat(document.getElementById("julianDate").value);
+            if(jdInput == NaN) {
+                return;
+            }
+
+            datetime = calculateGregorianDateFromJulianDay(jdInput);
+            fillGregorianDate(datetime);
+            fillSiderealTime(calculateSiderealTime(jdInput));
+
+            berechneDaten();
+        }
+
+        function changeGregorianDate() {
+            const dateInput = document.getElementById("date").value;
+            const timeInput = document.getElementById("time").value;
+            datetime = new Date(`${dateInput}T${timeInput}Z`);
+            if(isNaN(datetime.getTime())) {
+                return;
+            }
+
+            const julianDay = calculateJulianDay(datetime);
+
+            fillJulianDay(julianDay);
+            fillSiderealTime(calculateSiderealTime(julianDay));
+
+            berechneDaten();
+        }
+        function changeSiderealTime() {
+            /*
+             * Grundidee:
+             * 1. Sternzeit von Mitternacht des angegebenen Datums berechnen
+             * 2. Differenz in Millisekunden zu eingegebener Sternzeit berechnen
+             * 3. Datum/Zeit-Objekt auf berechnete Zeit anpassen
+             * 
+             * 1 Sterntag hat 86164100 Millisekunden und ist in 24 Sternzeitstunden geteilt
+             */
+
+            const julianDay = Math.round(calculateJulianDay(datetime));
+
+            const siderealTimeBase = calculateSiderealTime(julianDay);
+
+            const timeInput = document.getElementById("siderealTime").value;
+            const siderealTimeNew = timeInput.split(':');
+
+            timediffInMs = ((parseInt(siderealTimeNew[0])+36+parseInt(siderealTimeNew[1])/60-siderealTimeBase)%24)*86164100/24;
+
+            datetime.setUTCHours(0);
+            datetime.setUTCMinutes(0);
+            datetime.setUTCSeconds(0);
+            datetime.setUTCMilliseconds(0);
+            datetime.setTime(datetime.getTime()+timediffInMs);
+
+            fillGregorianDate(datetime);
+            fillJulianDay(calculateJulianDay(datetime));
+            berechneDaten();
+        }
+        function changeTime(offset) {
+            datetime.setTime(datetime.getTime()+offset);
+            fillGregorianDate(datetime);
+            const julianDay = calculateJulianDay(datetime);
+            fillJulianDay(julianDay);
+            fillSiderealTime(calculateSiderealTime(julianDay));
+
+            berechneDaten();
+        }
+
+        function changeTimeRepeat() {
+           changeTime(addTimeOffset);
+        }
+
+        function siderealDirectionCorrection(sideRealTime) {
+            /*
+             * Äquatoriales Koordinatensystem:
+             * Delta - Deklination 0: Äquatorebene
+             * Alpha - Rektazension: Sternzeit
+             *
+             * Ekliptikales Koordinatensystem:
+             * Lambda - Ekliptikale Länge vom Frühlingspunkt: Ziel
+             * Beta - Ekliptikale Breite: 0 => wir schauen nur von oben drauf
+             *
+             * Epsilon - Winkeldifferenz zwischen beiden Systemen
+             *
+             * Vollständige Formeln:
+             * lambda = atan2(sin(alpha)*cos(epsilon) + tan(delta)*cos(epsilon), cos(alpha))
+             * beta = arcsin(sin(delta)*cos(epsilon) - cos(delta)*sin(epsilon)*sin(alpha))
+             *
+             * Achtung: Ausrichtung der Erde beachten: Im Frühlingspunkt (Alpha = 0) ist Erde zur
+             * kleinen Halbachse ausgerichtet.
+            */
+            const alpha = sideRealTime+Math.PI/2;
+            const lambda = Math.atan2(Math.sin(alpha)*Math.cos(epsilon*deg2rad),Math.cos(alpha));
+            return lambda-Math.PI/2;
+        }
+
+        function berechneDaten() {
+
+            //Julianisches Datum
+            const julianDay = calculateJulianDay(datetime);
+
+            //Julianische Epoche
+            const julianEpoch = calculateJulianEpoch(julianDay);
+
+            //Zeitgleichung
+            const equationOfTime = calculateEquationOfTime(julianDay);
+
+            //Sternzeit
+            const siderealTime = calculateSiderealTime(julianDay);
+
+            //Position der Erde: Ekliptische Länge und Radius
+            const orbitLengthEarth = calculateEclipticalLength(julianDay);
+            const orbitRadiusEarth = calculateOrbitRadiusEarth(orbitLengthEarth);
+
+            //Tag- und Nachtgleichen und Sonnenwenden des Jahres bestimmen
+            const springEquinoxDate = calculateJDOfPoint(datetime.getUTCFullYear(),"spring");
+            const summerSolsticeDate = calculateJDOfPoint(datetime.getUTCFullYear(),"summer");
+            const autumnEquinoxDate = calculateJDOfPoint(datetime.getUTCFullYear(),"autumn");
+            const winterSolsticeDate = calculateJDOfPoint(datetime.getUTCFullYear(),"winter");
+
+            //Frühlingspunkt des Datums ist Ekliptische Länge der Frühlings Tag-und Nachtgleichen
+            const springEquinoxLength = calculateEclipticalLength(springEquinoxDate);
+
+            //Tabellen-Ausgabe
+
+            const siderealTimeRelative = (((siderealTime - datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
+
+            document.getElementById("equationOfTime").innerText = hoursToString(equationOfTime)+" Minuten ("+equationOfTime.toFixed(2)+" Minuten)";
+            
+            document.getElementById("springEquinox").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(springEquinoxDate));
+            document.getElementById("summerSolstice").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(summerSolsticeDate));
+            document.getElementById("autumnEquinox").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(autumnEquinoxDate));
+            document.getElementById("winterSolstice").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(winterSolsticeDate));
+
+            document.getElementById("difference").innerText = hoursToString(siderealTimeRelative);
+            document.getElementById("eclipticalLength").innerText = normalizeAngleDegree(orbitLengthEarth*rad2deg).toFixed(2)+'°';
+            document.getElementById("earhSunDistance").innerText = orbitRadiusEarth.toFixed(5) +" AE ("+(orbitRadiusEarth*aeTokm).toFixed(2)+" km)";
+
+            //Grafik-Ausgabe
+            canvas = document.getElementById('solarSystem');
+            ctx = canvas.getContext('2d');
+            ctx.resetTransform();
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
+            ctx.translate(canvas.width/2, canvas.height/2);
+
+            drawFullLineWithText(springEquinoxLength,"Frühlings Tag- und Nachtgleiche");
+            drawFullLineWithText(calculateEclipticalLength(summerSolsticeDate),"Sommersonnenwende");
+            drawFullLineWithText(calculateEclipticalLength(autumnEquinoxDate), "Herbst Tag- und Nachtgleiche");
+            drawFullLineWithText(calculateEclipticalLength(winterSolsticeDate),"Wintersonnenwende");
+
+            drawSun();
+
+            drawOrbit();
+
+            drawEarthWithIndicator(orbitRadiusEarth, orbitLengthEarth, springEquinoxLength, siderealTime/12*Math.PI);
+            drawOrbit();
+
+        }
+
+        function normalizeAngleDegree(angle) {
+            return ((angle % 360) + 360) % 360;
+        }
+
+        function hoursToString(hours) {
+            const t = Math.sign(hours)*Math.floor(Math.abs(hours));
+            const m = Math.floor(Math.abs((hours - t)*60));
+            return t.toString().padStart(2, '0')+":"+m.toString().padStart(2,'0');
+        }
+
+        function gregorianDateToString(date) {
+            let str = date.getUTCDate().toString().padStart(2,'0');
+            str += "." + (date.getUTCMonth()+1).toString().padStart(2,'0');
+            str += "." + date.getUTCFullYear().toString().padStart(4,'0');
+            str += " " + date.getUTCHours().toString().padStart(2, '0');
+            str += ":" + date.getUTCMinutes().toString().padStart(2, '0');
+            str += ":" + date.getUTCSeconds().toString().padStart(2,'0');
+            return str;
+        }
+
+        function calculateJulianDay(date) {
+            let year = date.getUTCFullYear();
+            let month = date.getUTCMonth() + 1;
+            const day = date.getUTCDate();
+            const hour = date.getUTCHours();
+            const minute = date.getUTCMinutes();
+            const second = date.getUTCSeconds();
+            const millisecond = date.getUTCMilliseconds();
+
+            if (month <= 2) {
+                year -= 1;
+                month += 12;
+            }
+
+            const A = Math.floor(year / 100);
+
+            //Gregorian calendar
+            let B = 2 - A + Math.floor(A / 4);
+
+            //Julian calendar
+            if((year < 1582) ||
+               ((year == 1582) && (month < 10)) ||
+               ((year == 1582) && (month == 10) && (day <= 4))) {
+               B = 0;
+            }
+
+
+            const jd = Math.floor(365.25 * (year + 4716)) +
+                       Math.floor(30.6001 * (month + 1)) +
+                       day + B - 1524.5 +
+                       (hour + minute / 60 + second / 3600) / 24;
+
+            return jd;
+        }
+
+        function calculateGregorianDateFromJulianDay(jd) {
+            // jd + 0.5 verschiebt auf den nächsten Tag, dann teilen in Ganzzahl und Bruchteil
+            let z = Math.floor(jd + 0.5);
+            let f = jd + 0.5 - z;
+
+            let a;
+            if (z < 2299161) {
+                a = z; // Julianischer Kalender
+            } else {
+                const alpha = Math.floor((z - 1867216.25) / 36524.25);
+                a = z + 1 + alpha - Math.floor(alpha / 4); // Gregorianischer Kalender
+            }
+
+            const b = a + 1524;
+            const c = Math.floor((b - 122.1) / 365.25);
+            const d = Math.floor(365.25 * c);
+            const e = Math.floor((b - d) / 30.6001);
+
+            // Tag, Monat und Jahr berechnen
+            const day = b - d - Math.floor(30.6001 * e) + f;
+            const month = (e < 14) ? e - 1 : e - 13;
+            const year = (month > 2) ? c - 4716 : c - 4715;
+
+            // Berechnung der Stunden, Minuten und Sekunden aus dem Bruchteil des Tages (f)
+            const dayFraction = day % 1; // Nur der Bruchteil des Tags
+            const hour = Math.floor(dayFraction * 24);
+            const minutes = Math.floor((dayFraction * 24 - hour) * 60);
+            const seconds = Math.floor((((dayFraction * 24 - hour) * 60) - minutes) * 60);
+            const milliseconds = Math.round((((((dayFraction * 24 - hour) * 60) - minutes) * 60)- seconds)*60);
+            //console.log(stunden,minuten,sekunden);
+            // Erzeugt ein Datum mit Jahr, Monat, Tag, Stunden, Minuten und Sekunden
+            return new Date(Date.UTC(year, month - 1, Math.floor(day), hour, minutes, seconds,milliseconds));
+        }
+
+        function calculateJDOfPoint(jear,type) {
+
+            const factors = [
+                [485, 324.96,   1934.136],
+                [203, 337.23,  32964.467],
+                [199, 342.08,     20.186],
+                [182,  27.85, 445267.112],
+                [156,  73.14,  45036.886],
+                [136, 171.52,  22518.443],
+                [77,  222.54,  65928.934],
+                [74,  296.72,   3034.906],
+                [70,  243.58,   9037.513],
+                [58,  119.81,  33718.147],
+                [52,  297.17,    150.678],
+                [50,   21.02,   2281.226],
+                [45,  247.54,  29929.562],
+                [44,  325.15,  31555.956],
+                [29,   60.93,   4443.417],
+                [18,  155.12,  67555.328],
+                [17,  288.79,   4562.452],
+                [16,  198.04,  62894.029],
+                [14,  199.76,  31436.921],
+                [12,   95.39,  14577.848],
+                [12,  287.11,  31931.756],
+                [12,  320.81,  34777.259],
+                [9,   227.73,   1222.114],
+                [8,    15.45,  16859.074],
+            ];
+
+            const parameters = {
+                "spring": [2451623.80984, 365242.37404, 0.05169, 0.00411, 0.00057], //
+                "summer": [2451716.56767, 365241.62603, 0.00325, 0.00888, 0.00030],
+                "autumn": [2451810.21715, 365242.01767, 0.11575, 0.00337, 0.00078],
+                "winter": [2451900.05952, 365242.74049, 0.06223, 0.00823, 0.00032]
+            }
+            jear = (jear - 2000)/1000;
+
+            const JDE0 = parameters[type][0] + (parameters[type][1] * jear) + ( parameters[type][2] * jear**2) - ( parameters[type][3] * jear**3) - ( parameters[type][4] * jear**4);
+
+            const T = calculateJulianEpoch(JDE0);
+            const W = 35999.373*T-2.47; //in Grad
+
+            const lambda = 1 + 0.0334*Math.cos(W/180*Math.PI) + 0.0007*Math.cos(2*W/180*Math.PI);
+
+            var S = 0;
+            for(vals in factors) {
+                S += factors[vals][0]*Math.cos((factors[vals][1]+factors[vals][2]*T)/180*Math.PI);
+            }
+
+            const JDE = JDE0 + 0.00001*S/lambda;
+
+            return JDE;
+        }
+
+        function calculateEquationOfTime(jd) {
+            const T = calculateJulianEpoch(jd);
+
+            // Mittlere Anomalie der Sonne (Formel 24.3)
+            const M = (357.52910 + T * (35999.05030 - 0.0001559 * T)-(T**3)*0.00000048)*deg2rad;
+
+            // Mittlere Länge der Sonne bezogen auf mittleres Äquinoktium des Datums (Formel 24.3)
+            const L0 = normalizeAngleDegree((280.46644567 + T * (36000.76982779 + T * 0.0003032028)));
+
+            // Mittelpunktsgleichung
+            const C = ((1.914600 - T * (0.004817 + 0.000014 * T)) * Math.sin(M)
+                    + (0.019993 - 0.000101 * T) * Math.sin(2 * M)
+                    + 0.000290 * Math.sin(3 * M));
+
+            // Wahre Länge der Sonne bezogen auf mittleres Äquinoktium des Datums
+            const L =  (L0 + C);
+
+            // Schiefe der Ekliptik (Formel 21.2) - Achtung, nicht für zu große T ()
+            const epsilon = (23.439292 - 0.013004167 * T - 0.0000001639 * T**2 + 0.0000005036 * T**3);
+
+            // Rektaszension der Sonne berechnen
+            let alpha = Math.atan2(Math.cos(epsilon * deg2rad) * Math.sin(L* deg2rad), Math.cos(L* deg2rad))*rad2deg;
+            alpha = normalizeAngleDegree(alpha);
+
+            // Zeitgleichung (Formel 27.1) ohne Nutation mit Umrechnung in Minuten
+            let E = (L0 - 0.0057183 -alpha) * 4; // Umrechnung in Minuten
+
+            /*
+             * Der Bereich E muss zwischen -20 Minuten und 20 Minuten liegen
+             * Vielfache von 24 Stunden können addiert oder subtrahiert werden
+             */
+            if(E > 60*12) {
+                E-=24*60;
+            } else if(E < -60*12) {
+                E+=24*60;
+            }
+
+            return E;
+
+            /* Alternative Berechnung (nach Smart) mit geringerer Genauigkeit:
+             * e: Exzentrität der Erdbahn
+             * const y = Math.tan(epsilon*deg2rad/2)**2;
+             * E = (y*Math.sin(2*L0*deg2rad)
+             *      - 2*e*Math.sin(M)
+             *      + 4*e*y*Math.sin(M)*Math.cos(2*L0*deg2rad)
+             *      - 0.5*y**2*Math.sin(4*L0*deg2rad)
+             *      -1.25*e**2*Math.sin(2*M))*rad2deg*4;
+             *
+             * Weitere Alternative - ausgehend vom Tag des Jahres:
+             *  // Bestimmen des Tages im Jahr
+             *  const start = new Date(datum.getFullYear(), 0, 0); // 1. Januar
+             *  const diff = datum - start; // Differenz in Millisekunden
+             *  const oneDay = 1000 * 60 * 60 * 24; // Millisekunden in einem Tag
+             *  const tagImJahr = Math.floor(diff / oneDay) + 1; // Tage zählen ab 1
+             *
+             *  // Berechnung von B
+             *  const B = (360 / 365) * (tagImJahr - 81) * (Math.PI / 180); // in Radiant
+             *
+             *  // Berechnung der Zeitgleichung (TE)
+             *  const E = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+             *
+             *  // Tageslängenkorrektur (Hier als Näherung, kann je nach Jahreszeit variieren)
+             *  const tageslaenge = 24; // Standard Tageslänge in Stunden
+             *  const C = (tageslaenge - 24) / 15; // Korrektur in Minuten
+             *
+             *  // Zeitgleichung (TE) in Minuten
+             *  const TE = E + C;
+             * return TE; // Ergebnis in Minuten
+             */
+        }
+
+        function calculateJulianEpoch(jd) {
+            return (jd - 2451545.0) / 36525.0;
+        }
+
+        function calculateSiderealTime(jd) {
+            const T = calculateJulianEpoch(jd);
+            // Greenwich Mean Sidereal Time (GMST) in degrees (Formel 11.4)
+            const gmstDeg = (280.46061837 + 360.98564736629 * (jd - 2451545.0) +
+                       T * T * (0.000387933 - T / 38710000.0));
+
+            // In Stunden umwandeln und im Bereich 0-24 normalisieren
+            const gmst = (((gmstDeg/15) % 24) + 24) % 24;
+            return gmst;
+        }
+
+        function calculateEclipticalLength(jd) {
+            T = calculateJulianEpoch(jd);
+
+            // Mittlere Anomalie der Sonne (Formel 24.3)
+            const M = (357.52910 + T * (35999.05030 - 0.0001559 * T)-(T**3)*0.00000048)*deg2rad;
+
+            // Exzentrische Anomalie (E) näherungsweise
+            let E = M; // Erste Näherung
+
+            //Iterative Verbesserung:
+            for (let i = 0; i < 5; i++) {
+                E = M + e * Math.sin(E);
+            }
+
+            // Berechnung der wahren Anomalie (ν) in Bogenmaß
+            const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+
+            return nu;
+        }
+
+        function calculateOrbitRadiusEarth(nu) {
+            r = a * (1 - e*e) / (1 + e * Math.cos(nu));
+            return r;
+        }
+
+        function fillGregorianDate(date) {
+            document.getElementById("date").value = date.toISOString().substring(0, 10);
+            document.getElementById("time").value = date.getUTCHours().toString().padStart(2, '0')+":"+date.getUTCMinutes().toString().padStart(2, '0');
+            document.getElementById("seconds").value = date.getUTCSeconds() + "." +date.getUTCMilliseconds();
+        }
+        function fillJulianDay(jd) {
+            document.getElementById("julianDate").value = jd.toFixed(8);
+        }
+        function fillSiderealTime(time) {
+            document.getElementById("siderealTime").value = hoursToString(time);
+        }
+
+        function addEvents(elem,timeoffset) {
+
+            elem.addEventListener('click', () => {
+                changeTime(timeoffset);
+            });
+            elem.addEventListener('mousedown', () => {
+                intervalId = setInterval(changeTimeRepeat, 200);
+                addTimeOffset = timeoffset;
+            });
+
+            // Intervall stoppen, wenn der Button losgelassen wird
+            elem.addEventListener('mouseup', () => {
+                clearInterval(intervalId);
+            });
+
+            // Intervall stoppen, wenn die Maus den Button verlässt
+            elem.addEventListener('mouseleave', () => {
+                clearInterval(intervalId);
+            });
+        }
+
+        function onLoad() {
+            datetime = new Date();
+            fillGregorianDate(datetime);
+            changeGregorianDate();
+            document.getElementById('date').addEventListener('input', changeGregorianDate);
+            document.getElementById('time').addEventListener('input', changeGregorianDate);
+            document.getElementById('julianDate').addEventListener('input', changeJD);
+            document.getElementById('siderealTime').addEventListener('input',changeSiderealTime);
+
+            addEvents(document.getElementById('button-1sh'),-86164100/24);
+            addEvents(document.getElementById('button-1h'),-3600000);
+            addEvents(document.getElementById('button-1d'),-86400000);
+            addEvents(document.getElementById('button-1sd'),-86164100);
+
+            addEvents(document.getElementById('button1sh'),86164100/24);
+            addEvents(document.getElementById('button1h'),3600000);
+            addEvents(document.getElementById('button1d'),86400000);
+            addEvents(document.getElementById('button1sd'),86164100);
+        }
+        window.onload = onLoad;
+    </script>
+</head>
+<body>
+    <h1>Sternzeit und Erdposition</h1>
+    <p>
+    Das Skript berechnet Erdposition zu gegebenen Datum und Uhreit.
+
+    </p>
+    <p>
+        Alle Angaben beziehen sich auf Weltzeit (UTC), Zeitverschiebung und Sommerzeit werden nicht berücksichtigt.
+        Für Sternzeit und Grafik werden Nullmeridian und Äquator angenommen.
+    </p>
+    <table>
+        <tr>
+            <td></td>
+            <td>dd.mm.yyyy</td>
+            <td>hh:mm</td>
+            <td>Sekunden</td>
+        </tr>
+    <tr>
+        <td>Datum und Uhrzeit</td>
+        <td><input type="date" id="date" /></td>
+        <td><input type="time" id="time" /></td>
+        <td><input id="seconds" style="width:100%"/></td>
+    </tr>
+    <tr>
+    <td>Sternzeit (Greenwich)</td>
+    <td></td>
+    <td><input id="siderealTime" type="time"/></td>
+    <td></td>
+    </tr>
+    <tr>
+    <td><label for="julianDate" >Julianisches Datum</label></td>
+    <td colspan="3"><input id="julianDate" style="width:100%"/></td>
+    </tr>
+    </table>
+    <!--
+    onClick="changeTime(-86164100/24)" onClick="changeTime(-3600000)" onClick="changeTime(-86400000)" onClick="changeTime(-86164100)"
+    onClick="changeTime(86164100/24)" onClick="changeTime(3600000)" onClick="changeTime(86400000)" onClick="changeTime(86164100)"
+    -->
+    <button  id="button-1sh">-1 Sternzeitstunde</button> <button  id="button-1h">-1 Stunde</button> <button  id="button-1d">-1 Tag</button> <button  id="button-1sd">-1 Sterntag</button><br>
+    
+    <button  id="button1sh">+1 Sternzeitstunde</button> <button  id="button1h">+1 Stunde</button> <button  id="button1d">+1 Tag</button> <button  id="button1sd">+1 Sterntag</button>
+
+    <table>
+
+    <tr>
+    <td colspan="2">Zeitgleichung</td>
+    <td><span id="equationOfTime"></span></td>
+    </tr>
+    <tr>
+        <td>&nbsp;&nbsp;&nbsp;</td>
+        <td>
+            Anteil durch Neigung der Erdachse
+        </td>
+        <td><span id="equationOfTimeAxle"></span></td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>
+            Anteil durch Exzentrität
+        </td>
+        <td><span id="equationOfTimeEx"></span></td>
+    </tr>
+    <td colspan="3">Position der Erde</td>
+</tr>
+<tr>
+    <td></td>
+<td>Differenz<br>Sternzeit zu normaler Zeit</td>
+<td><span id="difference"></span></td>
+</tr>
+
+<tr>
+    <td></td>
+<td>Ekliptikale Länge</td>
+<td><span id="eclipticalLength"></span></td>
+</tr>
+<tr>
+    <td></td>
+<td>Abstand Erde-Sonne</td>
+<td><span id="earhSunDistance"></span></td>
+</tr>
+    <tr>
+        <td colspan="2">Besondere Zeitpunkte</td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>Frühlings Tag- und Nachtgleiche</td>
+        <td><span id="springEquinox"></span></td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>Sommersonnenwende</td>
+        <td><span id="summerSolstice"></span></td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>Herbst Tag- und Nachtgleiche</td>
+        <td><span id="autumnEquinox"></span></td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>Wintersonnenwende</td>
+        <td><span id="winterSolstice"></span></td>
+    </tr>
+    <tr>
+
+    </table>
+
+    <canvas id="solarSystem" width="620" height="620"></canvas>
+
+</body>
+</html>
