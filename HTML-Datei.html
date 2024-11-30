@@ -8,10 +8,10 @@
         canvas {
             background-color: white;
             display: block;
-            margin: 0 auto;
+            /*margin: 0 auto;*/
         }
         button {
-            width:150px;
+            width:100px;
         }
     </style>
     <script>
@@ -40,6 +40,7 @@
             color: 'yellow'
         };
 
+        //280
         const earth = {
             radius: 10,
             color: 'blue',
@@ -293,7 +294,13 @@
 
             const rotationMatrixEpsilon = createRotationMatrix({x:0,y:1,z:0},-epsilon*deg2rad);
             const rotationMatrxEcliptic = createRotationMatrix({x:0,y:0,z:1},phase-Math.PI/2);
-            const rotationMatrix = multiplyMatrix(rotationMatrxEcliptic,rotationMatrixEpsilon);
+
+            let rotationMatrix = multiplyMatrix(rotationMatrxEcliptic,rotationMatrixEpsilon);
+            const axleDirectionRaw = applyMatrix({x:0,y:0,z:1},rotationMatrix);
+            const axleAngleY = Math.asin(Math.sin(phase-Math.PI/2)*Math.sin(-epsilon*deg2rad));//Math.asin(axleDirectionRaw.y);
+            const rotationMatrixPlain = createRotationMatrix({x:1,y:0,z:0},axleAngleY);
+            rotationMatrix = multiplyMatrix(rotationMatrixPlain,rotationMatrix);
+            console.log("rotation",applyMatrix({x:0,y:0,z:1},rotationMatrix));
 
              // Breitengrade (horizontale Ellipsen)
             const latSteps = 5; // Anzahl der Breitengrade
@@ -324,6 +331,15 @@
             ctx.strokeStyle = "black";
             ctx.stroke();
             ctx.closePath();
+
+            // for(let i = 0; i < 5; i++) {
+            // ctx.beginPath();
+            // ctx.setLineDash([]);
+            // ctx.arc(0, 0, earthRadius/5*i, 0, Math.PI*2,false);
+            // ctx.strokeStyle = "blue";
+            // ctx.stroke();
+            // ctx.closePath();
+            // }
 
             const polygonLineLatitude = calculateLatitudePoints(earthRadius,latitude*deg2rad, rotationMatrix);
             drawPolygonLine(ctx,polygonLineLatitude,'#000000');
@@ -605,8 +621,10 @@
 
             //Tabellen-Ausgabe
 
-            const siderealTimeRelative = (((siderealTime - datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
+            const siderealTimeRelative = (((siderealTime- datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
 
+            const radek = calculateRaDekSun(eclipticalLength);
+            console.log("ra:",hoursToString(((radek.ra/Math.PI*12)+36)%24));
 
             document.getElementById("equationOfTime").innerText = hoursToString(equationOfTimeFull)+" Minuten ("+equationOfTimeFull.toFixed(2)+" Minuten)";
             document.getElementById("equationOfTimeAxle").innerText = hoursToString(equatonOfTimeWithoutTilt)+" Minuten ("+equatonOfTimeWithoutTilt.toFixed(2)+" Minuten)";
@@ -619,11 +637,11 @@
             document.getElementById("winterSolstice").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(winterSolsticeDate)) + " ("+
             radToDegString(calculateEclipticalLengthKeppler(winterSolsticeDate))+ " wahre Anomalie)";
 
-            document.getElementById("perihel").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(perihelDate)) + " "+
-            radToDegString(calculateEclipticalLengthKeppler(perihelDate));
+            document.getElementById("perihel").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(perihelDate)) + " ("+
+            radToDegString(calculateEclipticalLengthKeppler(perihelDate)) + " wahre Anomalie)";
 
-            document.getElementById("aphel").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(aphelDate)) + " "+
-            radToDegString(calculateEclipticalLengthKeppler(aphelDate));
+            document.getElementById("aphel").innerText = gregorianDateToString(calculateGregorianDateFromJulianDay(aphelDate)) + " ("+
+            radToDegString(calculateEclipticalLengthKeppler(aphelDate))+ " wahre Anomalie)";
 
 
             document.getElementById("difference").innerText = hoursToString(siderealTimeRelative) +" (entspricht ≈"+ normalizeAngleDegree(siderealTimeRelative*15-180).toFixed(4) + "° ekliptikaler Länge)";
@@ -633,12 +651,13 @@
             document.getElementById("earhSunDistance").innerText = orbitRadiusEarth.toFixed(5) +" AE ("+(orbitRadiusEarth*aeTokm).toFixed(2)+" km)";
 
             const azimutheight = calculateHAzFromRaDek(calculateRaDekSun(eclipticalLength),siderealTime/12*Math.PI+longitude*deg2rad);
-            document.getElementById("sunAzimut").innerText = radToDegString(azimutheight.azimut);
+            document.getElementById("sunAzimut").innerText = radToDegString(azimutheight.azimut) + " ("+ (azimutheight.azimut*rad2deg).toFixed(4)+"°)";
+
             document.getElementById("sunHeight").innerText = (azimutheight.height*rad2deg).toFixed(2) +"°";
             
-            document.getElementById("zenit").innerText = hoursToString(sunriseSet.zenit);
-            document.getElementById("sunrise").innerText = hoursToString(sunriseSet.rising);
-            document.getElementById("sunset").innerText = hoursToString(sunriseSet.setting);
+            document.getElementById("zenit").innerText = (sunriseSet !== false)?hoursToString(sunriseSet.zenit):"-";
+            document.getElementById("sunrise").innerText = (sunriseSet !== false)?hoursToString(sunriseSet.rising):"-";
+            document.getElementById("sunset").innerText = (sunriseSet !== false)?hoursToString(sunriseSet.setting):"-";
 
             //Grafik-Ausgabe
             canvas = document.getElementById('solarSystem');
@@ -661,6 +680,26 @@
             drawPerihelAphel();
 
             drawEarthSingle(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad);
+            //fillTable();
+
+        }
+
+        function fillTable() {
+
+            let str ="";
+            for(let day = 0; day < 365; day++) {
+                datetime.setTime(datetime.getTime()+86400000);
+                const julianDay = calculateJulianDay(datetime);
+                const equationOfTimeFull = calculateEquationOfTime(julianDay,true);
+                const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDay,false);
+                const equationOfTimeWithoutExcentric = equationOfTimeFull - equatonOfTimeWithoutTilt;
+                const siderealTime = calculateSiderealTime(julianDay);//-equationOfTimeWithoutExcentric/60/24
+                const siderealTimeRelative = (((siderealTime - equatonOfTimeWithoutTilt/60 - datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
+                const eclipticalLength = calculateEclipticalLength(julianDay)*rad2deg;
+                const delta = normalizeAngleDegree(siderealTimeRelative*15-180);
+                str +=(julianDay).toString() + " " + String(eclipticalLength) + " " + String(delta) + " " +String(equatonOfTimeWithoutTilt)+"\n";
+            }
+            document.getElementById("table").value = str;
 
         }
 
@@ -967,81 +1006,72 @@
             //Mitternacht des aktuellen Datums finden
             jd = Math.round(jd)-0.5;
 
-            const length1 = calculateEclipticalLength(jd-1);
+            //const length1 = calculateEclipticalLength(jd-1);
             const length2 = calculateEclipticalLength(jd);
-            const length3 = calculateEclipticalLength(jd+1);
+            //const length3 = calculateEclipticalLength(jd+1);
 
-            const radek1 = calculateRaDekSun(length1);
+            //const radek1 = calculateRaDekSun(length1);
             const radek2 = calculateRaDekSun(length2);
-            const radek3 = calculateRaDekSun(length3);
+            //const radek3 = calculateRaDekSun(length3);
 
             const siderealTime = calculateSiderealTime(jd)*180/12;
-            //Verbesserung: scheinbare Sternzeit
 
-            //Näherungswert für Sonnenaufgang
+            //Abweichung Zenit zu Sonnenaufgang/Untergang
             const cH0 = (Math.sin(h0*deg2rad) - Math.sin(latitude*deg2rad)*Math.sin(radek2.dek))/
             (Math.cos(latitude*deg2rad)*Math.cos(radek2.dek));
 
+            //cH0 > 1: Objekt immer sichtbar
+            //cH0 < 1: Objekt ganzen Tag nicht sichtbar
             if(cH0 < -1 || cH0 > 1) {
-                return {
-                    zenit: false,
-                    rising: false,
-                    setting: false
-                }
+                return false;
             }
 
             const H0 = Math.acos(cH0)*rad2deg;
 
-            const timequation = calculateEquationOfTime(jd,true)/60;
-            const zenit = 12 - timequation - longitude/15;
-            const rising = zenit - H0/180*12;
-            const setting = zenit + H0/180*12;
+            // Alternative Umsetzung
+            //const timequation = calculateEquationOfTime(jd,true)/60;
+            //const zenit = 12 - timequation - longitude/15;
+            //const rising = zenit - H0/180*12;
+            //const setting = zenit + H0/180*12;
 
-            //return {
-            //    zenit: zenit,
-            //    rising: rising,
-            //    setting: setting
-            //};
 
-            const DT = 80;// Sekunden
+            //Erhöhte Genauigkeit
+            //const DT = 80;
 
             //Durchgang Näherung
             const m0 = (((radek2.ra*rad2deg - longitude - siderealTime)/360)%1+1)%1;
-            const t0 = siderealTime + 360.985647*m0;
-            const n0 = m0 + DT/86400;
-            const ra0 = interpolate(radek1.ra,radek2.ra,radek3.ra,n0);
-            let DH0 = t0 + longitude - ra0*rad2deg;
-            while (DH0 > 180) DH0-=360;
-            while (DH0 < -180) DH0+=360;
-            const Dm0 = -DH0/360; 
+            //const t0 = siderealTime + 360.985647*m0;
+            //const n0 = m0 + DT/86400;
+            //const ra0 = interpolate(radek1.ra,radek2.ra,radek3.ra,n0);
+            //let DH0 = t0 + longitude - ra0*rad2deg;
+            //while (DH0 > 180) DH0-=360;
+            //while (DH0 < -180) DH0+=360;
+            //const Dm0 = -DH0/360; 
 
             //Aufgang Näherung
             let m1 = (((m0 - H0/360)%1)+1)%1;
-            for(let i = 0; i < 0; i++) {
-                const t1 = siderealTime + 360.985647*m1;
-                const ra1 = radek2.ra;//interpolate(radek1.ra,radek2.ra,radek3.ra,m1 + DT/86400);
-                const dek1 = radek2.dek;//interpolate(radek1.dek,radek2.dek,radek3.dek,m1 + DT/86400);
-                const DH1 = t1 + longitude;
-                const az_rise = calculateHAzFromRaDek({ra:ra1,dek:dek1},DH1/180*12);
-                const Dm = (az_rise.height*rad2deg - h0)/(360*Math.cos(dek1)*Math.cos(latitude*deg2rad)*Math.sin(DH1*deg2rad-ra1));
-                m1 += Dm;
-
-            }
+            // for(let i = 0; i < 0; i++) {
+            //     const t1 = siderealTime + 360.985647*m1;
+            //     const ra1 = radek2.ra;//interpolate(radek1.ra,radek2.ra,radek3.ra,m1 + DT/86400);
+            //     const dek1 = radek2.dek;//interpolate(radek1.dek,radek2.dek,radek3.dek,m1 + DT/86400);
+            //     const DH1 = t1 + longitude;
+            //     const az_rise = calculateHAzFromRaDek({ra:ra1,dek:dek1},DH1/180*12);
+            //     const Dm = (az_rise.height*rad2deg - h0)/(360*Math.cos(dek1)*Math.cos(latitude*deg2rad)*Math.sin(DH1*deg2rad-ra1));
+            //     m1 += Dm;
+            // }
             //Untergang Näherung
             const m2 = (((m0 + H0/360)%1)+1)%1;
-            const t2 = siderealTime + 360.985647*m2;
-            const n2 = m2 + DT/86400;
-            const ra2 = interpolate(radek1.ra,radek2.ra,radek3.ra,n2);
-            const DH2 = t2 + longitude - ra0;
-            const Dm2 = -DH2/360; 
+            // const t2 = siderealTime + 360.985647*m2;
+            // const n2 = m2 + DT/86400;
+            // const ra2 = interpolate(radek1.ra,radek2.ra,radek3.ra,n2);
+            // const DH2 = t2 + longitude - ra0;
+            // const Dm2 = -DH2/360; 
 
             return {
-                zenit: (m0+Dm0)*24,
+                zenit: (m0)*24,
                 rising: (m1)*24,
                 setting: m2*24
             };
-
-
         }
 
         function calculateEclipticalLengthKeppler(jd) {
@@ -1209,19 +1239,23 @@
             const dmsRegex = /^(\d{1,3})°\s*(\d{1,2})'\s*(\d{1,2}(\.\d+)?)"?\s*([NSWE])$/;
 
             let feedbackElement = document.getElementById(`${type}-feedback`);
+            let inputElement = document.getElementById(`${type}`);
 
             let value = NaN;
 
             if (decimalRegex.test(input)) {
-                feedbackElement.textContent = "Gültiges Dezimalformat!";
+                //feedbackElement.textContent = "Gültiges Dezimalformat!";
                 feedbackElement.className = "feedback valid";
+                inputElement.style.borderColor="";
                 value = parseFloat(input);
             } else if (dmsRegex.test(input)) {
-                feedbackElement.textContent = "Gültiges DMS-Format!";
+                //feedbackElement.textContent = "Gültiges DMS-Format!";
                 feedbackElement.className = "feedback valid";
+                inputElement.style.borderColor="";
                 value = dmsToDecimal(input);
             } else {
-                feedbackElement.textContent = "Ungültiges Koordinatenformat!";
+                inputElement.style.borderColor="red";
+                //feedbackElement.textContent = "Ungültiges Koordinatenformat!";
                 feedbackElement.className = "feedback invalid";
             }
 
@@ -1350,11 +1384,10 @@
         Inspiriert von der Frage, welche Bahn die Sonne am Himmel zieht und wann sie untergeht, ist dieses kleine Erde-Sonne-Modell entstanden. Aus einer externen Perspektive lassen sich die Auswirkungen der Erdrotation, der geneigten Erdachse und der elliptischen Bewegung um die Sonne deutlich besser verstehen und nachvollziehen als aus der Sicht der bewegten Erde selbst. Neben der Betrachtung der Sonnenbahn ist die Ausrichtung von Erde und Sonne auch entscheidend für die sichtbaren Sternbilder im Verlauf des Jahres und dient als Orientierung im Universum.
     </p>
     <p>
-        Das Modell berechnet Erdposition und Richtung des Nullmeridians für einen Zeitpunkt. Alle Angaben beziehen sich auf Weltzeit (UTC), Zeitverschiebung und Sommerzeit werden nicht berücksichtigt.
+        Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Alle Angaben beziehen sich auf Weltzeit (UTC), Zeitverschiebung und Sommerzeit werden nicht berücksichtigt.
     </p>
 
-
-    <div>Beobachtungsort auf Erde
+    <div style="background-color: #EEEEEE;padding:5px">Beobachtungsort auf Erde
     <table style="margin-left:1em">
         <tr>
             <td><label for="latitude">Breitengrad</label></td>
@@ -1370,7 +1403,7 @@
     <button onClick="saveData()" style="width:300px;margin-left:1em">Ort für nächsten Seitenaufruf lokal merken</button>
     </div>
 <p></p>
-    <div>Zeit
+    <div style="background-color: #EEEEEE;padding:5px">Zeit
     <table style="margin-left:1em">
         <tr>
             <td></td>
@@ -1400,13 +1433,25 @@
     onClick="changeTime(-86164100/24)" onClick="changeTime(-3600000)" onClick="changeTime(-86400000)" onClick="changeTime(-86164100)"
     onClick="changeTime(86164100/24)" onClick="changeTime(3600000)" onClick="changeTime(86400000)" onClick="changeTime(86164100)"
     -->
+<div style ="float:left;">
+
     <canvas id="solarSystem" width="620" height="620"></canvas>
-    <button  id="button-1m">-1 Minute</button> <button  id="button-1h">-1 Stunde</button> <button  id="button-1d">-1 Tag</button> <button  id="button-1sd">-1 Sterntag</button><br>
-    
-    <button  id="button1m">+1 Minute</button> <button  id="button1h">+1 Stunde</button> <button  id="button1d">+1 Tag</button> <button  id="button1sd">+1 Sterntag</button>
+    <p>
+        Erdbahn um die Sonne
+    </p>
+
 
     <canvas id="earth" width="550" height="410"></canvas>
-    
+</div>
+<div>
+<button  id="button-1m" style = "float:left; margin: 2px;">-1 Minute</button> <button  id="button1m" style = "float:left; margin: 2px;">+1 Minute</button><br>
+
+<button  id="button-1h" style = "float:left; margin: 2px;">-1 Stunde</button> <button  id="button1h" style = "float:left; margin: 2px;">+1 Stunde</button>
+<br>
+<button  id="button-1d" style = "float:left; margin: 2px;">-1 Tag</button> <button  id="button1d" style = "float:left; margin: 2px;">+1 Tag</button> 
+<br>
+<button  id="button-1sd" style = "float:left; margin: 2px;">-1 Sterntag</button><button  id="button1sd" style = "float:left; margin: 2px;">+1 Sterntag</button>
+</div>
     <table>
 
     <tr>
@@ -1454,7 +1499,7 @@
 <td><span id="earhSunDistance"></span></td>
 </tr>
     <tr>
-        <td colspan="2">Besondere Zeitpunkte</td>
+        <td colspan="2">Zeitpunkte besonderer Erdposition im Jahr</td>
     </tr>
     <tr>
         <td></td>
@@ -1516,6 +1561,8 @@
         <td><span id="sunHeight"></span></td>
     </tr>
     </table>
+
+    <textarea id="table"></textarea>
 
 
     <p>
