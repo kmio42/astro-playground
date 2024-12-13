@@ -1381,12 +1381,9 @@
 </head>
 <body>
     <h1>Sternzeit und Erdposition</h1>
-    <p>
-        Inspiriert von der Frage, welche Bahn die Sonne am Himmel zieht und wann sie untergeht, ist dieses kleine Erde-Sonne-Modell entstanden. Aus einer externen Perspektive lassen sich die Auswirkungen der Erdrotation, der geneigten Erdachse und der elliptischen Bewegung um die Sonne deutlich besser verstehen und nachvollziehen als aus der Sicht der bewegten Erde selbst. Neben der Betrachtung der Sonnenbahn ist die Ausrichtung von Erde und Sonne auch entscheidend für die sichtbaren Sternbilder im Verlauf des Jahres und dient als Orientierung im Universum.
+    <p>Inspiriert von der Frage, welche Bahn die Sonne am Himmel zieht und wann sie untergeht, ist dieses kleine Erde-Sonne-Modell entstanden. Aus einer externen Perspektive lassen sich die Auswirkungen der Erdrotation, der geneigten Erdachse und der elliptischen Bewegung um die Sonne deutlich besser verstehen und nachvollziehen als aus der Sicht der bewegten Erde selbst. Neben der Betrachtung der Sonnenbahn ist die Ausrichtung von Erde und Sonne auch entscheidend für die sichtbaren Sternbilder im Verlauf des Jahres und dient als Orientierung im Universum.
     </p>
-    <p>
-        Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Alle Angaben beziehen sich auf Weltzeit (UTC), Zeitverschiebung und Sommerzeit werden nicht berücksichtigt.
-    </p>
+    <p>Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Alle Angaben beziehen sich auf Weltzeit (UTC), Zeitverschiebung und Sommerzeit werden nicht berücksichtigt. Die Knöpfe für Modifikation der Zeit können gedrückt gehalten werden.</p>
 
     <div style="background-color: #EEEEEE;padding:5px">Beobachtungsort auf Erde
     <table style="margin-left:1em">
@@ -1401,7 +1398,7 @@
             <td><span id="longitude-feedback" class="feedback"></span></td>
         </tr>
     </table>
-    <button onClick="saveData()" style="width:300px;margin-left:1em">Ort für nächsten Seitenaufruf lokal merken</button>
+    <button onClick="saveData()" style="margin-left:1em;width: fit-content;">Ort für nächsten Seitenaufruf lokal merken</button>
     </div>
 <p></p>
     <div style="background-color: #EEEEEE;padding:5px">Zeit
@@ -1444,30 +1441,31 @@
 
     <canvas id="earth" width="550" height="410"></canvas>
 </div>
-<div>
-<button  id="button-1m" style = "float:left; margin: 2px;">-1 Minute</button> <button  id="button1m" style = "float:left; margin: 2px;">+1 Minute</button><br>
+<div style ="position: relative;margin: 20px 0;padding: 20px;height: 1000px;">
+<div style ="position: sticky; top: 15px;padding: 10px;">
+<button  id="button-1m" style = "float:left; margin: 2px; width: 8em;">-1 Minute</button> <button  id="button1m" style = "float:left; margin: 2px;width: 8em;">+1 Minute</button><br>
 
-<button  id="button-1h" style = "float:left; margin: 2px;">-1 Stunde</button> <button  id="button1h" style = "float:left; margin: 2px;">+1 Stunde</button>
+<button  id="button-1h" style = "float:left; margin: 2px; width: 8em;">-1 Stunde</button> <button  id="button1h" style = "float:left; margin: 2px;width: 8em;">+1 Stunde</button>
 <br>
-<button  id="button-1d" style = "float:left; margin: 2px;">-1 Tag</button> <button  id="button1d" style = "float:left; margin: 2px;">+1 Tag</button> 
+<button  id="button-1d" style = "float:left; margin: 2px; width: 8em;">-1 Tag</button> <button  id="button1d" style = "float:left; margin: 2px;width: 8em;">+1 Tag</button>
 <br>
-<button  id="button-1sd" style = "float:left; margin: 2px;">-1 Sterntag</button><button  id="button1sd" style = "float:left; margin: 2px;">+1 Sterntag</button>
+<button  id="button-1sd" style = "float:left; margin: 2px; width: 8em;">-1 Sterntag</button><button  id="button1sd" style = "float:left; margin: 2px;width: 8em;">+1 Sterntag</button>
 </div>
-    <table>
+</div>
+     <table style="display:block;clear:left">
 
     <tr>
     <td colspan="2">Zeitgleichung</td>
     <td><span id="equationOfTime"></span></td>
     </tr>
     <tr>
-        <td>&nbsp;&nbsp;&nbsp;</td>
+        <td rowspan="2">&nbsp;&nbsp;&nbsp;</td>
         <td>
             Anteil durch Neigung der Erdachse
         </td>
         <td><span id="equationOfTimeAxle"></span></td>
     </tr>
     <tr>
-        <td></td>
         <td>
             Anteil durch Exzentrität
         </td>
@@ -1477,103 +1475,163 @@
 </tr>
 
 <tr>
-    <td></td>
+    <td rowspan = "4"></td>
 <td>Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
 <td><span id="eclipticalLength"></span></td>
 </tr>
 
 <tr>
-    <td></td>
 <td>Wahre Anomalie<br>(Winkel zum Perihel)</td>
 <td><span id="eclipticalLengthKeppler"></span></td>
 </tr>
 
 <tr>
-    <td></td>
 <td>&Delta; (UTC-Sternzeit)</td>
 <td><span id="difference"></span></td>
 </tr>
 
 <tr>
-    <td></td>
 <td>Abstand Erde-Sonne</td>
 <td><span id="earhSunDistance"></span></td>
 </tr>
     <tr>
-        <td colspan="2">Zeitpunkte besonderer Erdposition im Jahr</td>
+        <td colspan="3">Zeitpunkte besonderer Erdposition im Jahr</td>
     </tr>
     <tr>
-        <td></td>
+        <td rowspan="6"></td>
         <td>Perihel (grober Näherungswert)</td>
         <td><span id="perihel"></span></td>
     </tr>
     <tr>
-        <td></td>
         <td>Aphel (grober Näherungswert)</td>
         <td><span id="aphel"></span></td>
     </tr>
     <tr>
-        <td></td>
-        <td>Frühlings Tag- und Nachtgleiche</td>
+        <td>Frühlingsäquinoktium (Tag- und Nachtgleiche)</td>
         <td><span id="springEquinox"></span></td>
     </tr>
     <tr>
-        <td></td>
-        <td>Sommersonnenwende</td>
+        <td>Sommersolstitium (Sonnenwende)</td>
         <td><span id="summerSolstice"></span></td>
     </tr>
     <tr>
-        <td></td>
-        <td>Herbst Tag- und Nachtgleiche</td>
+        <td>Herbstäquinoktium (Tag- und Nachtgleiche)</td>
         <td><span id="autumnEquinox"></span></td>
     </tr>
     <tr>
-        <td></td>
-        <td>Wintersonnenwende</td>
+        <td>Wintersolstitium (Sonnenwende)</td>
         <td><span id="winterSolstice"></span></td>
     </tr>
-    
+
     <tr>
         <td colspan = "3">Ortsbezogene Daten</td>
     </tr>
     <tr>
-        <td></td>
-        <td>Sonnenaufgang</td>
-        <td><span id="sunrise"></td>
+        <td rowspan = "5"></td>
+        <td>Höhe Sonne</td>
+        <td><span id="sunHeight"></span></td>
     </tr>
     <tr>
-        <td></td>
-        <td>Zenit</td>
-        <td><span id="zenit"></span></td>
-    </tr>
-    <tr>
-        <td></td>
-        <td>Sonnenuntergang</td>
-        <td><span id="sunset"></span></td>
-    </tr>
-    <tr>
-        <td></td>
         <td>Azimut Sonne</td>
         <td><span id="sunAzimut"></span></td>
     </tr>
     <tr>
-        <td></td>
-        <td>Höhe Sonne</td>
-        <td><span id="sunHeight"></span></td>
+        <td>Sonnenaufgang</td>
+        <td><span id="sunrise"></td>
     </tr>
+    <tr>
+        <td>Sonnendurchgang (wahrer Mittag)</td>
+        <td><span id="zenit"></span></td>
+    </tr>
+    <tr>
+        <td>Sonnenuntergang</td>
+        <td><span id="sunset"></span></td>
+    </tr>
+
+
     </table>
 
-    <textarea id="table"></textarea>
+    <!--<textarea id="table"></textarea>-->
 
 
-    <p>
-        Mein erster Ansatz für dieses Projekt bestand in Anfragen an ChatGPT in dem Stil: &bdquo;Schreibe mir ein Programm, dass <tt>xxx</tt> berechnet/zeigt&rdquo;
-        Nach zunächst überraschend positiven Ergebnissen musste ich jedoch einsehen, dass ChatGPT alleine nicht hilft.
-        Spätestens als Berechnungen falsch waren oder ChatGPT felsenfest falsche Dinge behauptete, musste ich tiefer in die Grundlagen einsteigen.
-        Die nun verwendeten Formeln stammen aus dem Buch &ldquo;Astronomische Algorithmen&rdquo; von Jean Meuss. Es sind Näherungsformeln,
-        die für einige Jahrzehnte/Jahrhunderte um die aktuelle Zeit angemessen gut funktionieren.
-        Das Ziel lag mehr auf Nachvollziehbarkeit der wichtigsten Einflüsse - Elliptische Bahn mit Sonne im Brennpunkt statt Kreisbahn und Neigung der Erdachse - 
-        als auf extreme Genauigkeit.
-    </p>
+<h2>Hintergründe und Begriffe</h2>
+<table>
+<tr>
+<td valign="top">Sternzeit</td>
+<td>Die Erde dreht sich sowohl um ihre eigene Achse, als auch um die Sonne. Die Sternzeit berücksichtigt nur die Drehung um die eigene Achse - jeden Tag zur gleichen Sternzeit hat die Erde die gleiche Blickrichtung ins Universum (die Position auf der Bahn um die Sonne wird vernachlässigt). Ein Sterntag ist ca. 4 Minuten kürzer als ein normaler Tag und lässt sich in 24 Sternzeitstunden teilen. Die Sternzeit ist ortsabhängig.
+</td>
+</tr>
+<tr>
+<td valign="top">Julianisches Datum</td><td>Ein in der Astronomie verwendetes Zeitmaß. Es zählt fortlaufend die Anzahl der Tage seit dem 1. Januar 4713 v.Chr. Ein Tag beginnt um 12 Uhr Mittags in Greenwich (Nullmeridian), Uhrzeiten werden als Bruchteile eines Tages angegeben. Das Julianische Datum hat seinen Ursprung in einem 1583 n.Chr. erschienenen Buch von Joseph Scaliger, das verschiedene Kalendersysteme beleuchtete. Die genaue Messung und Referenzierung der Zeit stellt auch heute noch einige Herausforderungen. Zwar haben wir mittlerweile sehr gleichmäßig laufende Atomuhren, über Jahrhunderte hinweg dienten jedoch astronomische Beobachtung als Referenz. Die koordinierte Weltzeit (UTC) ist letztlich ein Kompromiss aus internationaler Atomzeit und astronomisch basierter Universalzeit.
+</tr>
+<tr>
+<td valign="top">Zeitgleichung</td>
+<td>Im Durchschnitt vergehen genau 24 Stunden, bis die Sonne zum Mittag wieder im Süden steht. Durch die Neigung der Erdachse und der elliptischen Bahn um die Sonne schwankt die genaue Zeitdauer innerhalb eines Jahres. Die Zeitgleichung gibt die Differenz der "wahren Sonnenzeit" (Zeit, die eine Sonnenuhr zeigt) zur "mittleren Zeit" (Zeit auf der Uhr) an. Dieser Unterschied kann bis zu 20 Minuten betragen und ändert sich im Laufe des Jahres.
+</td>
+</tr>
+<tr>
+<td valign="top">Ekliptikale Länge</td>
+<td>Die Erde bewegt sich (annähernd) in einer Ebene um die Sonne, diese Ebene wird Ekliptik genannt. Die Ekliptikale Länge gibt den Winkel der Erde in Bezug zum Frühlingspunkt an.
+</td>
+</tr>
+<tr>
+<td valign="top">Frühlingspunkt</td><td>Der Frühlingspunkt ergibt sich aus der Position von Erde und Sonne zum Frühlingsäquinoktium - das ist der genaue Zeitpunkt der Tag- und Nachtgleichen im März.
+Die Richtung, die die Sonne zu diesem Zeitpunkt hat, gilt als Referenz für astronomische Koordinatensysteme (ekliptisches und äquatoriales Koordinatensystem). Da sich die Erde nicht auf einer perfekten Bahn um die Sonne bewegt, verschiebt sich der Frühlingspunkt geringfügig im Laufe der Zeit. Als Bezugsangabe ist es daher wichtig, von welchem Frühlingspunkt die Rede ist.</td>
+</tr>
+<tr>
+<td>Wahre Anomalie</td>
+<td>Die "wahre Anomalie" ist eine weitere Bezugsangabe der Erdposition. Sie gibt den Winkel zwischen Schwerpunkt des Sonnensystems, Perihel (Punkt, der auf der elliptischen Bahn am nächsten am Schwerpunkt ist) und Erde an. In guter Vereinfachung lässt sich die Sonne als Schwerpunkt annehmen. Die "wahre Anomalie" entsteht aus der Berechnung der Planetenbahn (Kepplergleichung) und ist bis auf den Bezugspunkt sehr ähnlich zur Ekliptikalen Länge. Durch die unterschiedlichen Definitionen werden jedoch verschiedene Effekte berücksichtigt, die zu kleinen Abweichungen führen.
+</td>
+</tr>
+<tr>
+<td valign="top">Δ (UTC-Sternzeit)</td>
+<td>Die Differenz aus normaler Uhrzeit (Stunden und Minuten) und Sternzeit ist zwar keine formale Angabe, beschreibt aber einen interessanten Zusammenhang: Zur ersten Sonnendurchquerung nach dem Frühlingsäquinoktium - besteht eine definierte Differenz von 12 Stunden, anschließend laufen die Uhren je Tag um ca. 4 Minuten auseinander. Aus der Differenz lässt sich somit auf die Position schließen. Eine Abweichung entsteht durch die Exzentrik - die Umrechnung von Differenz in ekliptikale Länge schwankt genau um diesen Anteil der Zeitgleichung. Der Anteil der geneigten Erdachse wird dagegen indirekt berücksichtigt. Daneben gibt es nur eine kleine konstante Verschiebung die sich aus der Definition der Sternzeit ergibt.
+</td>
+</tr>
+<tr>
+<td valign="top">Perihel</td>
+<td>Perihel ist der Punkt, an dem die Erde am nächsten zur Sonne ist. Die Erde beschreibt eine leicht elliptische Bahn um die Sonne, die Sonne steht dabei in einem der Brennpunkte der Ellipse.
+Die beiden Brennpunkte der Ellipse sind in der Grafik der Erdbahn als kleine schwarze Punkte dargestellt. Die Sonne ist natürlich in der Darstellung viel zu groß, real befindet sie sich im rechten Brennpunkt. Die Erde bewegt sich in der Nähe des Perihels schneller auf ihrer Bahn um die Sonne, aktuell ist also der Winter auf der Nordhalbkugel etwas kürzer, als der Sommer.
+Im Jahr 1246 fielen Frühlingsäquinoktium und Perihel zusammen.
+Eine direkte Berechnung des Perihels ohne iterative Näherung ist nicht einfach. Der angegebene Wert entstammt einer Formel aus dem Buch "Astronomische Algorithmen" von Jean Meuss. Es wurde bewusst auf eine iterative Lösung verzichtet (diese kann selbst gefunden werden).
+</td>
+</tr>
+<tr>
+<td valign="top">Aphel</td>
+<td>Aphel ist der Punkt, an dem die Erde die größte Entfernung zur Sonne hat.</td>
+</tr>
+<tr>
+<td valign="top">Frühlingsäquinoktium</td>
+<td>
+Das Äquinoktium (lateinisch für „gleiche Nacht“) ist genau der Zeitpunkt, zu dem die Tag- und Nachtgleiche eintritt, bzw. die Sonne den Äquator überschreitet. Zu diesem Zeitpunkt ist die Erdachse nur seitlich zur Sonne geneigt, auf jedem Breitengrad wird genau die Hälfte von der Sonne beschienen.
+
+Das Frühlingsäquinoktium ist der wichtigste Bezugspunkt im astronomischen Jahr: Sternzeit, sowie ekliptikales und äquatoriales Koordinatensystem beziehen sich darauf. Außerdem markiert es den Beginn der Tierkreiszeichen (Sternzeichen). Bis zur Einführung des julianischen Kalenders im Jahr 45v.Chr. war der März der erste Monat des römischen Jahres.
+</td>
+</tr>
+<td valign="top">Sommersolstitium/ Wintersolstitium</td>
+<td>Das Solstitium (lateinisch für „Sonnenstillstand“) ist der Zeitpunkt im Jahr, an dem die Sonne ihren höchsten oder tiefsten Stand am Himmel erreicht. Dies markiert den Beginn des astronomischen Sommers oder Winters. Zur Sommersonnenwende ist der Tag auf der Nordhalbkugel am längsten, zur Wintersonnenwende am kürzesten.
+</td>
+</tr>
+<tr>
+<td>Höhe/Azimut</td>
+<td>Höhe und Azimut sind Angaben des horizontalen Koordinatensystems. Höhe gibt den Winkel zum Horizont an, Azimut die Richtung. Der Blick nach Süden, Westen, Norden, Osten entprechen 0°, 90°, 180° udn 270°, </td>
+</tr>
+<tr>
+<td valign="top">Sonnenaufgang/ Sonnenuntergang</td>
+<td>Sonnenaufgang ist der Moment an dem die Sonne gerade so sichtbar wird, Sonnenuntergang der Moment, an dem sie gerade so verschwindet. Durch Lichtbrechung (Refraktion) befindet sich die Sonne in Wirklichkeit schon unterhalb des Horizontes, obwohl sie noch sichtbar ist. Der Effekt ist unter anderem abhängig von der Lufttemperatur, Druck und Höhe des Beobachters und sorgt für kleine Abweichungen . Neben dem Begriff der Sonnenauf- und Untergänge, gibt es noch verschiedene Phasen der Dämmerung: Bürgerliche Dämmerung, nautische Dämmerung und astronomische Dämmerung.
+Sonnenauf- und Untergang sind symmetrisch zum Sonnendurchgang.
+</td>
+</tr>
+<tr>
+<td valign="top">Sonnendurchgang</td>
+<td>Sonnendurchgang bezeichnet den Moment, in dem die Sonne den höchsten Punkt ihrer täglichen Bahn am Himmel erreicht. Dies wird auch als Kulmination der Sonne bezeichnet, der Meridian (Längengrad des Beobachters) ist dann genau zur Sonne ausgerichtet. Der Sonnendurchgang (in Weltzeit) ergibt sich aus der Zeitgleichung und der geographischen Länge des Beobachters. In lokaler Zeit sind noch Zeitzonen zu berücksichtigen.
+</td>
+</tr>
+</table>
+
+<h2>Entstehung und Fazit des Projektes</h2>
+<p>Mein erster Ansatz für dieses Projekt bestand in Anfragen an ChatGPT in dem Stil: &bdquo;Schreibe ein Programm in (Javascript/C/Python), dass <tt>xyz</tt> berechnet/zeigt&rdquo; Nach zunächst überraschend positiven Ergebnissen musste ich jedoch einsehen, dass ChatGPT alleine nicht hilft (auch wenn es gute Anregungen geben und unterstützen kann). Spätestens als Berechnungen falsch waren oder ChatGPT felsenfest falsche Dinge behauptete, musste ich tiefer in die Grundlagen einsteigen. Die nun verwendeten Formeln stammen aus dem Buch &ldquo;Astronomische Algorithmen&rdquo; von Jean Meuss. Es sind Näherungsformeln, die teilweise für einige Jahrzehnte, teils für Jahrhunderte um das aktuelle Datum angemessen gut funktionieren. Mithilfe der interaktiven Darstellung können spezielle Fälle veranschaulicht und Näherungslösungen gefunden werden. Besonders durch die grafischen Darstellungen wurde deutlich, welche Aspekte zusammenspielen und ggf. genauer berücksichtigt werden müssen. Die Implementierung sollte mir gleichermaßen ein Verständnis vermitteln, als auch eine Referenz für mögliche, zukünftige Mikrocontroller-Projekte geben.
+</p>
+
 </body>
 </html>
