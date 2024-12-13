@@ -297,11 +297,11 @@
 
             let rotationMatrix = multiplyMatrix(rotationMatrxEcliptic,rotationMatrixEpsilon);
             const axleDirectionRaw = applyMatrix({x:0,y:0,z:1},rotationMatrix);
-            const axleAngleY = Math.asin(Math.cos(phase-Math.PI/2)*Math.sin(-epsilon*deg2rad));//Math.asin(axleDirectionRaw.y);
+            const axleAngleY = Math.asin(Math.sin(phase-Math.PI/2)*Math.sin(-epsilon*deg2rad));//Math.asin(axleDirectionRaw.y);
             const rotationMatrixPlain = createRotationMatrix({x:1,y:0,z:0},axleAngleY);
             rotationMatrix = multiplyMatrix(rotationMatrixPlain,rotationMatrix);
             //console.log("rotation",applyMatrix({x:0,y:0,z:1},rotationMatrix));
-            rotationMatrix = createRotationMatrix({x:0,y:1,z:0},axleAngleY);
+            //rotationMatrix = createRotationMatrix({x:0,y:1,z:0},axleAngleY);
 
              // Breitengrade (horizontale Ellipsen)
             const latSteps = 5; // Anzahl der Breitengrade
@@ -347,7 +347,7 @@
 
             ctx.lineWidth = 2;
             const longitude = 90*Math.PI/180;
-            const polygonLineLongitude = calculateLongitudePoints(earthRadius,phase-indicatorDirection+Math.PI, rotationMatrix);
+            const polygonLineLongitude = calculateLongitudePoints(earthRadius,-indicatorDirection-Math.PI/2, rotationMatrix);
             drawPolygonLine(ctx,polygonLineLongitude,'#FF0000');
             ctx.lineWidth = 1;
         }
