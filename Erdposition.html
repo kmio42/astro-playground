@@ -553,6 +553,9 @@
             //const eclipticalLength = orbitLengthEarth-springEquinoxLength;
             const eclipticalLength = calculateEclipticalLength(julianDate);
 
+            const moon = calculateMoon(julianDate);
+            console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
+
             //console.log(springEquinoxLength*rad2deg,orbitLengthEarth*rad2deg,(springEquinoxLength-orbitLengthEarth)*rad2deg);
 
             //Sonnenauf- und Untergang
@@ -563,7 +566,7 @@
             const siderealTimeRelative = (((siderealTime- datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
 
             const radek = calculateRaDekSun(eclipticalLength);
-            console.log("ra:",hoursToString(((radek.ra/Math.PI*12)+36)%24));
+            //console.log("ra:",hoursToString(((radek.ra/Math.PI*12)+36)%24));
 
             document.getElementById("equationOfTime").innerText = hoursToString(equationOfTimeFull)+" Minuten ("+equationOfTimeFull.toFixed(2)+" Minuten)";
             document.getElementById("equationOfTimeAxle").innerText = hoursToString(equatonOfTimeWithoutTilt)+" Minuten ("+equatonOfTimeWithoutTilt.toFixed(2)+" Minuten)";
@@ -1169,54 +1172,256 @@
             return JDE+correction;
         }
 
-        // function calculateMoon(jd) {
-        //     const T = calculateJulianEpoch(jd);
-        //
-        //     //Mittlere Länge des Mondes
-        //     const L0_Mond =  normalizeAngleDegree(218.31617 + T*(481267.88088 - 4.06*T/3600))*deg2rad;
-        //
-        //     //Mittlere Anomalie des Mondes
-        //     const l = normalizeAngleDegree(134.96292 + T*(477198.86753 + 33.25*T/3600))*deg2rad;
-        //
-        //     // Mittlere Anomalie der Sonne (Formel 24.3)
-        //     const l_Sonne = normalizeAngleDegree((357.52910 + T * (35999.05030 -  T*(0.0001559 + T*0.00000048))))*deg2rad;
-        //
-        //     // Mittlere Abstand des Mondes vom aufsteigenden Knoten
-        //     const F = normalizeAngleDegree(93.27283 + T*(483202.01873 - 11.56*T/3600))*deg2rad;
-        //
-        //     //Mittlere Elongation = Differenz der Längen von Sonne und Mond
-        //     const D = normalizeAngleDegree(297.85027 + T*(445267.11135 - 5.15*T/3600))*deg2rad;
-        //
-        //     const DL =   (22640 * Math.sin( 1) //große Ungleichheit
-        //                 - 4586 * Math.sin(l- 2*D) //Evektion
-        //                 + 2370 * Math.sin(2*D) //Variation
-        //                 +  769 * Math.sin(21) //große Ungleichheit
-        //                 -  668 * Math.sin(l_Sonne) //jährliche Gleichung
-        //                 -  412 * Math.sin(2*F) //Reduktion auf Ekliptik
-        //                 -  212 * Math.sin(2*l - 2*D)
-        //                 -  206 * Math.sin(l + l_Sonne - 2*D)
-        //                 +  192 * Math.sin(l + 2*D)
-        //                 -  165 * Math.sin(l_Sonne - 2*D)
-        //                 +  148 * Math.sin(l - l_Sonne)
-        //                 -  125 * Math.sin( D)
-        //                 -  110 * Math.sin( 1+ l_Sonne)
-        //                 -   55 * Math.sin (2*F - 2*D))/3600*deg2rad;
-        //
-        //     const L = L0_Mond + DL;
-        //
-        //     const S = F + DL + (412*sin(2*F)+541*sin(l_Sonne))/3600*deg2rad;
-        //
-        //     const N = (-526 * Math.sin(     F-2*D)
-        //               + 44 * Math.sin( l + F-2*D)
-        //               - 31 * Math.sin(-l + F-2*D)
-        //               - 23 * Math.sin(l_Sonne + F-2*D)
-        //               + 11 * Math.sin(-l_Sonne+ F-2*D)
-        //               - 25 * Math.sin(-2*l + F)
-        //               + 21 * Math.sin(-l   + F))/3600*deg2rad;
-        //     const B = (18520/3600*sin(S)*deg2rad+N);
-        //
-        //     //const sinPi = 0.999953253*(3422.7 +1sin II
-        // }
+        function calculateMoon(jd) {
+            const T = calculateJulianEpoch(jd);
+
+            //Mittlere Länge des Mondes mit kontanten Term Lichtzeit (45.1)
+            const l =  normalizeAngleDegree(218.3164591 + T*(481267.88134236 - 0.0013268*T) + T**3/538841 - T**4/65194000)*deg2rad;
+
+            //Mittlere Elongation = Differenz der Längen von Sonne und Mond (45.2)
+            const D = normalizeAngleDegree(297.8502042 + T*(445267.1115168 - T*0.0016300) + T**3/545868 - T**4/113065000)*deg2rad;
+
+            // Mittlere Anomalie der Sonne (45.3)
+            const M = normalizeAngleDegree(357.5291092 + T * (35999.0502909 + T * (-0.0001536 + T/24490000)))*deg2rad;
+
+            //Mittlere Anomalie des Mondes (45.4)
+            const m = normalizeAngleDegree(134.9634114 + T*(477198.8676313 + 0.0089970*T) + T**3/69699 - T**4/14712000)*deg2rad;
+
+            // Mittlere Abstand des Mondes vom aufsteigenden Knoten (45.5)
+            const F = normalizeAngleDegree(93.2720993 + T*(483202.0175273 - 0.0034029*T) - T**3/3526000 + T**4/863310000)*deg2rad;
+
+            //console.log("Mond L', D, M, M',F:",l*rad2deg,D*rad2deg,M*rad2deg,m*rad2deg,F*rad2deg);
+
+
+            const A1 = normalizeAngleDegree(119.75 +    131.849*T)*deg2rad;
+            const A2 = normalizeAngleDegree( 53.09 + 479264.290*T)*deg2rad;
+            const A3 = normalizeAngleDegree(313.45 + 481266.484*T)*deg2rad;
+
+            //Änderung der Exzentrität der Erde
+            const E = 1 + T*( -0.002516 - 0.0000074*T);
+
+            //Tabelle 45.1
+            // D, M, m, F, suml, sumr
+            const ta = [
+                [0, 0, 1, 0, 6288774, -20905355],
+                [2, 0, -1, 0, 1274027, -3699111],
+                [2, 0, 0, 0, 658314, -2955968],
+                [0, 0, 2, 0, 213618, -569925],
+
+                [0, 1, 0, 0, -185116, 48888],
+                [0, 0, 0, 2, -114332, -3149],
+                [2, 0, -2, 0, 58793, 246158],
+                [2, -1, -1, 0, 57066, -152138],
+
+                [2, 0, 1, 0, 53322, -170733],
+                [2, -1, 0, 0, 45758, -204586],
+                [0, 1, -1, 0, -40923, -129620],
+                [1, 0, 0, 0, -34720, 108743],
+
+                [0, 1, 1, 0, -30383, 104755],
+                [2, 0, 0, -2, 15327, 10321],
+                [0, 0, 1, 2, -12528, 0],
+                [0, 0, 1, -2, 10980, 79661],
+
+                [4, 0, -1, 0, 10675, -34782],
+                [0, 0, 3, 0, 10034, -23210],
+                [4, 0, -2, 0, 8548, -21636],
+                [2, 1, -1, 0, -7888, 24208],
+
+                [2, 1, 0, 0, -6766, 30824],
+                [1, 0, -1, 0, -5163, -8379],
+                [1, 1, 0, 0, 4987, -16675],
+                [2, -1, 1, 0, 4036, -12831],
+
+                [2, 0, 2, 0, 3994, -10445],
+                [4, 0, 0, 0, 3861, -11650],
+                [2, 0, -3, 0, 3665, 14403],
+                [0, 1, -2, 0, -2689, -7003],
+
+                [2, 0, -1, 2, -2602, 0],
+                [2, -1, -2, 0, 2390, 10056],
+                [1, 0, 1, 0, -2348, 6322],
+                [2, -2, 0, 0, 2236, -9884],
+
+                [0, 1, 2, 0, -2120, 5751],
+                [0, 2, 0, 0, -2069, 0],
+                [2, -2, -1, 0, 2048, -4950],
+                [2, 0, 1, -2, -1773, 4130],
+
+                [2, 0, 0, 2, -1595, 0],
+                [4, -1, -1, 0, 1215, -3958],
+                [0, 0, 2, 2, -1110, 0],
+                [3, 0, -1, 0, -892, 3258],
+
+                [2, 1, 1, 0, -810, 2616],
+                [4, -1, -2, 0, 759, -1897],
+                [0, 2, -1, 0, -713, -2117],
+                [2, 2, -1, 0, -700, 2354],
+
+                [2, 1, -2, 0, 691, 0],
+                [2, -1, 0, -2, 596, 0],
+                [4, 0, 1, 0, 549, -1423],
+                [0, 0, 4, 0, 537, -1117],
+
+                [4, -1, 0, 0, 520, -1571],
+                [1, 0, -2, 0, -487, -1739],
+                [2, 1, 0, -2, -399, 0],
+                [0, 0, 2, -2, -381, -4421],
+
+                [1, 1, 1, 0, 351, 0],
+                [3, 0, -2, 0, -340, 0],
+                [4, 0, -3, 0, 330, 0],
+                [2, -1, 2, 0, 327, 0],
+
+                [0, 2, 1, 0, -323, 1165],
+                [1, 1, -1, 0, 299, 0],
+                [2, 0, 3, 0, 294, 0],
+                [2, 0, -1, -2, 0, 8752]
+            ];
+
+            //Tabelle 45.2
+            const tb = [
+                [0, 0, 0, 1, 5128122],
+                [0, 0, 1, 1, 280602],
+                [0, 0, 1, -1, 277693],
+                [2, 0, 0, -1, 173237],
+
+                [2, 0, -1, 1, 55413],
+                [2, 0, -1, -1, 46271],
+                [2, 0, 0, 1, 32573],
+                [0, 0, 2, 1, 17198],
+
+                [2, 0, 1, -1, 9266],
+                [0, 0, 2, -1, 8822],
+                [2, -1, 0, -1, 8216],
+                [2, 0, -2, -1, 4324],
+
+                [2, 0, 1, 1, 4200],
+                [2, 1, 0, -1, -3359],
+                [2, -1, -1, 1, 2463],
+                [2, -1, 0, 1, 2211],
+
+                [2, -1, -1, -1, 2065],
+                [0, 1, -1, -1, -1870],
+                [4, 0, -1, -1, 1828],
+                [0, 1, 0, 1, -1794],
+
+                [0, 0, 0, 3, -1749],
+                [0, 1, -1, 1, -1565],
+                [1, 0, 0, 1, -1491],
+                [0, 1, 1, 1, -1475],
+
+                [0, 1, 1, -1, -1410],
+                [0, 1, 0, -1, -1344],
+                [1, 0, 0, -1, -1335],
+                [0, 0, 3, 1, 1107],
+
+                [4, 0, 0, -1, 1021],
+                [4, 0, -1, 1, 833],
+
+                [0, 0, 1, -3, 777],
+                [4, 0, -2, 1, 671],
+                [2, 0, 0, -3, 607],
+                [2, 0, 2, -1, 596],
+
+                [2, -1, 1, -1, 491],
+                [2, 0, -2, 1, -451],
+                [0, 0, 3, -1, 439],
+                [2, 0, 2, 1, 422],
+
+                [2, 0, -3, -1, 421],
+                [2, 1, -1, 1, -366],
+                [2, 1, 0, 1, -351],
+                [4, 0, 0, 1, 331],
+
+                [2, -1, 1, 1, 315],
+                [2, -2, 0, -1, 302],
+                [0, 0, 1, 3, -283],
+                [2, 1, 1, -1, -229],
+
+                [1, 1, 0, -1, 223],
+                [1, 1, 0, 1, 223],
+                [0, 1, -2, -1, -220],
+                [2, 1, -1, -1, -220],
+
+                [1, 0, 1, 1, -185],
+                [2, -1, -2, -1, 181],
+                [0, 1, 2, 1, -177],
+                [4, 0, -2, -1, 176],
+
+                [4, -1, -1, -1, 166],
+                [1, 0, 1, -1, -164],
+                [4, 0, 1, -1, 132],
+                [1, 0, -1, -1, -119],
+
+                [4, -1, 0, -1, 115],
+                [2, -2, 0, 1, 107]
+            ] ;
+
+            let suml = 0;
+            let sumr = 0;
+
+            for(i in ta) {
+                const sl = ta[i][4]*Math.sin(ta[i][0]*D + ta[i][1]*M + ta[i][2]*m + ta[i][3]*F);
+                const sr = ta[i][5]*Math.cos(ta[i][0]*D + ta[i][1]*M + ta[i][2]*m + ta[i][3]*F);
+                switch(ta[i][1]) {
+                case 0:
+                    suml += sl;
+                    sumr += sr;
+                    break;
+                case 1:
+                case -1:
+                    suml += sl*E;
+                    sumr += sr*E;
+                    break;
+                case 2:
+                case -2:
+                    suml += sl*E*E;
+                    sumr += sr*E*E;
+                    break;
+                }
+            }
+
+
+            suml += 3958*Math.sin(A1); //Einfluss Venus
+            suml += 1962*Math.sin(l - F); //Einfluss Abplattung Erde
+            suml += 318*Math.sin(A2); //Einfluss Jupiter
+
+            let sumb = 0;
+            for(i in tb) {
+                const sb = tb[i][4]*Math.sin(tb[i][0]*D + tb[i][1]*M + tb[i][2]*m + tb[i][3]*F);
+                switch(tb[i][1]) {
+                case 0:
+                    sumb += sb;
+                    break;
+                case 1:
+                case -1:
+                    sumb += sb*E;
+                    break;
+                case 2:
+                case -2:
+                    sumb += sb*E*E;
+                    break;
+                }
+            }
+
+            sumb += -2235 * Math.sin(l); //Einfluss Abplattung Erde
+            sumb +=   382 * Math.sin(A3);
+            sumb +=   175 * Math.sin(A1-F);
+            sumb +=   175 * Math.sin(A1+F);
+            sumb +=   127 * Math.sin(l-m);
+            sumb +=  -115 * Math.sin(l+m);
+
+            //console.log("Mond suml, sumb, sumr:",suml,sumb, sumr);
+
+            return {
+                "length": l + (suml/1000000)*deg2rad,
+                "width" : (sumb/1000000)*deg2rad,
+                "r" : 385000.56 + sumr/1000
+            }
+
+            //const sinPi = 0.999953253*(3422.7 +1sin II
+        }
 
 
 
@@ -1317,7 +1522,7 @@
             return decimal;
         }
 
-                function changeJD() {
+        function changeJD() {
             const jdInput = parseFloat(document.getElementById("julianDate").value);
             if(jdInput == NaN) {
                 return;
@@ -1522,7 +1727,12 @@
     <td>Sternzeit (Greenwich)</td>
     <td></td>
     <td><input id="siderealTime" type="time"/></td>
+    <td><input id="siderealSeconds" style="width:100%"/></td>
+    </tr>
+    <td>Sternzeit Lokal</td>
     <td></td>
+    <td><input id="siderealTimeLocal" type="time"/></td>
+    <td><input id="siderealSecondsLocal" style="width:100%"/></td>
     </tr>
     <tr>
     <td><label for="julianDate" >Julianisches Datum</label></td>
