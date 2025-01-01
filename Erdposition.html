@@ -20,6 +20,8 @@
         const e = 0.016708634; // Exzentrizität der Erdbahn
         const a = 1.000001018;  // Halbe große Achse in AE
         const epsilon = 23.439292; // Mittlere Neigung Erdachse
+        const earthRadius = 6378.137;
+        const moonRadius = 1738.1;
 
         const rad2deg = 180/Math.PI;
         const deg2rad = Math.PI/180;
@@ -58,6 +60,14 @@
             }
         };
 
+        const moon = {
+            radius: 5,
+            color: 'gray',
+            orbit: {
+                radius: 20
+            }
+        }
+
         /**
          * Zeichne Sonne in Bild 1 "Erdposition"
          */
@@ -66,6 +76,32 @@
             ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2, false);
             ctx.fillStyle = sun.color;
             ctx.fill();
+            ctx.closePath();
+        };
+
+        /**
+         * Zeichne Mond in Bild 1 "Erdposition"
+         */
+        function drawMoon(eclipticalLongitude, risingKnotMoon) {
+            const moonX = moon.orbit.radius*Math.cos(eclipticalLongitude);
+            const moonY = moon.orbit.radius*Math.sin(eclipticalLongitude);
+            ctx.beginPath();
+            ctx.arc(moonX, moonY, moon.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = moon.color;
+            ctx.fill();
+            ctx.closePath();
+
+            //Indikator
+            IndicatorXStart = -moon.orbit.radius*Math.cos(risingKnotMoon);
+            IndicatorYStart = moon.orbit.radius*Math.sin(risingKnotMoon);
+            IndicatorXEnd = -(moon.orbit.radius+10)*Math.cos(risingKnotMoon);
+            IndicatorYEnd = (moon.orbit.radius+10)*Math.sin(risingKnotMoon);
+            ctx.beginPath();
+            ctx.moveTo(IndicatorXStart, IndicatorYStart);
+            ctx.lineTo(IndicatorXEnd, IndicatorYEnd);
+            ctx.strokeStyle = 'green';
+            ctx.lineWidth = 2;
+            ctx.stroke();
             ctx.closePath();
         };
 
@@ -128,7 +164,7 @@
         /**
          * Zeichne Erde mit Meridian in Bild 1 "Erdposition"
          */
-        function drawEarthWithIndicator(radius, eclipticalLength, vernalPoint, indicatorDirection) {
+        function drawEarthWithIndicatorAndMoon(radius, eclipticalLength, vernalPoint, indicatorDirection,moonLongitude, risingKnotMoon) {
             // Position der Erde um die Umlaufbahn
             const earthX = sun.x + radius*earth.orbit.radius * Math.cos(eclipticalLength);
             const earthY = sun.y - radius*earth.orbit.radius * Math.sin(eclipticalLength);
@@ -147,6 +183,20 @@
             //ctx.arc(0, 0, earth.radius, 0, Math.PI * 2, false);
             ctx.fillStyle = earth.color;
             ctx.fill();
+            ctx.closePath();
+
+            drawMoon(-moonLongitude+Math.PI,risingKnotMoon);
+
+            //Indikator
+            indicatorDirection = siderealDirectionCorrection(indicatorDirection);
+            IndicatorX = -earth.indicator.length*Math.cos(indicatorDirection);
+            IndicatorY = earth.indicator.length*Math.sin(indicatorDirection);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(IndicatorX, IndicatorY);
+            ctx.strokeStyle = earth.indicator.color;
+            ctx.lineWidth = earth.indicator.width;
+            ctx.stroke();
             ctx.closePath();
 
             //Indikator
@@ -414,42 +464,14 @@
         }
 
         //Zeichne Erde in Bild 2 "Ausrichtung Erde"
-        function drawEarthSingle(eclipticalLength,vernalPoint,indicatorDirection) {
+        function drawEarthSingleWithMoon(eclipticalLength,vernalPoint,indicatorDirection,moonLength,moonWidth,moonDistance) {
             canvas = document.getElementById('earth');
             const ctx = canvas.getContext('2d');
             ctx.resetTransform();
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
             ctx.translate(canvas.width/2, canvas.height/2);
 
-            const earthRadius = 200;
-
-            //Sonnenstrahlen
-            ctx.font= "15px arial";
-            ctx.fillStyle="black";
-            ctx.textAlign = "left";
-            ctx.fillText("Sonne", -canvas.width/2 ,-5);
-
-            ctx.setLineDash([]);
-
-            for(let y = -earthRadius; y < earthRadius+1; y+=earthRadius/10) {
-                ctx.beginPath();
-                ctx.moveTo(-canvas.width/2,y);
-                const xEnd = Math.sqrt(earthRadius**2-y**2)+3;
-                ctx.lineTo(-xEnd,y);
-                ctx.strokeStyle = "yellow";
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                ctx.closePath();
-            }
-
-            ctx.lineWidth = 1;
-
-            //Halbkugel Nacht
-            ctx.beginPath();
-            ctx.arc(0,0,earthRadius,-90*deg2rad,90*deg2rad,false);
-            ctx.fillStyle = "#dddddd";
-            ctx.fill();
-            ctx.closePath();
+            const earthRadiusGraphic = 200;
 
             const phase = eclipticalLength - vernalPoint;
 
@@ -464,11 +486,60 @@
             //console.log("rotation",applyMatrix({x:0,y:0,z:1},rotationMatrix));
             //rotationMatrix = createRotationMatrix({x:0,y:1,z:0},axleAngleY);
 
+            /*const rotationMatrixMoonWidth = createRotationMatrix({x:0,y:1,z:0}, moonWidth);
+            const rotationMatrixMoonLength = createRotationMatrix({x:0,y:0,z:1}, );
+
+            const moonY = earthRadiusGraphic/earthRadius * moonDistance * Math.sin(-moonWidth);
+            const moonX = 260 * Math.cos(phase - moonLength + Math.PI);
+            const moonZ = Math.sin(phase - moonLength + Math.PI);
+
+            console.log("Mond Grafik ",moonY, moonX, moonZ);*/
+           // let rotationMatrixMoon = multiplyMatrix(rotationMatrixMoonWidth,rotationMatrixMoonLength);
+           // const moonPos = applyMatrix({x:260,y:0,z:0},rotationMatrixMoon);
+
+
+            //Halbkugel Nacht
+            ctx.beginPath();
+            ctx.arc(0,0,earthRadiusGraphic,-90*deg2rad,90*deg2rad,false);
+            ctx.fillStyle = "#dddddd";
+            ctx.fill();
+            ctx.closePath();
+
+           // if(moonPos.y < 0) {
+            /*ctx.beginPath();
+            ctx.arc(moonX, moonY, 0.27*earthRadiusGraphic, 0, Math.PI * 2, false);
+            ctx.fillStyle = (moonZ < 0)?'blue':'cyan';
+            ctx.fill();
+            ctx.closePath();*/
+            //}
+
+            //Sonnenstrahlen
+            ctx.font= "15px arial";
+            ctx.fillStyle="black";
+            ctx.textAlign = "left";
+            ctx.fillText("Sonne", -canvas.width/2 ,-5);
+
+            ctx.setLineDash([]);
+
+            for(let y = -earthRadiusGraphic; y < earthRadiusGraphic+1; y+=earthRadiusGraphic/10) {
+                ctx.beginPath();
+                ctx.moveTo(-canvas.width/2,y);
+                const xEnd = Math.sqrt(earthRadiusGraphic**2-y**2)+3;
+                ctx.lineTo(-xEnd,y);
+                ctx.strokeStyle = "yellow";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.closePath();
+            }
+
+            ctx.lineWidth = 1;
+
+
              // Breitengrade (horizontale Ellipsen)
             const latSteps = 5; // Anzahl der Breitengrade
             for (let lat = -latSteps; lat < latSteps; lat++) {
                 const theta = (lat / latSteps) * Math.PI / 2; // Breitengradwinkel
-                const polygonLine = calculateLatitudePoints(earthRadius,theta, rotationMatrix);
+                const polygonLine = calculateLatitudePoints(earthRadiusGraphic,theta, rotationMatrix);
                 drawPolygonLine(ctx,polygonLine,'#bbbbbb',true);
             }
 
@@ -476,20 +547,22 @@
             const lonSteps = 12; // Anzahl der Längengrade
             for (let lon = 0; lon < lonSteps; lon++) {
                 const phi = (lon / lonSteps) *2*Math.PI; // Breitengradwinkel
-                const polygonLine = calculateLongitudePoints(earthRadius,phi, rotationMatrix);
+                const polygonLine = calculateLongitudePoints(earthRadiusGraphic,phi, rotationMatrix);
                 drawPolygonLine(ctx,polygonLine,'#bbbbbb',true);
             }
 
+
+
             //Erdachse
-            const northpole = applyMatrix({x:0,y:0,z:earthRadius},rotationMatrix);
-            const southpole = applyMatrix({x:0,y:0,z:-earthRadius},rotationMatrix);
+            const northpole = applyMatrix({x:0,y:0,z:earthRadiusGraphic},rotationMatrix);
+            const southpole = applyMatrix({x:0,y:0,z:-earthRadiusGraphic},rotationMatrix);
             const center = {x:0,y:0,z:0};
             drawPolygonLine(ctx,[northpole,center,southpole],'#000000');
 
             //Kontur Erde
             ctx.beginPath();
             ctx.setLineDash([]);
-            ctx.arc(0, 0, earthRadius, 0, Math.PI*2,false);
+            ctx.arc(0, 0, earthRadiusGraphic, 0, Math.PI*2,false);
             ctx.strokeStyle = "black";
             ctx.stroke();
             ctx.closePath();
@@ -503,14 +576,15 @@
             // ctx.closePath();
             // }
 
-            const polygonLineLatitude = calculateLatitudePoints(earthRadius,latitude*deg2rad, rotationMatrix);
+            const polygonLineLatitude = calculateLatitudePoints(earthRadiusGraphic,latitude*deg2rad, rotationMatrix);
             drawPolygonLine(ctx,polygonLineLatitude,'#000000');
 
             ctx.lineWidth = 2;
             const longitude = 90*Math.PI/180;
-            const polygonLineLongitude = calculateLongitudePoints(earthRadius,-indicatorDirection-Math.PI/2, rotationMatrix);
+            const polygonLineLongitude = calculateLongitudePoints(earthRadiusGraphic,-indicatorDirection-Math.PI/2, rotationMatrix);
             drawPolygonLine(ctx,polygonLineLongitude,'#FF0000');
             ctx.lineWidth = 1;
+
         }
 
     /////////////////////////////////////////////////////////////////
@@ -553,8 +627,16 @@
             //const eclipticalLength = orbitLengthEarth-springEquinoxLength;
             const eclipticalLength = calculateEclipticalLength(julianDate);
 
+            const sunAzimutheight = calculateHAzFromRaDek(calculateRaDek(eclipticalLength,0),siderealTime/12*Math.PI+longitude*deg2rad);
+
             const moon = calculateMoon(julianDate);
-            console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
+            const risingKnotMoon = calculateRisingKnotMoon(julianDate);
+            const moonDistanceEcliptic = moon.distance * Math.sin(moon.latitude);
+
+            const moonRaDek = calculateRaDek(moon.longitude, moon.latitude);
+            const moonAzimutHeight = calculateHAzFromRaDek(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
+
+            //console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
 
             //console.log(springEquinoxLength*rad2deg,orbitLengthEarth*rad2deg,(springEquinoxLength-orbitLengthEarth)*rad2deg);
 
@@ -565,8 +647,8 @@
 
             const siderealTimeRelative = (((siderealTime- datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
 
-            const radek = calculateRaDekSun(eclipticalLength);
-            //console.log("ra:",hoursToString(((radek.ra/Math.PI*12)+36)%24));
+            const radek = calculateRaDek(eclipticalLength,0);
+            console.log("ra:",hoursToString(((radek.ra/Math.PI*12)+36)%24),radek.dek);
 
             document.getElementById("equationOfTime").innerText = hoursToString(equationOfTimeFull)+" Minuten ("+equationOfTimeFull.toFixed(2)+" Minuten)";
             document.getElementById("equationOfTimeAxle").innerText = hoursToString(equatonOfTimeWithoutTilt)+" Minuten ("+equatonOfTimeWithoutTilt.toFixed(2)+" Minuten)";
@@ -585,6 +667,16 @@
             document.getElementById("aphel").innerText = gregorianDateToString(calculateGregorianDateFromJulianDate(aphelDate)) + " ("+
             radToDegString(calculateTrueAnomaly(aphelDate))+ " wahre Anomalie)";
 
+            document.getElementById("moonLongitude").innerText = radToDegString(moon.longitude) + " ("+normalizeAngleDegree(moon.longitude*rad2deg).toFixed(4)+'°)';
+
+            document.getElementById("moonLatitude").innerText = (moon.latitude*rad2deg).toFixed(2) +"°"
+            document.getElementById("moonDistance").innerText = Math.round(moon.distance) + " km";
+            document.getElementById("moonDistanceEcliptic").innerText = Math.round(moonDistanceEcliptic) + " km";
+
+            document.getElementById("moonRisingKnot").innerText = radToDegString(risingKnotMoon) + " ("+normalizeAngleDegree(risingKnotMoon*rad2deg).toFixed(4)+'°)';
+
+            document.getElementById("moonRADEK").innerText = normalizeAngleDegree(moonRaDek.ra*rad2deg).toFixed(4) + "° / " + (moonRaDek.dek*rad2deg).toFixed(4)+"°";
+
 
             document.getElementById("difference").innerText = hoursToString(siderealTimeRelative) +" (entspricht ≈"+ normalizeAngleDegree(siderealTimeRelative*15-180).toFixed(4) + "° ekliptikaler Länge)";
             document.getElementById("eclipticalLength").innerText = radToDegString(eclipticalLength) + " ("+normalizeAngleDegree(eclipticalLength*rad2deg).toFixed(4)+'°)';
@@ -592,14 +684,18 @@
             //document.getElementById("eclipticalLengthDiff").innerText = radToDegString((eclipticalLength1-eclipticalLength));
             document.getElementById("earhSunDistance").innerText = orbitRadiusEarth.toFixed(5) +" AE ("+(orbitRadiusEarth*aeTokm).toFixed(2)+" km)";
 
-            const azimutheight = calculateHAzFromRaDek(calculateRaDekSun(eclipticalLength),siderealTime/12*Math.PI+longitude*deg2rad);
-            document.getElementById("sunAzimut").innerText = radToDegString(azimutheight.azimut) + " ("+ (azimutheight.azimut*rad2deg).toFixed(4)+"°)";
 
-            document.getElementById("sunHeight").innerText = (azimutheight.height*rad2deg).toFixed(2) +"°";
+            document.getElementById("sunAzimut").innerText = radToDegString(sunAzimutheight.azimut) + " ("+ (sunAzimutheight.azimut*rad2deg).toFixed(4)+"°)";
+
+            document.getElementById("sunHeight").innerText = (sunAzimutheight.height*rad2deg).toFixed(2) +"°";
             
             document.getElementById("zenit").innerText = (sunriseSet !== false)?hoursToString(sunriseSet.zenit):"-";
             document.getElementById("sunrise").innerText = (sunriseSet !== false)?hoursToString(sunriseSet.rising):"-";
             document.getElementById("sunset").innerText = (sunriseSet !== false)?hoursToString(sunriseSet.setting):"-";
+
+            document.getElementById("moonAzimut").innerText = radToDegString(moonAzimutHeight.azimut) + " ("+ (moonAzimutHeight.azimut*rad2deg).toFixed(4)+"°)";
+            document.getElementById("moonHeight").innerText = (moonAzimutHeight.height*rad2deg).toFixed(2) +"°";
+
 
             //Grafik-Ausgabe
             canvas = document.getElementById('solarSystem');
@@ -617,12 +713,21 @@
 
             drawOrbit();
 
-            drawEarthWithIndicator(orbitRadiusEarth, orbitLengthEarth, springEquinoxLength, siderealTime/12*Math.PI+longitude*deg2rad);
+            drawEarthWithIndicatorAndMoon(orbitRadiusEarth, orbitLengthEarth, springEquinoxLength, siderealTime/12*Math.PI+longitude*deg2rad, moon.longitude,risingKnotMoon);
             drawOrbit();
             drawPerihelAphel();
 
-            drawEarthSingle(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad);
+            drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad,moon.latitude,moon.longitude,moon.distance);
             //fillTable();
+
+           /* let str = "";
+            for(let stunde = 0; stunde < 365*24; stunde++) {
+                const moon = calculateMoon(julianDate+stunde/24);
+
+                str += moon.length + " " + moon.width + " " + moon.r + "\n";
+                //console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
+            }
+            document.getElementById("table").value = str;*/
 
         }
 
@@ -1001,11 +1106,11 @@
         }
 
         /**
-         * Berechnung der äquatorialen Sonnenkoordinaten aus ekliptischer Länge
+         * Berechnung der äquatorialen Koordinaten aus Ekliptischen Koordinaten
          */
-        function calculateRaDekSun(eclipticalLength) {
-            const ra = Math.atan2(Math.cos(epsilon*deg2rad)*Math.sin(eclipticalLength),Math.cos(eclipticalLength));
-            const dek = Math.asin(Math.sin(epsilon*deg2rad)*Math.sin(eclipticalLength));
+        function calculateRaDek(eclipticalLongitude,eclipticalLatitude) {
+            const ra = Math.atan2(Math.cos(epsilon*deg2rad)*Math.sin(eclipticalLongitude) - Math.tan(eclipticalLatitude)*Math.sin(epsilon*deg2rad),Math.cos(eclipticalLongitude));
+            const dek = Math.asin(Math.sin(eclipticalLatitude)* Math.cos(epsilon*deg2rad) + Math.cos(eclipticalLatitude)*Math.sin(epsilon*deg2rad)*Math.sin(eclipticalLongitude));
             return {
                 "ra": ra,
                 "dek": dek
@@ -1055,7 +1160,7 @@
             //const length3 = calculateEclipticalLength(jd+1);
 
             //const radek1 = calculateRaDekSun(length1);
-            const radek2 = calculateRaDekSun(length2);
+            const radek2 = calculateRaDek(length2,0);
             //const radek3 = calculateRaDekSun(length3);
 
             const siderealTime = calculateSiderealTime(jd)*180/12;
@@ -1415,14 +1520,19 @@
             //console.log("Mond suml, sumb, sumr:",suml,sumb, sumr);
 
             return {
-                "length": l + (suml/1000000)*deg2rad,
-                "width" : (sumb/1000000)*deg2rad,
-                "r" : 385000.56 + sumr/1000
+                "longitude": l + (suml/1000000)*deg2rad,
+                "latitude" : (sumb/1000000)*deg2rad,
+                "distance" : 385000.56 + sumr/1000
             }
 
             //const sinPi = 0.999953253*(3422.7 +1sin II
         }
 
+        function calculateRisingKnotMoon(jd) {
+            const T = calculateJulianEpoch(jd);
+            const risingKnot = 125.0445550 - 1934.1361849*T + 0.0020762*T**2 + T**3/467410 - T**4/60616000;
+            return normalizeAngleDegree(risingKnot)*deg2rad;
+        }
 
 
 
@@ -1784,29 +1894,28 @@
         </td>
         <td><span id="equationOfTimeEx"></span></td>
     </tr>
-    <td colspan="3">Position der Erde</td>
-</tr>
+        <td colspan="3">Position der Erde</td>
+    </tr>
+    <tr>
+        <td rowspan = "4"></td>
+        <td>Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
+        <td><span id="eclipticalLength"></span></td>
+    </tr>
 
-<tr>
-    <td rowspan = "4"></td>
-<td>Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
-<td><span id="eclipticalLength"></span></td>
-</tr>
+    <tr>
+        <td>Wahre Anomalie<br>(Winkel zum Perihel)</td>
+        <td><span id="eclipticalLengthKeppler"></span></td>
+    </tr>
 
-<tr>
-<td>Wahre Anomalie<br>(Winkel zum Perihel)</td>
-<td><span id="eclipticalLengthKeppler"></span></td>
-</tr>
+    <tr>
+        <td>&Delta; (UTC-Sternzeit)</td>
+        <td><span id="difference"></span></td>
+    </tr>
 
-<tr>
-<td>&Delta; (UTC-Sternzeit)</td>
-<td><span id="difference"></span></td>
-</tr>
-
-<tr>
-<td>Abstand Erde-Sonne</td>
-<td><span id="earhSunDistance"></span></td>
-</tr>
+    <tr>
+        <td>Abstand Erde-Sonne</td>
+        <td><span id="earhSunDistance"></span></td>
+    </tr>
     <tr>
         <td colspan="3">Zeitpunkte besonderer Erdposition im Jahr</td>
     </tr>
@@ -1835,12 +1944,39 @@
         <td>Wintersolstitium (Sonnenwende)</td>
         <td><span id="winterSolstice"></span></td>
     </tr>
-
+    <tr>
+        <td colspan="3">Position des Mondes</td>
+    </tr>
+    <tr>
+        <td rowspan ="6"></td>
+        <td>ekliptikale Länge <br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
+        <td><span id="moonLongitude"></td>
+    </tr>
+    <tr>
+        <td>ekliptikale Breite</td>
+        <td><span id="moonLatitude"></td>
+    </tr>
+    <tr>
+        <td>Abstand zur Erde</td>
+        <td><span id="moonDistance"></td>
+    </tr>
+    <tr>
+        <td>Abstand zur Ekliptik</td>
+        <td><span id="moonDistanceEcliptic"></td>
+    </tr>
+    <tr>
+        <td>aufsteigender Knoten</td>
+        <td><span id="moonRisingKnot"></td>
+    </tr>
+    <tr>
+        <td>RA/Dek</td>
+        <td><span id="moonRADEK"></td>
+    </tr>
     <tr>
         <td colspan = "3">Ortsbezogene Daten</td>
     </tr>
     <tr>
-        <td rowspan = "5"></td>
+        <td rowspan = "7"></td>
         <td>Höhe Sonne</td>
         <td><span id="sunHeight"></span></td>
     </tr>
@@ -1860,11 +1996,17 @@
         <td>Sonnenuntergang</td>
         <td><span id="sunset"></span></td>
     </tr>
-
-
+    <tr>
+        <td>Höhe Mond</td>
+        <td><span id="moonHeight"></td>
+    </tr>
+    <tr>
+        <td>Azimut Mond</td>
+        <td><span id="moonAzimut"></td>
+    </tr>
     </table>
 
-    <!--<textarea id="table"></textarea>-->
+    <textarea id="table"></textarea>
 
 
 <h2>Hintergründe und Begriffe</h2>
