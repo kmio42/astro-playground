@@ -635,6 +635,7 @@
 
             const moonRaDek = calculateRaDek(moon.longitude, moon.latitude);
             const moonAzimutHeight = calculateHAzFromRaDek(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
+            const moonPhase = calculateMoonPhase(eclipticalLength,moon);
 
             //console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
 
@@ -695,6 +696,8 @@
 
             document.getElementById("moonAzimut").innerText = radToDegString(moonAzimutHeight.azimut) + " ("+ (moonAzimutHeight.azimut*rad2deg).toFixed(4)+"°)";
             document.getElementById("moonHeight").innerText = (moonAzimutHeight.height*rad2deg).toFixed(2) +"°";
+
+            document.getElementById("moonPhase").innerText = (moonPhase*100).toFixed(2) + "%";
 
 
             //Grafik-Ausgabe
@@ -1534,6 +1537,17 @@
             return normalizeAngleDegree(risingKnot)*deg2rad;
         }
 
+        function calculateMoonPhase(sunLongitude, moon) {
+
+            // Formel 46.1
+            //const k = (1 + Math.cos(i))/2;
+
+            //Vereinfachung: cos(i) = -cos(psi)
+            const k = (1 - Math.cos(moon.latitude)*Math.cos(moon.longitude-sunLongitude))/2;
+
+            return k;
+        }
+
 
 
         // function interpolateQuad(ym,y0,yp) {
@@ -1568,6 +1582,18 @@
         }
         function fillSiderealTime(time) {
             document.getElementById("siderealTime").value = hoursToString(time);
+            const remainingHours = time - Math.floor(time);
+            const remainingMinutes = remainingHours * 60 - Math.floor(remainingHours * 60);
+            const seconds = remainingMinutes * 60;
+            document.getElementById("siderealSeconds").value = seconds.toFixed(3);
+
+            const timeLocal = (time+longitude/15)%24;
+            const remainingHoursLocal = timeLocal - Math.floor(timeLocal);
+            const remainingMinutesLocal = remainingHoursLocal - Math.floor(remainingHoursLocal);
+            const secondsLocal = remainingMinutesLocal*60
+
+            document.getElementById("siderealTimeLocal").innerHTML = hoursToString(timeLocal);
+            document.getElementById("siderealSecondsLocal").innerHTML = secondsLocal.toFixed(3);
         }
 
         function validateCoordinate(input, type) {
@@ -1600,6 +1626,9 @@
 
             if(type =="longitude" && value != NaN) {
                 longitude = value;
+
+                const julianDate = calculateJulianDate(datetime);
+                fillSiderealTime(calculateSiderealTime(julianDate));
                 berechneDaten();
             } else if(type =="latitude" && value != NaN) {
                 latitude = value;
@@ -1682,8 +1711,9 @@
 
             const timeInput = document.getElementById("siderealTime").value;
             const siderealTimeNew = timeInput.split(':');
+            const timeInputSeconds = document.getElementById("siderealSeconds").value;
 
-            timediffInMs = ((parseInt(siderealTimeNew[0])+24+parseInt(siderealTimeNew[1])/60-siderealTimeBase)%24)*86164100/24; //+36
+            timediffInMs = ((parseInt(siderealTimeNew[0])+24+parseInt(siderealTimeNew[1])/60+parseFloat(timeInputSeconds)/3600-siderealTimeBase)%24)*86164100/24; //+36
 
             //datetime.setUTCHours(0);
             //datetime.setUTCMinutes(0);
@@ -1764,6 +1794,13 @@
         }
 
         function onLoad() {
+                    document.getElementById('latitude').addEventListener('input', function () {
+                validateCoordinate(this.value.trim(), 'latitude');
+            });
+            document.getElementById('longitude').addEventListener('input', function () {
+                validateCoordinate(this.value.trim(), 'longitude');
+            });
+            loadData();
             datetime = new Date();
             fillGregorianDate(datetime);
             changeGregorianDate();
@@ -1772,6 +1809,8 @@
             document.getElementById('seconds').addEventListener('input', changeGregorianDate);
             document.getElementById('julianDate').addEventListener('input', changeJD);
             document.getElementById('siderealTime').addEventListener('input',changeSiderealTime);
+            document.getElementById('siderealSeconds').addEventListener('input',changeSiderealTime);
+
 
             //addEvents(document.getElementById('button-1sh'),-86164100/24);
             addEvents(document.getElementById('button-1h'),-3600000);
@@ -1786,13 +1825,7 @@
             addEvents(document.getElementById('button1sd'),86164100);
             addEvents(document.getElementById('button1m'), 60000);
 
-            document.getElementById('latitude').addEventListener('input', function () {
-                validateCoordinate(this.value.trim(), 'latitude');
-            });
-            document.getElementById('longitude').addEventListener('input', function () {
-                validateCoordinate(this.value.trim(), 'longitude');
-            });
-            loadData();
+
         }
         window.onload = onLoad;
     </script>
@@ -1841,8 +1874,8 @@
     </tr>
     <td>Sternzeit Lokal</td>
     <td></td>
-    <td><input id="siderealTimeLocal" type="time"/></td>
-    <td><input id="siderealSecondsLocal" style="width:100%"/></td>
+    <td><span id="siderealTimeLocal" ></span></td>
+    <td><span id="siderealSecondsLocal" ></span></td>
     </tr>
     <tr>
     <td><label for="julianDate" >Julianisches Datum</label></td>
@@ -1948,7 +1981,7 @@
         <td colspan="3">Position des Mondes</td>
     </tr>
     <tr>
-        <td rowspan ="6"></td>
+        <td rowspan ="7"></td>
         <td>ekliptikale Länge <br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
         <td><span id="moonLongitude"></td>
     </tr>
@@ -1965,7 +1998,7 @@
         <td><span id="moonDistanceEcliptic"></td>
     </tr>
     <tr>
-        <td>aufsteigender Knoten</td>
+        <td>Aufsteigender Knoten</td>
         <td><span id="moonRisingKnot"></td>
     </tr>
     <tr>
@@ -1973,16 +2006,21 @@
         <td><span id="moonRADEK"></td>
     </tr>
     <tr>
+        <td>Mondphase</td>
+        <td><span id="moonPhase"></td>
+    </tr>
+    <tr>
         <td colspan = "3">Ortsbezogene Daten</td>
     </tr>
     <tr>
         <td rowspan = "7"></td>
-        <td>Höhe Sonne</td>
-        <td><span id="sunHeight"></span></td>
-    </tr>
-    <tr>
         <td>Azimut Sonne</td>
         <td><span id="sunAzimut"></span></td>
+
+    </tr>
+    <tr>
+        <td>Höhe Sonne</td>
+        <td><span id="sunHeight"></span></td>
     </tr>
     <tr>
         <td>Sonnenaufgang</td>
@@ -1997,12 +2035,12 @@
         <td><span id="sunset"></span></td>
     </tr>
     <tr>
-        <td>Höhe Mond</td>
-        <td><span id="moonHeight"></td>
-    </tr>
-    <tr>
         <td>Azimut Mond</td>
         <td><span id="moonAzimut"></td>
+    </tr>
+    <tr>
+        <td>Höhe Mond</td>
+        <td><span id="moonHeight"></td>
     </tr>
     </table>
 
