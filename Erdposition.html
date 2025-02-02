@@ -1678,14 +1678,19 @@
             const dateInput = document.getElementById("date").value;
             const timeInput = document.getElementById("time").value;
             const secondInput = document.getElementById("seconds").value;
-            datetime = new Date(`${dateInput}T${timeInput}Z`);
-            if(isNaN(datetime.getTime())) {
+            const datetime_new = new Date(`${dateInput}T${timeInput}Z`);
+            if(isNaN(datetime_new.getTime())) {
                 return;
             }
             const seconds = parseFloat(secondInput);
-            datetime.setSeconds(Math.floor(seconds));
-            //console.log((seconds-Math.floor(seconds))*1000);
-            datetime.setMilliseconds((seconds-Math.floor(seconds))*1000);
+            if(isNaN(seconds)) {
+                return;
+            }
+            datetime_new.setUTCSeconds(Math.floor(seconds));
+            datetime_new.setUTCMilliseconds((seconds-Math.floor(seconds))*1000);
+            datetime = datetime_new;
+
+           // console.log("Zeit",dateInput,timeInput,datetime.toISOString(),datetime.getUTCHours());
 
             const julianDate = calculateJulianDate(datetime);
 
@@ -1896,6 +1901,9 @@
 
 
     <canvas id="earth" width="550" height="410"></canvas>
+
+    <canvas id="moon" width="200" height="200"></canvas>
+
 </div>
 <div style ="position: relative;margin: 20px 0;padding: 20px;height: 1000px;">
 <div style ="position: sticky; top: 15px;padding: 10px;">
