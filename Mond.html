@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sternzeit und Erdposition</title>
+    <title>Mond</title>
     <style>
         canvas {
             background-color: white;
@@ -22,9 +22,13 @@
         const epsilon = 23.439292; // Mittlere Neigung Erdachse
         const earthRadius = 6378.137;
         const moonRadius = 1738.1;
+        const moonOrbitRadius = 384400;
 
         const rad2deg = 180/Math.PI;
         const deg2rad = Math.PI/180;
+
+        const moonImage = new Image();
+        moonImage.src = "./mond.png";
 
         // Grafik-Ausgabe
         var canvas,ctx;
@@ -39,16 +43,10 @@
     ////                      Grafikausgabe                        //
     /////////////////////////////////////////////////////////////////
         // Parameter für Bild 1 "Erdposition"
-        const sun = {
-            x: 0,
-            y: 0,
-            radius: 20,
-            color: 'yellow'
-        };
 
         const earth = {
-            radius: 10,
-            color: 'blue',
+            radius: 40,
+            color: 'darkblue',
             orbit: {
                 radius: 280,
                 color: 'gray'
@@ -61,14 +59,14 @@
         };
 
         const moon = {
-            radius: 5,
+            radius: 25,
             color: 'gray',
             orbit: {
-                radius: 20
+                radius: 250
             }
         }
 
-        function drawMoonPhase(sunRaDek, moonRaDek, siderealtime) {
+        function drawMoonPhase(sunRaDek, moonRaDek, moonAxle, siderealtime) {
 
             const cosPsi = Math.sin(sunRaDek.dek)*Math.sin(moonRaDek.dek) +  Math.cos(sunRaDek.dek)*Math.cos(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra);
 
@@ -77,36 +75,98 @@
 
             const chi = Math.atan2(Math.cos(sunRaDek.dek)*Math.sin(sunRaDek.ra - moonRaDek.ra),
             Math.sin(sunRaDek.dek)*Math.cos(moonRaDek.dek) - Math.cos(sunRaDek.dek)*Math.sin(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra)
-            )
+            );
             // k = 0: a = max, k = 0.5 => a = 0.5, k = 1: a = max
-            const a = Math.abs(1-k*2);
+            const c = Math.abs(1-k*2);
             const dir = (k <= 0.5)?false:true;
 
             const q = Math.atan2(Math.sin(siderealtime - moonRaDek.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDek.dek) - Math.sin(moonRaDek.dek)*Math.cos(siderealtime - moonRaDek.ra));
 
-
+            const i = Math.asin(-cosPsi);
+            console.log("Mond: ",(chi+Math.PI)*rad2deg,chi-q+Math.PI/2, (chi-q+Math.PI/2)*rad2deg);
+            const p = (chi + Math.PI);
+            console.log("http://moon.local/?phase="+k+"&mask="+(chi-q+Math.PI/2)+"&rot="+(q+moonAxle)); //(chi-q+Math.PI/2+((p > Math.PI)?Math.PI:0))
             canvas = document.getElementById('moon');
             const ctx = canvas.getContext('2d');
 
             ctx.resetTransform();
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
             ctx.translate(canvas.width/2, canvas.height/2);
+
+
+
+  //           const mask = (chi-q+Math.PI/2);
+  // const r = 100;
+  // const b = r * r;
+  // let a = r * r;
+  // if (k > 0.5) {
+  //   a *= (k * 2 - 1)**2;
+  // } else {
+  //   a *= (1 - k * 2)**2;
+  // }
+  // const cosMask = 1;//Math.cos(-mask);
+  // const sinMask = 0;//Math.sin(-mask);
+  // //const cosRot = Math.cos(-rotation);
+  // //const sinRot = Math.sin(-rotation);
+  //
+  // for (let y = -r; y < r; y++) {
+  //   for (let x = -r; x < r; x++) {
+  //     let circle = x * x + y * y - r * r;
+  //     if (circle > 0) {
+  //       //tft.drawPixel(x+r,y+r,ST77XX_BLACK);
+  //       continue;
+  //     }
+  //     let conditionX = x * cosMask + y * sinMask;
+  //     let conditionY = -x * sinMask + y * cosMask;
+  //     let ellipse = conditionX * conditionX * b + conditionY * conditionY * a - a * b;
+  //     let pixelActive = false;
+  //
+  //     if (k > 0.5) {
+  //       pixelActive = conditionX >= 0 || ellipse <= 0;
+  //     } else {
+  //       pixelActive = conditionX >= 0 && ellipse > 0;
+  //     }
+  //     // let pixelColor = 0;
+  //     // if(pixelActive) {
+  //     //   int pixelX = (x * cosRot + y * sinRot) + r;
+  //     //   int pixelY = (-x * sinRot + y * cosRot) + r;
+  //     //   memcpy_P(&pixelColor, &FullMoon[pixelY*128 + pixelX], 2);
+  //     // }
+  //     if(pixelActive) {
+  //      // ctx.fillRect(x,y,1,1);
+  //       }
+  //     //tft.drawPixel(x + r, y + r, pixelColor);
+  //   }
+  // }
             ctx.rotate(-chi+q+Math.PI);
+            if(moonImage.complete) {
+                const width = canvas.width;
+                const height = canvas.height;
+                ctx.save();
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 100, c*100, 0, 0, Math.PI,dir);
+                ctx.arc(0, 0, 100, Math.PI, 0, true);
+                //ctx.arc(0, 0, 100, Math.PI * 2,0 , true);
+                ctx.closePath();
+                ctx.clip();
+                //ctx.rotate((chi > 0)?-Math.PI/2:Math.PI/2);
+                console.log("Mond 2:",chi);
+                ctx.rotate(-moonAxle+chi-Math.PI);
+                ctx.drawImage(moonImage, -width / 2, -height / 2, width, height);
+                ctx.restore();
 
+            } else {
             ctx.beginPath();
-            ctx.arc(0, 0, 100, 0, Math.PI * 2, false);
             ctx.fillStyle = 'gray';
+            ctx.arc(0, 0, 100, Math.PI * 2,0 , true);
             ctx.fill();
-            ctx.closePath();
-
-
-            ctx.beginPath();
-            ctx.ellipse(0, 0, 100, a*100, 0, 0, Math.PI,dir);
-            ctx.arc(0, 0, 100, Math.PI, 0, true);
-            ctx.closePath();
-
-            ctx.fillStyle = 'silver';
-            ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 100, c*100, 0, 0, Math.PI,dir);
+                ctx.arc(0, 0, 100, Math.PI, 0, true);
+                ctx.closePath();
+                ctx.fillStyle = 'silver';
+                ctx.fill();
+            }
         }
 
         /**
@@ -123,14 +183,25 @@
         /**
          * Zeichne Mond in Bild 1 "Erdposition"
          */
-        function drawMoon(eclipticalLongitude, risingKnotMoon) {
+        function drawMoon(eclipticalLongitude, vernalPoint, eclipticalLength, risingKnotMoon) {
             const moonX = moon.orbit.radius*Math.cos(eclipticalLongitude);
             const moonY = moon.orbit.radius*Math.sin(eclipticalLongitude);
             ctx.beginPath();
-            ctx.arc(moonX, moonY, moon.radius, 0, Math.PI * 2, false);
+            ctx.arc(moonX, moonY, moon.radius, vernalPoint - eclipticalLength - Math.PI/2, vernalPoint - eclipticalLength + Math.PI/2 , false);
             ctx.fillStyle = moon.color;
             ctx.fill();
-            ctx.closePath();
+
+            ctx.beginPath();
+            ctx.arc(moonX, moonY, moon.radius, vernalPoint - eclipticalLength - Math.PI/2, vernalPoint - eclipticalLength + Math.PI/2 , true);
+            ctx.fillStyle = 'lightgray';
+            ctx.fill();
+
+
+            ctx.beginPath();
+            ctx.moveTo(moon.radius*Math.cos(eclipticalLongitude-Math.PI/2) + moonX,moon.radius*Math.sin(eclipticalLongitude-Math.PI/2)+moonY);
+            ctx.lineTo(moon.radius*Math.cos(eclipticalLongitude +Math.PI/2)+moonX,moon.radius*Math.sin(eclipticalLongitude+Math.PI/2)+moonY);
+            ctx.strokeStyle= 'black';
+            ctx.stroke();
 
             //Indikator
             IndicatorXStart = -moon.orbit.radius*Math.cos(risingKnotMoon);
@@ -207,8 +278,8 @@
          */
         function drawEarthWithIndicatorAndMoon(radius, eclipticalLength, vernalPoint, indicatorDirection,moonLongitude, risingKnotMoon) {
             // Position der Erde um die Umlaufbahn
-            const earthX = sun.x + radius*earth.orbit.radius * Math.cos(eclipticalLength);
-            const earthY = sun.y - radius*earth.orbit.radius * Math.sin(eclipticalLength);
+            const earthX = 0;//sun.x + radius*earth.orbit.radius * Math.cos(eclipticalLength);
+            const earthY = 0;//sun.y - radius*earth.orbit.radius * Math.sin(eclipticalLength);
 
             /*
             Erdachse ist geneigt gegenüber Ekliptikebene.
@@ -217,28 +288,19 @@
             */
 
             ctx.save();
-            ctx.translate(earthX, earthY);
+            //ctx.translate(earthX, earthY);
             ctx.rotate(-vernalPoint);
             ctx.beginPath();
-            ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(epsilon*deg2rad), Math.PI/2, 0, Math.PI * 2);
-            //ctx.arc(0, 0, earth.radius, 0, Math.PI * 2, false);
+            ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(epsilon*deg2rad), Math.PI/2, vernalPoint - eclipticalLength , vernalPoint - eclipticalLength + Math.PI);
+            ctx.fillStyle = 'lightblue';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(epsilon*deg2rad), Math.PI/2, vernalPoint - eclipticalLength, vernalPoint - eclipticalLength + Math.PI,true);
             ctx.fillStyle = earth.color;
             ctx.fill();
-            ctx.closePath();
 
-            drawMoon(-moonLongitude+Math.PI,risingKnotMoon);
-
-            //Indikator
-            indicatorDirection = siderealDirectionCorrection(indicatorDirection);
-            IndicatorX = -earth.indicator.length*Math.cos(indicatorDirection);
-            IndicatorY = earth.indicator.length*Math.sin(indicatorDirection);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(IndicatorX, IndicatorY);
-            ctx.strokeStyle = earth.indicator.color;
-            ctx.lineWidth = earth.indicator.width;
-            ctx.stroke();
-            ctx.closePath();
+            drawMoon(-moonLongitude+Math.PI,vernalPoint, eclipticalLength,risingKnotMoon);
 
             //Indikator
             indicatorDirection = siderealDirectionCorrection(indicatorDirection);
@@ -251,6 +313,7 @@
             ctx.lineWidth = earth.indicator.width;
             ctx.stroke();
             ctx.closePath();
+
 
             //console.log("Diff",vernalPoint*rad2deg,indicatorDirection*rad2deg,eclipticalLength*rad2deg);
             if(Math.abs(normalizeAngleDifferenceRad(vernalPoint+indicatorDirection-eclipticalLength)) < 10*deg2rad) {
@@ -642,11 +705,6 @@
             //Julianische Epoche
             const julianEpoch = calculateJulianEpoch(julianDate);
 
-            //Zeitgleichung
-            const equationOfTimeFull = calculateEquationOfTime(julianDate,true);
-            const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDate,false);
-            const equationOfTimeWithoutExcentric = equationOfTimeFull - equatonOfTimeWithoutTilt;
-
             //Sternzeit
             const siderealTime = calculateSiderealTime(julianDate);
 
@@ -656,16 +714,9 @@
 
             //Tag- und Nachtgleichen und Sonnenwenden des Jahres bestimmen
             const springEquinoxDate = calculateJDOfPoint(datetime.getUTCFullYear(),"spring");
-            const summerSolsticeDate = calculateJDOfPoint(datetime.getUTCFullYear(),"summer");
-            const autumnEquinoxDate = calculateJDOfPoint(datetime.getUTCFullYear(),"autumn");
-            const winterSolsticeDate = calculateJDOfPoint(datetime.getUTCFullYear(),"winter");
-
-            const aphelDate = calculatePerihelAphel(datetime,"aphel");
-            const perihelDate = calculatePerihelAphel(datetime,"perihel");
 
             //Fruehlingspunkt des Datums ist Ekliptische Laenge der Fruehlings Tag-und Nachtgleichen
             const springEquinoxLength = calculateTrueAnomaly(springEquinoxDate);
-            //const eclipticalLength = orbitLengthEarth-springEquinoxLength;
             const eclipticalLength = calculateEclipticalLength(julianDate);
 
             const sunRaDek = calculateRaDek(eclipticalLength,0);
@@ -674,16 +725,13 @@
             const moon = calculateMoon(julianDate);
             const risingKnotMoon = calculateRisingKnotMoon(julianDate);
             const moonDistanceEcliptic = moon.distance * Math.sin(moon.latitude);
+            const moonAxle = calculateMoonAxle(julianDate,moon);
 
             const moonRaDek = calculateRaDek(moon.longitude, moon.latitude);
             const moonAzimutHeight = calculateHAzFromRaDek(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
             const moonParallax = Math.asin(6378.14/moon.distance);
             console.log("Mond Parallaxe:", moonParallax*rad2deg*60);
             const moonPhase = calculateMoonPhase(sunRaDek, orbitRadiusEarth*aeTokm, calculateParallax(moonRaDek,moonParallax,siderealTime/12*Math.PI+longitude*deg2rad), moon.distance);
-
-            //console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
-
-            //console.log(springEquinoxLength*rad2deg,orbitLengthEarth*rad2deg,(springEquinoxLength-orbitLengthEarth)*rad2deg);
 
             //Sonnenauf- und Untergang
             const sunriseSet = calculateSunriseSunset(julianDate);
@@ -693,24 +741,8 @@
             const siderealTimeRelative = (((siderealTime- datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
 
             const radek = calculateRaDek(eclipticalLength,0);
-            //console.log("ra:",hoursToString(((radek.ra/Math.PI*12)+36)%24),radek.dek);
-
-            document.getElementById("equationOfTime").innerText = hoursToString(equationOfTimeFull)+" Minuten ("+equationOfTimeFull.toFixed(2)+" Minuten)";
-            document.getElementById("equationOfTimeAxle").innerText = hoursToString(equatonOfTimeWithoutTilt)+" Minuten ("+equatonOfTimeWithoutTilt.toFixed(2)+" Minuten)";
-            document.getElementById("equationOfTimeEx").innerText = hoursToString(equationOfTimeWithoutExcentric)+" Minuten ("+equationOfTimeWithoutExcentric.toFixed(2)+" Minuten)";
 
             document.getElementById("springEquinox").innerText = gregorianDateToString(calculateGregorianDateFromJulianDate(springEquinoxDate)) + " ("+ radToDegString(springEquinoxLength) + " wahre Anomalie)";
-            document.getElementById("summerSolstice").innerText = gregorianDateToString(calculateGregorianDateFromJulianDate(summerSolsticeDate)) + " ("+ radToDegString(calculateTrueAnomaly(summerSolsticeDate))+" wahre Anomalie)";
-            document.getElementById("autumnEquinox").innerText = gregorianDateToString(calculateGregorianDateFromJulianDate(autumnEquinoxDate)) + " ("+
-            radToDegString(calculateTrueAnomaly(autumnEquinoxDate)) + " wahre Anomalie)";
-            document.getElementById("winterSolstice").innerText = gregorianDateToString(calculateGregorianDateFromJulianDate(winterSolsticeDate)) + " ("+
-            radToDegString(calculateTrueAnomaly(winterSolsticeDate))+ " wahre Anomalie)";
-
-            document.getElementById("perihel").innerText = gregorianDateToString(calculateGregorianDateFromJulianDate(perihelDate)) + " ("+
-            radToDegString(calculateTrueAnomaly(perihelDate)) + " wahre Anomalie)";
-
-            document.getElementById("aphel").innerText = gregorianDateToString(calculateGregorianDateFromJulianDate(aphelDate)) + " ("+
-            radToDegString(calculateTrueAnomaly(aphelDate))+ " wahre Anomalie)";
 
             document.getElementById("moonLongitude").innerText = radToDegString(moon.longitude) + " ("+normalizeAngleDegree(moon.longitude*rad2deg).toFixed(4)+'°)';
 
@@ -722,11 +754,8 @@
 
             document.getElementById("moonRADEK").innerText = normalizeAngleDegree(moonRaDek.ra*rad2deg).toFixed(4) + "° / " + (moonRaDek.dek*rad2deg).toFixed(4)+"°";
 
-
-            document.getElementById("difference").innerText = hoursToString(siderealTimeRelative) +" (entspricht ≈"+ normalizeAngleDegree(siderealTimeRelative*15-180).toFixed(4) + "° ekliptikaler Länge)";
             document.getElementById("eclipticalLength").innerText = radToDegString(eclipticalLength) + " ("+normalizeAngleDegree(eclipticalLength*rad2deg).toFixed(4)+'°)';
-            document.getElementById("eclipticalLengthKeppler").innerText = radToDegString(orbitLengthEarth) + " ("+normalizeAngleDegree(orbitLengthEarth*rad2deg).toFixed(4)+'°)';
-            //document.getElementById("eclipticalLengthDiff").innerText = radToDegString((eclipticalLength1-eclipticalLength));
+
             document.getElementById("earhSunDistance").innerText = orbitRadiusEarth.toFixed(5) +" AE ("+(orbitRadiusEarth*aeTokm).toFixed(2)+" km)";
 
 
@@ -751,20 +780,23 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
             ctx.translate(canvas.width/2, canvas.height/2);
 
-            drawFullLineWithText(springEquinoxLength,"Frühlings Tag- und Nachtgleiche");
-            drawFullLineWithText(calculateTrueAnomaly(summerSolsticeDate),"Sommersonnenwende");
-            drawFullLineWithText(calculateTrueAnomaly(autumnEquinoxDate), "Herbst Tag- und Nachtgleiche");
-            drawFullLineWithText(calculateTrueAnomaly(winterSolsticeDate),"Wintersonnenwende");
+            //drawFullLineWithText(springEquinoxLength,"Frühlings Tag- und Nachtgleiche");
 
-            drawSun();
+            //drawSun();
 
-            drawOrbit();
+            //drawOrbit();
+
+            ctx.save();
+            ctx.rotate(-springEquinoxLength);
+
+            drawPolygonLine(ctx,calculateMoonOrbit(julianDate),'black',false);
+            ctx.restore();
 
             drawEarthWithIndicatorAndMoon(orbitRadiusEarth, orbitLengthEarth, springEquinoxLength, siderealTime/12*Math.PI+longitude*deg2rad, moon.longitude,risingKnotMoon);
-            drawOrbit();
-            drawPerihelAphel();
+            //drawOrbit();
+            //drawPerihelAphel();
 
-            drawMoonPhase(sunRaDek, moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
+            drawMoonPhase(sunRaDek, moonRaDek,moonAxle,siderealTime/12*Math.PI+longitude*deg2rad);
 
             //drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad,moon.latitude,moon.longitude,moon.distance);
             //fillTable();
@@ -778,6 +810,25 @@
             }
             document.getElementById("table").value = str;*/
 
+        }
+
+        function calculateMoonOrbit(jd) {
+            const stepsize = .5;
+            let polygonLine = [];
+            for(let i = -13.8; i < 13.8; i+=stepsize) {
+                const julianDate = jd + i;
+                const moonCoordinates = calculateMoon(julianDate);
+
+                const radius = moonCoordinates.distance/moonOrbitRadius*moon.orbit.radius;
+
+                const point = {
+                 x: Math.cos(moonCoordinates.longitude + Math.PI) * radius, //moon.orbit.radius,
+                 y: i,
+                 z: Math.sin(moonCoordinates.longitude + Math.PI) * radius //moon.orbit.radius
+                };
+                polygonLine.push(point);
+            }
+            return polygonLine;
         }
 
         function fillTable() {
@@ -1351,7 +1402,7 @@
             const A2 = normalizeAngleDegree( 53.09 + 479264.290*T)*deg2rad;
             const A3 = normalizeAngleDegree(313.45 + 481266.484*T)*deg2rad;
 
-            //Änderung der Exzentrität der Erde
+            //Änderung der Exzentrität der Erde (45.6)
             const E = 1 + T*( -0.002516 - 0.0000074*T);
 
             //Tabelle 45.1
@@ -1618,6 +1669,109 @@
                 "ra": objRaDek.ra + alpha,
                 "dek": dek
             };
+        }
+
+        function calculateMoonAxle(jd,moon) {
+            const T = calculateJulianEpoch(jd);
+
+            const risingKnot = calculateRisingKnotMoon(jd);
+            const I = 1.54242*deg2rad; //Winkel Mondäquator - Ekliptik 1,54242°
+            const lambda = moon.longitude; //scheinbare geozentrische Länge Mond
+            const beta = moon.latitude; //scheinbare geozentrische Breite Mond
+
+            //Änderung der Exzentrität der Erde
+            const E = 1 + T*( -0.002516 - 0.0000074*T);
+
+            //Mittlere Länge des Mondes mit kontanten Term Lichtzeit (45.1)
+            const l =  normalizeAngleDegree(218.3164591 + T*(481267.88134236 - 0.0013268*T) + T**3/538841 - T**4/65194000)*deg2rad;
+
+            //Mittlere Elongation = Differenz der Längen von Sonne und Mond (45.2)
+            const D = normalizeAngleDegree(297.8502042 + T*(445267.1115168 - T*0.0016300) + T**3/545868 - T**4/113065000)*deg2rad;
+
+            // Mittlere Anomalie der Sonne (45.3)
+            const M = normalizeAngleDegree(357.5291092 + T * (35999.0502909 + T * (-0.0001536 + T/24490000)))*deg2rad;
+
+            //Mittlere Anomalie des Mondes (45.4)
+            const m = normalizeAngleDegree(134.9634114 + T*(477198.8676313 + 0.0089970*T) + T**3/69699 - T**4/14712000)*deg2rad;
+
+            // Mittlere Abstand des Mondes vom aufsteigenden Knoten (45.5)
+            const F = normalizeAngleDegree(93.2720993 + T*(483202.0175273 - 0.0034029*T) - T**3/3526000 + T**4/863310000)*deg2rad;
+
+            const W = lambda - risingKnot;
+
+            //Formel 51.1
+            const A = Math.atan2(Math.sin(W)*Math.cos(beta)*Math.cos(I) - Math.sin(beta)*Math.sin(I), Math.cos(W)*Math.cos(beta));
+
+            //optische Liberation
+            const l1 = A - F;
+            const b1 = Math.asin(-Math.sin(W)*Math.cos(beta)*Math.sin(I)-Math.sin(beta)*Math.cos(I));
+
+            const K1 = 119.75 + 131.849*T;
+            const K2 =  72.56 +  20.186*T;
+
+            const rho = (
+                -.02752 * Math.cos(m) +
+                -.02245 * Math.sin(F) +
+                 .00684 * Math.cos(m-2*F) +
+                -.00293 * Math.cos(2*F) +
+                -.00085 * Math.cos(2*(F-D)) +
+                -.00054 * Math.cos(m-2*D) +
+                -.0002  * Math.sin(m+F) +
+                -.0002  * Math.cos(m+2*F) +
+                -.0002  * Math.cos(m-F) +
+                 .00014 * Math.cos(m+2*(F-D)))*deg2rad;
+
+            const sigma = (
+                -.02816 * Math.sin(m) +
+                 .02244 * Math.cos(F) +
+                -.00682 * Math.sin(m-2*F) +
+                -.00279 * Math.sin(2*F) +
+                -.00083 * Math.sin(2*(F-D)) +
+                 .00069 * Math.sin(m-2*D) +
+                 .0004  * Math.cos(m+F) +
+                -.00025 * Math.sin(2*m) +
+                -.00023 * Math.sin(m+2*F) +
+                 .0002  * Math.cos(m-F) +
+                 .00019 * Math.sin(m-F) +
+                 .00013 * Math.sin(m+2*(F-D)) +
+                -.0001  * Math.cos(m-3*F))*deg2rad;
+
+            const tau = (
+                 .0252  * Math.sin(M)*E +
+                 .00473 * Math.sin(2*(m-F)) +
+                -.00467 * Math.sin(m) +
+                 .00396 * Math.sin(K1) +
+                 .00276 * Math.sin(2*(m-D)) +
+                 .00196 * Math.sin(risingKnot) +
+                -.00183 * Math.cos(m-F) +
+                 .00115 * Math.sin(m-2*D) +
+                -.00096 * Math.sin(m-D) +
+                 .00046 * Math.sin(2*(F-D)) +
+                -.00039 * Math.sin(m-F) +
+                -.00032 * Math.sin(m-M-D) +
+                 .00027 * Math.sin(2*(m-D)-M) +
+                 .00023 * Math.sin(K2) +
+                -.00014 * Math.sin(2*D) +
+                 .00014 * Math.cos(2*(m-F)) +
+                -.00012 * Math.sin(m-2*F) +
+                -.00012 * Math.sin(2*m) +
+                 .00011 * Math.sin(2*(m-M-D)))*deg2rad;
+
+            const l2 = -tau  + (rho * Math.cos(A) + sigma * Math.sin(A))* Math.tan(b1);
+            const b2 = sigma * Math.cos(A) - rho * Math.sin(A);
+            console.log("Libration:",(l1+l2)*rad2deg,(b1+b2)*rad2deg);
+
+            const moonRadek = calculateRaDek(moon.longitude,moon.latitude);
+
+            const V = risingKnot + sigma/Math.sin(I);
+            const X = Math.sin(I + rho)*Math.sin(V);
+            const Y = Math.sin(I + rho)*Math.cos(V)*Math.cos(epsilon*deg2rad) - Math.cos(I + rho)*Math.sin(epsilon*deg2rad);
+
+            const w = Math.atan2(X,Y);
+            const P = Math.asin(Math.sqrt(X**2+Y**2)*Math.cos(moonRadek.ra - w)/Math.cos(moon.latitude));
+
+            console.log("Mondachse:",normalizeAngleDegree(P*rad2deg));
+            return P;
         }
 
 
@@ -1967,6 +2121,7 @@
     <!--<canvas id="earth" width="550" height="410"></canvas>-->
 
     <canvas id="moon" width="200" height="200"></canvas>
+    Mond
 
 </div>
 <div style ="position: relative;margin: 20px 0;padding: 20px;height: 1000px;">
@@ -1982,25 +2137,7 @@
 </div>
      <table style="display:block;clear:left">
 
-    <tr>
-    <td colspan="2">Zeitgleichung</td>
-    <td><span id="equationOfTime"></span></td>
-    </tr>
-    <tr>
-        <td rowspan="2">&nbsp;&nbsp;&nbsp;</td>
-        <td>
-            Anteil durch Neigung der Erdachse
-        </td>
-        <td><span id="equationOfTimeAxle"></span></td>
-    </tr>
-    <tr>
-        <td>
-            Anteil durch Exzentrität
-        </td>
-        <td><span id="equationOfTimeEx"></span></td>
-    </tr>
-        <td colspan="3">Position der Erde</td>
-    </tr>
+
     <tr>
         <td rowspan = "4"></td>
         <td>Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
@@ -2008,46 +2145,12 @@
     </tr>
 
     <tr>
-        <td>Wahre Anomalie<br>(Winkel zum Perihel)</td>
-        <td><span id="eclipticalLengthKeppler"></span></td>
-    </tr>
-
-    <tr>
-        <td>&Delta; (UTC-Sternzeit)</td>
-        <td><span id="difference"></span></td>
-    </tr>
-
-    <tr>
         <td>Abstand Erde-Sonne</td>
         <td><span id="earhSunDistance"></span></td>
     </tr>
     <tr>
-        <td colspan="3">Zeitpunkte besonderer Erdposition im Jahr</td>
-    </tr>
-    <tr>
-        <td rowspan="6"></td>
-        <td>Perihel (grober Näherungswert)</td>
-        <td><span id="perihel"></span></td>
-    </tr>
-    <tr>
-        <td>Aphel (grober Näherungswert)</td>
-        <td><span id="aphel"></span></td>
-    </tr>
-    <tr>
         <td>Frühlingsäquinoktium (Tag- und Nachtgleiche)</td>
         <td><span id="springEquinox"></span></td>
-    </tr>
-    <tr>
-        <td>Sommersolstitium (Sonnenwende)</td>
-        <td><span id="summerSolstice"></span></td>
-    </tr>
-    <tr>
-        <td>Herbstäquinoktium (Tag- und Nachtgleiche)</td>
-        <td><span id="autumnEquinox"></span></td>
-    </tr>
-    <tr>
-        <td>Wintersolstitium (Sonnenwende)</td>
-        <td><span id="winterSolstice"></span></td>
     </tr>
     <tr>
         <td colspan="3">Position des Mondes</td>
@@ -2119,84 +2222,6 @@
     <textarea id="table"></textarea>
 
 
-<h2>Hintergründe und Begriffe</h2>
-<table>
-<tr>
-<td valign="top">Sternzeit</td>
-<td>Die Erde dreht sich sowohl um ihre eigene Achse, als auch um die Sonne. Die Sternzeit berücksichtigt nur die Drehung um die eigene Achse - jeden Tag zur gleichen Sternzeit hat die Erde die gleiche Blickrichtung ins Universum (die Position auf der Bahn um die Sonne wird vernachlässigt). Ein Sterntag ist ca. 4 Minuten kürzer als ein normaler Tag und lässt sich in 24 Sternzeitstunden teilen. Die Sternzeit ist ortsabhängig.
-</td>
-</tr>
-<tr>
-<td valign="top">Julianisches Datum</td><td>Ein in der Astronomie verwendetes Zeitmaß. Es zählt fortlaufend die Anzahl der Tage seit dem 1. Januar 4713 v.Chr. Ein Tag beginnt um 12 Uhr Mittags in Greenwich (Nullmeridian), Uhrzeiten werden als Bruchteile eines Tages angegeben. Das Julianische Datum hat seinen Ursprung in einem 1583 n.Chr. erschienenen Buch von Joseph Scaliger, das verschiedene Kalendersysteme beleuchtete. Die genaue Messung und Referenzierung der Zeit stellt auch heute noch einige Herausforderungen. Zwar haben wir mittlerweile sehr gleichmäßig laufende Atomuhren, über Jahrhunderte hinweg dienten jedoch astronomische Beobachtung als Referenz. Die koordinierte Weltzeit (UTC) ist letztlich ein Kompromiss aus internationaler Atomzeit und astronomisch basierter Universalzeit.
-</tr>
-<tr>
-<td valign="top">Zeitgleichung</td>
-<td>Im Durchschnitt vergehen genau 24 Stunden, bis die Sonne zum Mittag wieder im Süden steht. Durch die Neigung der Erdachse und der elliptischen Bahn um die Sonne schwankt die genaue Zeitdauer innerhalb eines Jahres. Die Zeitgleichung gibt die Differenz der "wahren Sonnenzeit" (Zeit, die eine Sonnenuhr zeigt) zur "mittleren Zeit" (Zeit auf der Uhr) an. Dieser Unterschied kann bis zu 20 Minuten betragen und ändert sich im Laufe des Jahres.
-</td>
-</tr>
-<tr>
-<td valign="top">Ekliptikale Länge</td>
-<td>Die Erde bewegt sich (annähernd) in einer Ebene um die Sonne, diese Ebene wird Ekliptik genannt. Die Ekliptikale Länge gibt den Winkel der Erde in Bezug zum Frühlingspunkt an.
-</td>
-</tr>
-<tr>
-<td valign="top">Frühlingspunkt</td><td>Der Frühlingspunkt ergibt sich aus der Position von Erde und Sonne zum Frühlingsäquinoktium - das ist der genaue Zeitpunkt der Tag- und Nachtgleichen im März.
-Die Richtung, die die Sonne zu diesem Zeitpunkt hat, gilt als Referenz für astronomische Koordinatensysteme (ekliptisches und äquatoriales Koordinatensystem). Da sich die Erde nicht auf einer perfekten Bahn um die Sonne bewegt, verschiebt sich der Frühlingspunkt geringfügig im Laufe der Zeit. Als Bezugsangabe ist es daher wichtig, von welchem Frühlingspunkt die Rede ist.</td>
-</tr>
-<tr>
-<td>Wahre Anomalie</td>
-<td>Die "wahre Anomalie" ist eine weitere Bezugsangabe der Erdposition. Sie gibt den Winkel zwischen Schwerpunkt des Sonnensystems, Perihel (Punkt, der auf der elliptischen Bahn am nächsten am Schwerpunkt ist) und Erde an. In guter Vereinfachung lässt sich die Sonne als Schwerpunkt annehmen. Die "wahre Anomalie" entsteht aus der Berechnung der Planetenbahn (Kepplergleichung) und ist bis auf den Bezugspunkt sehr ähnlich zur Ekliptikalen Länge. Durch die unterschiedlichen Definitionen werden jedoch verschiedene Effekte berücksichtigt, die zu kleinen Abweichungen führen.
-</td>
-</tr>
-<tr>
-<td valign="top">Δ (UTC-Sternzeit)</td>
-<td>Die Differenz aus normaler Uhrzeit (Stunden und Minuten) und Sternzeit ist zwar keine formale Angabe, beschreibt aber einen interessanten Zusammenhang: Zur ersten Sonnendurchquerung nach dem Frühlingsäquinoktium - besteht eine definierte Differenz von 12 Stunden, anschließend laufen die Uhren je Tag um ca. 4 Minuten auseinander. Aus der Differenz lässt sich somit auf die Position schließen. Eine Abweichung entsteht durch die Exzentrik - die Umrechnung von Differenz in ekliptikale Länge schwankt genau um diesen Anteil der Zeitgleichung. Der Anteil der geneigten Erdachse wird dagegen indirekt berücksichtigt. Daneben gibt es nur eine kleine konstante Verschiebung die sich aus der Definition der Sternzeit ergibt.
-</td>
-</tr>
-<tr>
-<td valign="top">Perihel</td>
-<td>Perihel ist der Punkt, an dem die Erde am nächsten zur Sonne ist. Die Erde beschreibt eine leicht elliptische Bahn um die Sonne, die Sonne steht dabei in einem der Brennpunkte der Ellipse.
-Die beiden Brennpunkte der Ellipse sind in der Grafik der Erdbahn als kleine schwarze Punkte dargestellt. Die Sonne ist natürlich in der Darstellung viel zu groß, real befindet sie sich im rechten Brennpunkt. Die Erde bewegt sich in der Nähe des Perihels schneller auf ihrer Bahn um die Sonne, aktuell ist also der Winter auf der Nordhalbkugel etwas kürzer, als der Sommer.
-Im Jahr 1246 fielen Frühlingsäquinoktium und Perihel zusammen.
-Eine direkte Berechnung des Perihels ohne iterative Näherung ist nicht einfach. Der angegebene Wert entstammt einer Formel aus dem Buch "Astronomische Algorithmen" von Jean Meuss. Es wurde bewusst auf eine iterative Lösung verzichtet (diese kann selbst gefunden werden).
-</td>
-</tr>
-<tr>
-<td valign="top">Aphel</td>
-<td>Aphel ist der Punkt, an dem die Erde die größte Entfernung zur Sonne hat.</td>
-</tr>
-<tr>
-<td valign="top">Frühlingsäquinoktium</td>
-<td>
-Das Äquinoktium (lateinisch für „gleiche Nacht“) ist genau der Zeitpunkt, zu dem die Tag- und Nachtgleiche eintritt, bzw. die Sonne den Äquator überschreitet. Zu diesem Zeitpunkt ist die Erdachse nur seitlich zur Sonne geneigt, auf jedem Breitengrad wird genau die Hälfte von der Sonne beschienen.
-
-Das Frühlingsäquinoktium ist der wichtigste Bezugspunkt im astronomischen Jahr: Sternzeit, sowie ekliptikales und äquatoriales Koordinatensystem beziehen sich darauf. Außerdem markiert es den Beginn der Tierkreiszeichen (Sternzeichen). Bis zur Einführung des julianischen Kalenders im Jahr 45v.Chr. war der März der erste Monat des römischen Jahres.
-</td>
-</tr>
-<td valign="top">Sommersolstitium/ Wintersolstitium</td>
-<td>Das Solstitium (lateinisch für „Sonnenstillstand“) ist der Zeitpunkt im Jahr, an dem die Sonne ihren höchsten oder tiefsten Stand am Himmel erreicht. Dies markiert den Beginn des astronomischen Sommers oder Winters. Zur Sommersonnenwende ist der Tag auf der Nordhalbkugel am längsten, zur Wintersonnenwende am kürzesten.
-</td>
-</tr>
-<tr>
-<td>Höhe/Azimut</td>
-<td>Höhe und Azimut sind Angaben des horizontalen Koordinatensystems. Höhe gibt den Winkel zum Horizont an, Azimut die Richtung. Der Blick nach Süden, Westen, Norden, Osten entprechen 0°, 90°, 180° udn 270°, </td>
-</tr>
-<tr>
-<td valign="top">Sonnenaufgang/ Sonnenuntergang</td>
-<td>Sonnenaufgang ist der Moment an dem die Sonne gerade so sichtbar wird, Sonnenuntergang der Moment, an dem sie gerade so verschwindet. Durch Lichtbrechung (Refraktion) befindet sich die Sonne in Wirklichkeit schon unterhalb des Horizontes, obwohl sie noch sichtbar ist. Der Effekt ist unter anderem abhängig von der Lufttemperatur, Druck und Höhe des Beobachters und sorgt für kleine Abweichungen . Neben dem Begriff der Sonnenauf- und Untergänge, gibt es noch verschiedene Phasen der Dämmerung: Bürgerliche Dämmerung, nautische Dämmerung und astronomische Dämmerung.
-Sonnenauf- und Untergang sind symmetrisch zum Sonnendurchgang.
-</td>
-</tr>
-<tr>
-<td valign="top">Sonnendurchgang</td>
-<td>Sonnendurchgang bezeichnet den Moment, in dem die Sonne den höchsten Punkt ihrer täglichen Bahn am Himmel erreicht. Dies wird auch als Kulmination der Sonne bezeichnet, der Meridian (Längengrad des Beobachters) ist dann genau zur Sonne ausgerichtet. Der Sonnendurchgang (in Weltzeit) ergibt sich aus der Zeitgleichung und der geographischen Länge des Beobachters. In lokaler Zeit sind noch Zeitzonen zu berücksichtigen.
-</td>
-</tr>
-</table>
-
-<h2>Entstehung und Fazit des Projektes</h2>
-<p>Mein erster Ansatz für dieses Projekt bestand in Anfragen an ChatGPT in dem Stil: &bdquo;Schreibe ein Programm in (Javascript/C/Python), dass <tt>xyz</tt> berechnet/zeigt&rdquo; Nach zunächst überraschend positiven Ergebnissen musste ich jedoch einsehen, dass ChatGPT alleine nicht hilft (auch wenn es gute Anregungen geben und unterstützen kann). Spätestens als Berechnungen falsch waren oder ChatGPT felsenfest falsche Dinge behauptete, musste ich tiefer in die Grundlagen einsteigen. Die nun verwendeten Formeln stammen aus dem Buch &ldquo;Astronomische Algorithmen&rdquo; von Jean Meuss. Es sind Näherungsformeln, die teilweise für einige Jahrzehnte, teils für Jahrhunderte um das aktuelle Datum angemessen gut funktionieren. Mithilfe der interaktiven Darstellung können spezielle Fälle veranschaulicht und Näherungslösungen gefunden werden. Besonders durch die grafischen Darstellungen wurde deutlich, welche Aspekte zusammenspielen und ggf. genauer berücksichtigt werden müssen. Die Implementierung sollte mir gleichermaßen ein Verständnis vermitteln, als auch eine Referenz für mögliche, zukünftige Mikrocontroller-Projekte geben.
-</p>
 
 </body>
 </html>
