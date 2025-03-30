@@ -66,7 +66,7 @@
             }
         }
 
-        function drawMoonPhase(sunRaDek, moonRaDek, moonAxle, siderealtime) {
+        function drawMoonPhase(sunRaDek, moonRaDek, moonAxle, libration, siderealtime) {
 
             const cosPsi = Math.sin(sunRaDek.dek)*Math.sin(moonRaDek.dek) +  Math.cos(sunRaDek.dek)*Math.cos(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra);
 
@@ -83,7 +83,7 @@
             const q = Math.atan2(Math.sin(siderealtime - moonRaDek.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDek.dek) - Math.sin(moonRaDek.dek)*Math.cos(siderealtime - moonRaDek.ra));
 
             const i = Math.asin(-cosPsi);
-            console.log("Mond: ",(chi+Math.PI)*rad2deg,chi-q+Math.PI/2, (chi-q+Math.PI/2)*rad2deg);
+           // console.log("Mond: ",(chi+Math.PI)*rad2deg,chi-q+Math.PI/2, (chi-q+Math.PI/2)*rad2deg);
             const p = (chi + Math.PI);
             console.log("http://moon.local/?phase="+k+"&mask="+(chi-q+Math.PI/2)+"&rot="+(q+moonAxle)); //(chi-q+Math.PI/2+((p > Math.PI)?Math.PI:0))
             canvas = document.getElementById('moon');
@@ -93,80 +93,96 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
             ctx.translate(canvas.width/2, canvas.height/2);
 
+            const axleRot = createRotationMatrix({x:0,y:0,z:1},moonAxle-q);//axleRot
+            const libLongitudeRot = createRotationMatrix({x:0,y:1,z:0},libration.longitude-2.009*deg2rad);
+            const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},libration.latitude-0.64*deg2rad);
+            let rotMatrix = multiplyMatrix(libLatitudeRot,libLongitudeRot);
+                 rotMatrix = multiplyMatrix(rotMatrix,axleRot);
+            console.log("Mond Libration",normalizeAngleDifferenceRad(libration.latitude)*rad2deg,normalizeAngleDifferenceRad(libration.longitude)*rad2deg);
 
+            ctx.fillStyle ="#afa89c";
+  const mask = (chi-q+Math.PI/2);
+  const r = 120;
+  const b = r * r;
+  let a = r * r;
+  if (k > 0.5) {
+    a *= (k * 2 - 1)**2;
+  } else {
+    a *= (1 - k * 2)**2;
+  }
+  const cosMask = Math.cos(-mask);
+  const sinMask = Math.sin(-mask);
+  const cosRot = Math.cos(moonAxle);
+  const sinRot = Math.sin(moonAxle);
 
-  //           const mask = (chi-q+Math.PI/2);
-  // const r = 100;
-  // const b = r * r;
-  // let a = r * r;
-  // if (k > 0.5) {
-  //   a *= (k * 2 - 1)**2;
-  // } else {
-  //   a *= (1 - k * 2)**2;
-  // }
-  // const cosMask = 1;//Math.cos(-mask);
-  // const sinMask = 0;//Math.sin(-mask);
-  // //const cosRot = Math.cos(-rotation);
-  // //const sinRot = Math.sin(-rotation);
-  //
-  // for (let y = -r; y < r; y++) {
-  //   for (let x = -r; x < r; x++) {
-  //     let circle = x * x + y * y - r * r;
-  //     if (circle > 0) {
-  //       //tft.drawPixel(x+r,y+r,ST77XX_BLACK);
-  //       continue;
-  //     }
-  //     let conditionX = x * cosMask + y * sinMask;
-  //     let conditionY = -x * sinMask + y * cosMask;
-  //     let ellipse = conditionX * conditionX * b + conditionY * conditionY * a - a * b;
-  //     let pixelActive = false;
-  //
-  //     if (k > 0.5) {
-  //       pixelActive = conditionX >= 0 || ellipse <= 0;
-  //     } else {
-  //       pixelActive = conditionX >= 0 && ellipse > 0;
-  //     }
-  //     // let pixelColor = 0;
-  //     // if(pixelActive) {
-  //     //   int pixelX = (x * cosRot + y * sinRot) + r;
-  //     //   int pixelY = (-x * sinRot + y * cosRot) + r;
-  //     //   memcpy_P(&pixelColor, &FullMoon[pixelY*128 + pixelX], 2);
-  //     // }
-  //     if(pixelActive) {
-  //      // ctx.fillRect(x,y,1,1);
-  //       }
-  //     //tft.drawPixel(x + r, y + r, pixelColor);
-  //   }
-  // }
-            ctx.rotate(-chi+q+Math.PI);
-            if(moonImage.complete) {
-                const width = canvas.width;
-                const height = canvas.height;
-                ctx.save();
-                ctx.beginPath();
-                ctx.ellipse(0, 0, 100, c*100, 0, 0, Math.PI,dir);
-                ctx.arc(0, 0, 100, Math.PI, 0, true);
-                //ctx.arc(0, 0, 100, Math.PI * 2,0 , true);
-                ctx.closePath();
-                ctx.clip();
-                //ctx.rotate((chi > 0)?-Math.PI/2:Math.PI/2);
-                console.log("Mond 2:",chi);
-                ctx.rotate(-moonAxle+chi-Math.PI);
-                ctx.drawImage(moonImage, -width / 2, -height / 2, width, height);
-                ctx.restore();
+  for (let y = -r; y < r; y++) {
+    for (let x = -r; x < r; x++) {
+      let circle = x * x + y * y - r * r;
+      if (circle > 0) {
+        //tft.drawPixel(x+r,y+r,ST77XX_BLACK);
+        continue;
+      }
+      let conditionX = x * cosMask + y * sinMask;
+      let conditionY = -x * sinMask + y * cosMask;
+      let ellipse = conditionX * conditionX * b + conditionY * conditionY * a - a * b;
+      let pixelActive = false;
 
-            } else {
-            ctx.beginPath();
-            ctx.fillStyle = 'gray';
-            ctx.arc(0, 0, 100, Math.PI * 2,0 , true);
-            ctx.fill();
-                ctx.beginPath();
-                ctx.ellipse(0, 0, 100, c*100, 0, 0, Math.PI,dir);
-                ctx.arc(0, 0, 100, Math.PI, 0, true);
-                ctx.closePath();
-                ctx.fillStyle = 'silver';
-                ctx.fill();
-            }
+      if (k > 0.5) {
+        pixelActive = conditionX >= 0 || ellipse <= 0;
+      } else {
+        pixelActive = conditionX >= 0 && ellipse > 0;
+      }
+      // let pixelColor = 0;
+      // if(pixelActive) {
+      //   int pixelX = (x * cosRot + y * sinRot) + r;
+      //   int pixelY = (-x * sinRot + y * cosRot) + r;
+      //   memcpy_P(&pixelColor, &FullMoon[pixelY*128 + pixelX], 2);
+      // }
+      //pixelActive = 1;
+      if(pixelActive) {
+        //const pixelX = (x * cosRot + y * sinRot) + r;
+        //const pixelY = (-x * sinRot + y * cosRot) + r;
+        const z = Math.sqrt(r*r - x*x - y*y);
+        const point = applyMatrix({x:x,y:y,z:z},rotMatrix);
+       //ctx.fillRect(x,y,1,1);
+        if(moonImage.complete && point.z >0) {//
+            ctx.drawImage(moonImage,point.x+r,point.y+r,1,1, x, y, 1, 1);
+        } else {
+            ctx.fillRect(x,y,1,1);
+        }
+       }
+      //tft.drawPixel(x + r, y + r, pixelColor);
+    }
+  }
+            // ctx.rotate(-chi+q+Math.PI);
+            // if(moonImage.complete) {
+            //     const width = canvas.width;
+            //     const height = canvas.height;
+            //     ctx.save();
+            //     ctx.beginPath();
+            //     ctx.ellipse(0, 0, 100, c*100, 0, 0, Math.PI,dir);
+            //     ctx.arc(0, 0, 100, Math.PI, 0, true);
+            //     //ctx.arc(0, 0, 100, Math.PI * 2,0 , true);
+            //     ctx.closePath();
+            //     ctx.clip();
+            //     //ctx.rotate((chi > 0)?-Math.PI/2:Math.PI/2);
+            //     console.log("Mond 2:",chi);
+            //     ctx.rotate(-moonAxle+chi-Math.PI);
+            //     ctx.drawImage(moonImage, -width / 2, -height / 2, width, height);
+            //     ctx.restore();
+            //
+            // } else {
+            // ctx.beginPath();
+            // ctx.fillStyle = 'gray';
+            // ctx.arc(0, 0, 100, Math.PI * 2,0 , true);
+            // ctx.fill();
+            //     ctx.beginPath();
+            //     ctx.ellipse(0, 0, 100, c*100, 0, 0, Math.PI,dir);
+            //     ctx.arc(0, 0, 100, Math.PI, 0, true);
+            //     ctx.closePath();
+            //     ctx.fillStyle = 'silver';
+            //     ctx.fill();
+            // }
         }
 
         /**
@@ -183,9 +199,9 @@
         /**
          * Zeichne Mond in Bild 1 "Erdposition"
          */
-        function drawMoon(eclipticalLongitude, vernalPoint, eclipticalLength, risingKnotMoon) {
-            const moonX = moon.orbit.radius*Math.cos(eclipticalLongitude);
-            const moonY = moon.orbit.radius*Math.sin(eclipticalLongitude);
+        function drawMoon(eclipticalLongitude, distance, vernalPoint, eclipticalLength, risingKnotMoon) {
+            const moonX =distance*Math.cos(eclipticalLongitude);
+            const moonY = distance*Math.sin(eclipticalLongitude);
             ctx.beginPath();
             ctx.arc(moonX, moonY, moon.radius, vernalPoint - eclipticalLength - Math.PI/2, vernalPoint - eclipticalLength + Math.PI/2 , false);
             ctx.fillStyle = moon.color;
@@ -195,7 +211,6 @@
             ctx.arc(moonX, moonY, moon.radius, vernalPoint - eclipticalLength - Math.PI/2, vernalPoint - eclipticalLength + Math.PI/2 , true);
             ctx.fillStyle = 'lightgray';
             ctx.fill();
-
 
             ctx.beginPath();
             ctx.moveTo(moon.radius*Math.cos(eclipticalLongitude-Math.PI/2) + moonX,moon.radius*Math.sin(eclipticalLongitude-Math.PI/2)+moonY);
@@ -276,7 +291,7 @@
         /**
          * Zeichne Erde mit Meridian in Bild 1 "Erdposition"
          */
-        function drawEarthWithIndicatorAndMoon(radius, eclipticalLength, vernalPoint, indicatorDirection,moonLongitude, risingKnotMoon) {
+        function drawEarthWithIndicatorAndMoon(radius, eclipticalLength, vernalPoint, indicatorDirection,moonCoordinates, risingKnotMoon) {
             // Position der Erde um die Umlaufbahn
             const earthX = 0;//sun.x + radius*earth.orbit.radius * Math.cos(eclipticalLength);
             const earthY = 0;//sun.y - radius*earth.orbit.radius * Math.sin(eclipticalLength);
@@ -300,7 +315,9 @@
             ctx.fillStyle = earth.color;
             ctx.fill();
 
-            drawMoon(-moonLongitude+Math.PI,vernalPoint, eclipticalLength,risingKnotMoon);
+            const distance = moonCoordinates.distance/moonOrbitRadius*moon.orbit.radius;
+
+            drawMoon(-moonCoordinates.longitude+Math.PI,distance,vernalPoint, eclipticalLength,risingKnotMoon);
 
             //Indikator
             indicatorDirection = siderealDirectionCorrection(indicatorDirection);
@@ -733,6 +750,10 @@
             console.log("Mond Parallaxe:", moonParallax*rad2deg*60);
             const moonPhase = calculateMoonPhase(sunRaDek, orbitRadiusEarth*aeTokm, calculateParallax(moonRaDek,moonParallax,siderealTime/12*Math.PI+longitude*deg2rad), moon.distance);
 
+            const moonRand = Math.atan2(Math.cos(sunRaDek.dek)*Math.sin(sunRaDek.ra - moonRaDek.ra),
+            Math.sin(sunRaDek.dek)*Math.cos(moonRaDek.dek) - Math.cos(sunRaDek.dek)*Math.sin(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra)
+            );
+
             //Sonnenauf- und Untergang
             const sunriseSet = calculateSunriseSunset(julianDate);
 
@@ -771,6 +792,14 @@
             document.getElementById("moonHeight").innerText = (moonAzimutHeight.height*rad2deg).toFixed(2) +"°";
 
             document.getElementById("moonPhase").innerText = (moonPhase*100).toFixed(2) + "%";
+            document.getElementById("moonAxle").innerText = radToDegString(moonAxle.axle) + " ("+
+            (moonAxle.axle*rad2deg).toFixed(4)+"°)";
+
+            document.getElementById("moonRand").innerHTML = radToDegString(moonRand) + " ("+
+            (moonRand*rad2deg).toFixed(4)+"°)";
+            document.getElementById("moonLibration").innerText = radToDegString(moonAxle.libration.longitude) + " / "+
+            radToDegString(moonAxle.libration.latitude);
+
 
 
             //Grafik-Ausgabe
@@ -792,11 +821,11 @@
             drawPolygonLine(ctx,calculateMoonOrbit(julianDate),'black',false);
             ctx.restore();
 
-            drawEarthWithIndicatorAndMoon(orbitRadiusEarth, orbitLengthEarth, springEquinoxLength, siderealTime/12*Math.PI+longitude*deg2rad, moon.longitude,risingKnotMoon);
+            drawEarthWithIndicatorAndMoon(orbitRadiusEarth, orbitLengthEarth, springEquinoxLength, siderealTime/12*Math.PI+longitude*deg2rad, moon,risingKnotMoon);
             //drawOrbit();
             //drawPerihelAphel();
 
-            drawMoonPhase(sunRaDek, moonRaDek,moonAxle,siderealTime/12*Math.PI+longitude*deg2rad);
+            drawMoonPhase(sunRaDek, moonRaDek,moonAxle.axle,moonAxle.libration, siderealTime/12*Math.PI+longitude*deg2rad);
 
             //drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad,moon.latitude,moon.longitude,moon.distance);
             //fillTable();
@@ -823,7 +852,7 @@
 
                 const point = {
                  x: Math.cos(moonCoordinates.longitude + Math.PI) * radius, //moon.orbit.radius,
-                 y: i,
+                 y: moonCoordinates.latitude,
                  z: Math.sin(moonCoordinates.longitude + Math.PI) * radius //moon.orbit.radius
                 };
                 polygonLine.push(point);
@@ -1702,6 +1731,7 @@
             //Formel 51.1
             const A = Math.atan2(Math.sin(W)*Math.cos(beta)*Math.cos(I) - Math.sin(beta)*Math.sin(I), Math.cos(W)*Math.cos(beta));
 
+            //console.log("W, A, F",normalizeAngleDegree(W*rad2deg), normalizeAngleDegree( A*rad2deg), normalizeAngleDegree(F*rad2deg));
             //optische Liberation
             const l1 = A - F;
             const b1 = Math.asin(-Math.sin(W)*Math.cos(beta)*Math.sin(I)-Math.sin(beta)*Math.cos(I));
@@ -1759,7 +1789,7 @@
 
             const l2 = -tau  + (rho * Math.cos(A) + sigma * Math.sin(A))* Math.tan(b1);
             const b2 = sigma * Math.cos(A) - rho * Math.sin(A);
-            console.log("Libration:",(l1+l2)*rad2deg,(b1+b2)*rad2deg);
+            console.log("Libration:",b1*rad2deg,b2*rad2deg,l1*rad2deg,l2*rad2deg);
 
             const moonRadek = calculateRaDek(moon.longitude,moon.latitude);
 
@@ -1771,7 +1801,13 @@
             const P = Math.asin(Math.sqrt(X**2+Y**2)*Math.cos(moonRadek.ra - w)/Math.cos(moon.latitude));
 
             console.log("Mondachse:",normalizeAngleDegree(P*rad2deg));
-            return P;
+            return {
+                libration: {
+                    longitude: (l1+l2),
+                    latitude: (b1+b2),
+                },
+                axle: P
+            }
         }
 
 
@@ -2114,13 +2150,13 @@
 
     <canvas id="solarSystem" width="620" height="620"></canvas>
     <p>
-        Erdbahn um die Sonne
+        Mondbahn um die Erde
     </p>
 
 
     <!--<canvas id="earth" width="550" height="410"></canvas>-->
 
-    <canvas id="moon" width="200" height="200"></canvas>
+    <canvas id="moon" width="240" height="240"></canvas>
     Mond
 
 </div>
@@ -2137,9 +2173,12 @@
 </div>
      <table style="display:block;clear:left">
 
+    <tr>
+        <td colspan="3">Sonne</td>
+    </tr>
 
     <tr>
-        <td rowspan = "4"></td>
+        <td rowspan = "4">&nbsp;&nbsp;</td>
         <td>Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
         <td><span id="eclipticalLength"></span></td>
     </tr>
@@ -2153,15 +2192,21 @@
         <td><span id="springEquinox"></span></td>
     </tr>
     <tr>
-        <td colspan="3">Position des Mondes</td>
+        <td>RA/Dek</td>
+        <td><span id="sunRadek"></span></td>
     </tr>
+
     <tr>
-        <td rowspan ="7"></td>
-        <td>ekliptikale Länge <br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
+        <td colspan="3">Mond</td>
+    </tr>
+
+    <tr>
+        <td rowspan ="10"></td>
+        <td>Ekliptikale Länge <br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
         <td><span id="moonLongitude"></td>
     </tr>
     <tr>
-        <td>ekliptikale Breite</td>
+        <td>Ekliptikale Breite</td>
         <td><span id="moonLatitude"></td>
     </tr>
     <tr>
@@ -2185,10 +2230,22 @@
         <td><span id="moonPhase"></td>
     </tr>
     <tr>
+        <td>Positionswinkel Achse</td>
+        <td><span id="moonAxle"></td>
+    </tr>
+    <tr>
+        <td>Positionswinkel heller Rand</td>
+        <td><span id="moonRand"></td>
+    </tr>
+    <tr>
+        <td>Libration (Länge/Breite)</td>
+        <td><span id="moonLibration"></td>
+    </tr>
+    <tr>
         <td colspan = "3">Ortsbezogene Daten</td>
     </tr>
     <tr>
-        <td rowspan = "7"></td>
+        <td rowspan = "8"></td>
         <td>Azimut Sonne</td>
         <td><span id="sunAzimut"></span></td>
 
@@ -2216,6 +2273,10 @@
     <tr>
         <td>Höhe Mond</td>
         <td><span id="moonHeight"></td>
+    </tr>
+    <tr>
+        <td>Mond - parallaktischer Winkel</td>
+        <td><span id="moonQ"></td>
     </tr>
     </table>
 
