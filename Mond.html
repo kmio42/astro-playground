@@ -45,7 +45,7 @@
         // Parameter für Bild 1 "Erdposition"
 
         const earth = {
-            radius: 40,
+            radius: 30,
             color: 'darkblue',
             orbit: {
                 radius: 280,
@@ -53,13 +53,13 @@
             },
             indicator: {
                 width: 2,
-                length: 30,
+                length: 60,
                 color: 'red'
             }
         };
 
         const moon = {
-            radius: 25,
+            radius: 20,
             color: 'gray',
             orbit: {
                 radius: 250
@@ -93,7 +93,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
             ctx.translate(canvas.width/2, canvas.height/2);
 
-            const axleRot = createRotationMatrix({x:0,y:0,z:1},moonAxle-q);//axleRot
+            const axleRot = createRotationMatrix({x:0,y:0,z:1},moonAxle-q-0.389615);//axleRot
             const libLongitudeRot = createRotationMatrix({x:0,y:1,z:0},libration.longitude-2.009*deg2rad);
             const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},libration.latitude-0.64*deg2rad);
             let rotMatrix = multiplyMatrix(libLatitudeRot,libLongitudeRot);
@@ -743,16 +743,18 @@
             const risingKnotMoon = calculateRisingKnotMoon(julianDate);
             const moonDistanceEcliptic = moon.distance * Math.sin(moon.latitude);
             const moonAxle = calculateMoonAxle(julianDate,moon);
-
-            const moonRaDek = calculateRaDek(moon.longitude, moon.latitude);
-            const moonAzimutHeight = calculateHAzFromRaDek(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
             const moonParallax = Math.asin(6378.14/moon.distance);
-            console.log("Mond Parallaxe:", moonParallax*rad2deg*60);
-            const moonPhase = calculateMoonPhase(sunRaDek, orbitRadiusEarth*aeTokm, calculateParallax(moonRaDek,moonParallax,siderealTime/12*Math.PI+longitude*deg2rad), moon.distance);
+
+
+            const moonRaDekRaw = calculateRaDek(moon.longitude, moon.latitude);
+            const moonRaDek = calculateParallax(moonRaDekRaw,moonParallax,siderealTime/12*Math.PI+longitude*deg2rad);
+
+            const moonAzimutHeight = calculateHAzFromRaDek(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
+            const moonPhase = calculateMoonPhase(sunRaDek, orbitRadiusEarth*aeTokm, moonRaDek, moon.distance);
 
             const moonRand = Math.atan2(Math.cos(sunRaDek.dek)*Math.sin(sunRaDek.ra - moonRaDek.ra),
-            Math.sin(sunRaDek.dek)*Math.cos(moonRaDek.dek) - Math.cos(sunRaDek.dek)*Math.sin(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra)
-            );
+            Math.sin(sunRaDek.dek)*Math.cos(moonRaDek.dek) - Math.cos(sunRaDek.dek)*Math.sin(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra));
+            const moonParallacticAngle = calculateParallacticAngle(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
 
             //Sonnenauf- und Untergang
             const sunriseSet = calculateSunriseSunset(julianDate);
@@ -773,7 +775,8 @@
 
             document.getElementById("moonRisingKnot").innerText = radToDegString(risingKnotMoon) + " ("+normalizeAngleDegree(risingKnotMoon*rad2deg).toFixed(4)+'°)';
 
-            document.getElementById("moonRADEK").innerText = normalizeAngleDegree(moonRaDek.ra*rad2deg).toFixed(4) + "° / " + (moonRaDek.dek*rad2deg).toFixed(4)+"°";
+            document.getElementById("moonRADEK").innerText = normalizeAngleDegree(moonRaDekRaw.ra*rad2deg).toFixed(4) + "° / " + (moonRaDekRaw.dek*rad2deg).toFixed(4)+"°";
+            document.getElementById("moonRADEKCorrect").innerText = normalizeAngleDegree(moonRaDek.ra*rad2deg).toFixed(4) + "° / " + (moonRaDek.dek*rad2deg).toFixed(4)+"°";
 
             document.getElementById("eclipticalLength").innerText = radToDegString(eclipticalLength) + " ("+normalizeAngleDegree(eclipticalLength*rad2deg).toFixed(4)+'°)';
 
@@ -799,6 +802,8 @@
             (moonRand*rad2deg).toFixed(4)+"°)";
             document.getElementById("moonLibration").innerText = radToDegString(moonAxle.libration.longitude) + " / "+
             radToDegString(moonAxle.libration.latitude);
+
+            document.getElementById("moonParallacticAngle").innerText = (moonParallacticAngle*rad2deg).toFixed(2)+"°";
 
 
 
@@ -1261,6 +1266,15 @@
                 "height": h
             };
         }
+
+        /**
+         * Berechnung parallaktischer Winkel - wie ein Himmelskörper während einer bestimmten Zeit am Himmel gedreht erscheint
+         */
+         function calculateParallacticAngle(radek,siderealTime) {
+            const q = Math.atan2(Math.sin(siderealTime - radek.ra), Math.tan(latitude*deg2rad)*Math.cos(radek.dek) - Math.sin(radek.dek)*Math.cos(siderealTime - radek.ra));
+            return q;
+         }
+
 
         /**
          * Interpolationsformel aus "Astronomische Algorithmen" von Jean Meuss
@@ -2201,7 +2215,7 @@
     </tr>
 
     <tr>
-        <td rowspan ="10"></td>
+        <td rowspan ="11"></td>
         <td>Ekliptikale Länge <br>(zum mittl. Frühlingspunkt des aktuellen Datums)</td>
         <td><span id="moonLongitude"></td>
     </tr>
@@ -2224,6 +2238,10 @@
     <tr>
         <td>RA/Dek</td>
         <td><span id="moonRADEK"></td>
+    </tr>
+    <tr>
+        <td>RA/Dek (scheinbar)</td>
+        <td><span id="moonRADEKCorrect"></td>
     </tr>
     <tr>
         <td>Mondphase</td>
@@ -2276,7 +2294,7 @@
     </tr>
     <tr>
         <td>Mond - parallaktischer Winkel</td>
-        <td><span id="moonQ"></td>
+        <td><span id="moonParallacticAngle"></td>
     </tr>
     </table>
 
