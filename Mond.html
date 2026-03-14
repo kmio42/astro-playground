@@ -70,8 +70,10 @@
 
             const cosPsi = Math.sin(sunRaDek.dek)*Math.sin(moonRaDek.dek) +  Math.cos(sunRaDek.dek)*Math.cos(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra);
 
+            const i = Math.atan2(sunRaDek.distance*Math.sin(Math.acos(cosPsi)),(moonRaDek.distance-sunRaDek.distance*cosPsi));
+            const k = (1 + Math.cos(i))/2;
             //const i = Math.atan2(sunDistance*Math.sqrt(1-cosPsi**2),moonDistance-sunDistance*cosPsi);
-            const k = (1 - cosPsi)/2;
+            //const k = (1 - cosPsi)/2;
 
             const chi = Math.atan2(Math.cos(sunRaDek.dek)*Math.sin(sunRaDek.ra - moonRaDek.ra),
             Math.sin(sunRaDek.dek)*Math.cos(moonRaDek.dek) - Math.cos(sunRaDek.dek)*Math.sin(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra)
@@ -82,7 +84,7 @@
 
             const q = Math.atan2(Math.sin(siderealtime - moonRaDek.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDek.dek) - Math.sin(moonRaDek.dek)*Math.cos(siderealtime - moonRaDek.ra));
 
-            const i = Math.asin(-cosPsi);
+            //const i = Math.asin(-cosPsi);
            // console.log("Mond: ",(chi+Math.PI)*rad2deg,chi-q+Math.PI/2, (chi-q+Math.PI/2)*rad2deg);
             const p = (chi + Math.PI);
             console.log("http://moon.local/?phase="+k+"&mask="+(chi-q+Math.PI/2)+"&rot="+(q+moonAxle)); //(chi-q+Math.PI/2+((p > Math.PI)?Math.PI:0))
@@ -93,15 +95,17 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
             ctx.translate(canvas.width/2, canvas.height/2);
 
-            const axleRot = createRotationMatrix({x:0,y:0,z:1},moonAxle-q-0.389615);//axleRot
+            const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxle+q+0.389615);//axleRot -moonAxle+q
             const libLongitudeRot = createRotationMatrix({x:0,y:1,z:0},libration.longitude-2.009*deg2rad);
             const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},libration.latitude-0.64*deg2rad);
-            let rotMatrix = multiplyMatrix(libLatitudeRot,libLongitudeRot);
-                 rotMatrix = multiplyMatrix(rotMatrix,axleRot);
+            let rotMatrix = multiplyMatrix(libLongitudeRot,libLatitudeRot);
+                 rotMatrix = multiplyMatrix(axleRot,rotMatrix);
+                 //rotMatrix = axleRot;
+                 //rotMatrix = [[1,0,0],[0,1,0],[0,0,1]];
             console.log("Mond Libration",normalizeAngleDifferenceRad(libration.latitude)*rad2deg,normalizeAngleDifferenceRad(libration.longitude)*rad2deg);
 
             ctx.fillStyle ="#afa89c";
-  const mask = (chi-q+Math.PI/2);
+  const mask = (chi-q+Math.PI/2); //
   const r = 120;
   const b = r * r;
   let a = r * r;
@@ -143,10 +147,10 @@
         //const pixelX = (x * cosRot + y * sinRot) + r;
         //const pixelY = (-x * sinRot + y * cosRot) + r;
         const z = Math.sqrt(r*r - x*x - y*y);
-        const point = applyMatrix({x:x,y:y,z:z},rotMatrix);
+        const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
        //ctx.fillRect(x,y,1,1);
         if(moonImage.complete && point.z >0) {//
-            ctx.drawImage(moonImage,point.x+r,point.y+r,1,1, x, y, 1, 1);
+            ctx.drawImage(moonImage,point.x+r,-point.y+r,1,1, x, y, 1, 1);
         } else {
             ctx.fillRect(x,y,1,1);
         }
@@ -829,7 +833,8 @@
             drawEarthWithIndicatorAndMoon(orbitRadiusEarth, orbitLengthEarth, springEquinoxLength, siderealTime/12*Math.PI+longitude*deg2rad, moon,risingKnotMoon);
             //drawOrbit();
             //drawPerihelAphel();
-
+            sunRaDek.distance = orbitRadiusEarth*aeTokm;
+            moonRaDek.distance = moon.distance;
             drawMoonPhase(sunRaDek, moonRaDek,moonAxle.axle,moonAxle.libration, siderealTime/12*Math.PI+longitude*deg2rad);
 
             //drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad,moon.latitude,moon.longitude,moon.distance);
@@ -1703,10 +1708,17 @@
         }
 
         function calculateParallax(objRaDek, parallax, direction) {
-            const alpha = Math.atan(-Math.cos(latitude*deg2rad)*Math.sin(parallax)*Math.sin(direction-objRaDek.ra)/(Math.cos(objRaDek.dek) - Math.sin(latitude*deg2rad)*Math.sin(parallax)*Math.cos(direction-objRaDek.ra)));
+
+            const ba = 0.99664719;
+            const H = 0;
+            const u = Math.atan(ba*Math.tan(latitude*deg2rad));
+            const rhoSinPhi = ba*Math.sin(u) + H/6378140 * Math.sin(latitude*deg2rad);
+            const rhoCosPhi =    Math.cos(u) + H/6378140 * Math.cos(latitude*deg2rad);
+
+            const alpha = Math.atan(-rhoCosPhi*Math.sin(parallax)*Math.sin(direction-objRaDek.ra)/(Math.cos(objRaDek.dek) - rhoCosPhi*Math.sin(parallax)*Math.cos(direction-objRaDek.ra)));
 
             const dek = Math.atan2(
-                (Math.sin(objRaDek.dek) - Math.sin(latitude*deg2rad)*Math.sin(parallax))*Math.cos(alpha),(Math.cos(objRaDek.dek) - Math.sin(latitude*deg2rad)*Math.sin(parallax)*Math.cos(direction-objRaDek.ra)));
+                (Math.sin(objRaDek.dek) - rhoSinPhi*Math.sin(parallax))*Math.cos(alpha),(Math.cos(objRaDek.dek) - rhoCosPhi*Math.sin(parallax)*Math.cos(direction-objRaDek.ra)));
             console.log("Parallaxe",parallax*rad2deg,alpha*rad2deg,(dek-objRaDek.dek)*rad2deg);
             return {
                 "ra": objRaDek.ra + alpha,
