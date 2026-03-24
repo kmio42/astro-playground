@@ -124,22 +124,14 @@ inline double gradToRad(double grad, double minute = 0, double second = 0 ) {
 
 /**
  * Berechnet die aktuelle Exzentrizität der Erdbahn für ein gegebenes Julianisches Datum.
- * @brief Calculates the current eccentricity of Earth's orbit based on the Julian date.
  *
- * This function computes the eccentricity of Earth's orbit using a formula derived
- * from astronomical algorithms. The formula accounts for the variation of eccentricity
- * over time, which is influenced by gravitational interactions and other celestial mechanics.
- *
- * @param jd The Julian date for which the eccentricity is to be calculated.
- * @return The current eccentricity of Earth's orbit.
- *
- * @note The formula used is based on the approximation provided in "Astronomical Algorithms"
- *       by Jean Meeus, which is a widely used reference in the field of celestial mechanics.
+ * @param jd Julianisches Datum
+ * @return Exzentrizität der Erdbahn
+ * 
+ * @note Formel 24.4 aus "Astronomical Algorithms" von Jean Meeus.
  */
 double calculateCurrentExcentric(double jd) {
     double T = calculateJulianEpoch(jd);
-
-    //Tabelle 30.1
     return 0.016708617 - T * (0.000042037 + 0.0000001236 * T);
 }
 
@@ -149,6 +141,8 @@ double calculateCurrentExcentric(double jd) {
  * Formeln: 24.3 aus "Astronomical Algorithms" von Jean Meeus.
  * @param jd Julianisches Datum
  * @return Ekliptikale Länge in Bogenmaß
+ * 
+ * @note Formel 24.3 aus "Astronomical Algorithms" von Jean Meeus.
  */
 double calculateEclipticalLength(double jd) {
     double T = calculateJulianEpoch(jd);
@@ -188,6 +182,7 @@ double calculateTrueAnomaly(double jd) {
     }
 
     // Berechnung der wahren Anomalie (ν) in Bogenmaß
+    // umgestellte Formel 29.1 aus "Astronomical Algorithms" von Jean Meeus.
     double nu = 2.0 * atan2(sqrt(1 + e_current) * sin(E / 2),
                              sqrt(1 - e_current) * cos(E / 2));
     return nu;
@@ -259,9 +254,11 @@ double calculateEquationOfTime(double jd, bool withEarthTilt) {
  * @return Äquatoriale Koordinaten (RA in Bogenmaß, Dek in Bogenmaß, Distanz 0)
  */
 RaDek calculateRaDek(double eclipticalLongitude, double eclipticalLatitude) {
+    // Formel 12.3 aus "Astronomical Algorithms" von Jean Meeus.
     double ra = atan2(
         cos(EPSILON * DEG2RAD) * sin(eclipticalLongitude) - tan(eclipticalLatitude) * sin(EPSILON * DEG2RAD),
         cos(eclipticalLongitude));
+    // Formel 12.4 aus "Astronomical Algorithms" von Jean Meeus.
     double dek = asin(
         sin(eclipticalLatitude) * cos(EPSILON * DEG2RAD)
       + cos(eclipticalLatitude) * sin(EPSILON * DEG2RAD) * sin(eclipticalLongitude));
@@ -277,9 +274,12 @@ RaDek calculateRaDek(double eclipticalLongitude, double eclipticalLatitude) {
  */
 AzimutHeight calculateHAzFromRaDek(const RaDek& radek, double siderealTime, double latitude) {
     double H = siderealTime - radek.ra;
+    // Formel 12.5 aus "Astronomical Algorithms" von Jean Meeus.
     double A = atan2(sin(H),
                      cos(H) * sin(latitude * DEG2RAD)
                    - tan(radek.dek) * cos(latitude * DEG2RAD));
+    
+    // Formel 12.6 aus "Astronomical Algorithms" von Jean Meeus.
     double h = asin(sin(latitude * DEG2RAD) * sin(radek.dek)
                   + cos(latitude * DEG2RAD) * cos(radek.dek) * cos(H));
     return {A, h};
@@ -291,6 +291,8 @@ AzimutHeight calculateHAzFromRaDek(const RaDek& radek, double siderealTime, doub
  * @param siderealTime Sternzeit in Stunden
  * @param latitude Breitengrad in Grad
  * @return Parallaktischer Winkel in Bogenmaß
+ * 
+ * @note Formel 13.1 aus "Astronomical Algorithms" von Jean Meeus.
  */
 double calculateParallacticAngle(const RaDek& radek, double siderealTime, double latitude) {
     return atan2(sin(siderealTime - radek.ra),
@@ -306,6 +308,8 @@ double calculateParallacticAngle(const RaDek& radek, double siderealTime, double
  * @return Korrigierte äquatoriale Koordinaten
  */
 RaDek calculateParallax(const RaDek& objRaDek, double parallax, double direction, double latitude) {
+    
+    // Kapitel 10 aus "Astronomical Algorithms" von Jean Meeus.
     constexpr double ba = 0.99664719;
     constexpr double H = 0; // Höhe über Meeresspiegel
 
@@ -313,9 +317,11 @@ RaDek calculateParallax(const RaDek& objRaDek, double parallax, double direction
     double rhoSinPhi = ba * sin(u) + H / 6378140.0 * sin(latitude * DEG2RAD);
     double rhoCosPhi = cos(u) + H / 6378140.0 * cos(latitude * DEG2RAD);
 
+    // Formel 39.2 aus "Astronomical Algorithms" von Jean Meeus.
     double alpha = atan(-rhoCosPhi * sin(parallax) * sin(direction - objRaDek.ra)
                        / (cos(objRaDek.dek) - rhoCosPhi * sin(parallax) * cos(direction - objRaDek.ra)));
 
+    // Formel 39.3 aus "Astronomical Algorithms" von Jean Meeus.
     double dek = atan2(
         (sin(objRaDek.dek) - rhoSinPhi * sin(parallax)) * cos(alpha),
          cos(objRaDek.dek) - rhoCosPhi * sin(parallax) * cos(direction - objRaDek.ra));
@@ -336,9 +342,11 @@ RaDek calculateParallax(const RaDek& objRaDek, double parallax, double direction
  * @return Interpolierter Wert
  */
 double interpolate(double y1, double y2, double y3, double n) {
+    // Formel 3.1 aus "Astronomical Algorithms" von Jean Meeus.
     double a = y2 - y1;
     double b = y3 - y2;
     double c = b - a;
+    // Formel 3.3 aus "Astronomical Algorithms" von Jean Meeus.
     return y2 + n / 2.0 * (a + b + n * c);
 }
 
@@ -362,6 +370,7 @@ SunriseSunset calculateSunriseSunset(double jd, double latitude, double longitud
     RaDek radek2 = calculateRaDek(length2, 0);
     double siderealTime = calculateSiderealTime(jd) * 180.0 / 12.0;
 
+    // Formel 14.1 aus "Astronomical Algorithms" von Jean Meeus.
     double cH0 = (sin(h0 * DEG2RAD) - sin(latitude * DEG2RAD) * sin(radek2.dek))
                / (cos(latitude * DEG2RAD) * cos(radek2.dek));
 
@@ -371,6 +380,7 @@ SunriseSunset calculateSunriseSunset(double jd, double latitude, double longitud
 
     double H0 = acos(cH0) * RAD2DEG;
 
+    // Formel 14.2 aus "Astronomical Algorithms" von Jean Meeus.
     double m0 = fmod((radek2.ra * RAD2DEG - longitude - siderealTime) / 360.0, 1.0);
     m0 = fmod(m0 + 1.0, 1.0);
 
@@ -391,6 +401,10 @@ SunriseSunset calculateSunriseSunset(double jd, double latitude, double longitud
  * @return Julianisches Datum des Ereignisses
  */
 double calculateJDOfPoint(int year, EquinoxType type) {
+
+    //Kapitel 26 aus "Astronomical Algorithms" von Jean Meeus.
+    
+    //Tabelle 26.3 aus "Astronomical Algorithms" von Jean Meeus.
     static const double factors[][3] = {
         {485, 324.96,   1934.136},
         {203, 337.23,  32964.467},
@@ -418,21 +432,23 @@ double calculateJDOfPoint(int year, EquinoxType type) {
         {  8,  15.45,  16859.074},
     };
 
+    // Tabelle 26.2 aus "Astronomical Algorithms" von Jean Meeus.
+    // Die Werte für die Jahre 1000–3000 wurden hier auf 2000 zentriert, um die Genauigkeit zu verbessern.
     static const double parameters[4][5] = {
-        {2451623.80984, 365242.37404,  0.05169, 0.00411, 0.00057}, // Frühling
-        {2451716.56767, 365241.62603,  0.00325, 0.00888, 0.00030}, // Sommer
-        {2451810.21715, 365242.01767,  0.11575, 0.00337, 0.00078}, // Herbst
-        {2451900.05952, 365242.74049,  0.06223, 0.00823, 0.00032}, // Winter
+        {2451623.80984, 365242.37404,  0.05169, -0.00411, -0.00057}, // Frühling
+        {2451716.56767, 365241.62603,  0.00325, 0.00888, -0.00030}, // Sommer
+        {2451810.21715, 365242.01767,  -0.11575, 0.00337, 0.00078}, // Herbst
+        {2451900.05952, 365242.74049,  -0.06223, -0.00823, 0.00032}, // Winter
     };
 
     int idx = static_cast<int>(type);
     double y = (year - 2000) / 1000.0;
 
-    double JDE0 = parameters[idx][0]
-                + parameters[idx][1] * y
-                + parameters[idx][2] * y * y
-                - parameters[idx][3] * y * y * y
-                - parameters[idx][4] * y * y * y * y;
+    double JDE0 = parameters[idx][0] +
+                y * ( parameters[idx][1] +
+                y * ( parameters[idx][2] +
+                y * ( parameters[idx][3] +
+                y * ( parameters[idx][4] ))));
 
     double T = calculateJulianEpoch(JDE0);
     double W = 35999.373 * T - 2.47;
