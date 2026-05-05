@@ -30,6 +30,9 @@
         const moonImage = new Image();
         moonImage.src = "./mond.png";
 
+        const moonImage2 = new Image();
+        moonImage2.src = "./lroc_color_poles_1k.jpg";
+
         // Grafik-Ausgabe
         var canvas,ctx;
 
@@ -87,7 +90,7 @@
             //const i = Math.asin(-cosPsi);
            // console.log("Mond: ",(chi+Math.PI)*rad2deg,chi-q+Math.PI/2, (chi-q+Math.PI/2)*rad2deg);
             const p = (chi + Math.PI);
-            console.log("http://moon.local/?phase="+k+"&mask="+(chi-q+Math.PI/2)+"&rot="+(q+moonAxle)); //(chi-q+Math.PI/2+((p > Math.PI)?Math.PI:0))
+            //console.log("http://moon.local/?phase="+k+"&mask="+(chi-q+Math.PI/2)+"&rot="+(q+moonAxle)); //(chi-q+Math.PI/2+((p > Math.PI)?Math.PI:0))
             canvas = document.getElementById('moon');
             const ctx = canvas.getContext('2d');
 
@@ -95,69 +98,77 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
             ctx.translate(canvas.width/2, canvas.height/2);
 
-            const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxle+q+0.389615);//axleRot -moonAxle+q
-            const libLongitudeRot = createRotationMatrix({x:0,y:1,z:0},libration.longitude-2.009*deg2rad);
-            const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},libration.latitude-0.64*deg2rad);
+            const axleRot = createRotationMatrix({x:0,y:0,z:-1},moonAxle-q);//axleRot -moonAxle+q -0.389615
+            const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},-libration.latitude); //Negativ +0.64*deg2rad
+            const libLongitudeRot = createRotationMatrix({x:0,y:1,z:0},-libration.longitude); //Negativ +2.009*deg2rad
             let rotMatrix = multiplyMatrix(libLongitudeRot,libLatitudeRot);
-                 rotMatrix = multiplyMatrix(axleRot,rotMatrix);
-                 //rotMatrix = axleRot;
-                 //rotMatrix = [[1,0,0],[0,1,0],[0,0,1]];
-            console.log("Mond Libration",normalizeAngleDifferenceRad(libration.latitude)*rad2deg,normalizeAngleDifferenceRad(libration.longitude)*rad2deg);
+                rotMatrix = multiplyMatrix(rotMatrix,axleRot);
 
             ctx.fillStyle ="#afa89c";
-  const mask = (chi-q+Math.PI/2); //
-  const r = 120;
-  const b = r * r;
-  let a = r * r;
-  if (k > 0.5) {
-    a *= (k * 2 - 1)**2;
-  } else {
-    a *= (1 - k * 2)**2;
-  }
-  const cosMask = Math.cos(-mask);
-  const sinMask = Math.sin(-mask);
-  const cosRot = Math.cos(moonAxle);
-  const sinRot = Math.sin(moonAxle);
+            const mask = (chi-q+Math.PI/2); //
+            const r = 120;
+            const b = r * r;
+            let a = r * r;
+            if (k > 0.5) {
+                a *= (k * 2 - 1)**2;
+            } else {
+                a *= (1 - k * 2)**2;
+            }
+            const cosMask = Math.cos(-mask);
+            const sinMask = Math.sin(-mask);
+            // const cosRot = Math.cos(moonAxle);
+            // const sinRot = Math.sin(moonAxle);
 
-  for (let y = -r; y < r; y++) {
-    for (let x = -r; x < r; x++) {
-      let circle = x * x + y * y - r * r;
-      if (circle > 0) {
-        //tft.drawPixel(x+r,y+r,ST77XX_BLACK);
-        continue;
-      }
-      let conditionX = x * cosMask + y * sinMask;
-      let conditionY = -x * sinMask + y * cosMask;
-      let ellipse = conditionX * conditionX * b + conditionY * conditionY * a - a * b;
-      let pixelActive = false;
+            for (let y = -r; y < r; y++) {
+                for (let x = -r; x < r; x++) {
+                    let circle = x * x + y * y - r * r;
+                    if (circle > 0) {
+                        continue;
+                    }
+                    let conditionX = x * cosMask + y * sinMask;
+                    let conditionY = -x * sinMask + y * cosMask;
+                    let ellipse = conditionX * conditionX * b + conditionY * conditionY * a - a * b;
+                    let pixelActive = false;
 
-      if (k > 0.5) {
-        pixelActive = conditionX >= 0 || ellipse <= 0;
-      } else {
-        pixelActive = conditionX >= 0 && ellipse > 0;
-      }
-      // let pixelColor = 0;
-      // if(pixelActive) {
-      //   int pixelX = (x * cosRot + y * sinRot) + r;
-      //   int pixelY = (-x * sinRot + y * cosRot) + r;
-      //   memcpy_P(&pixelColor, &FullMoon[pixelY*128 + pixelX], 2);
-      // }
-      //pixelActive = 1;
-      if(pixelActive) {
-        //const pixelX = (x * cosRot + y * sinRot) + r;
-        //const pixelY = (-x * sinRot + y * cosRot) + r;
-        const z = Math.sqrt(r*r - x*x - y*y);
-        const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
-       //ctx.fillRect(x,y,1,1);
-        if(moonImage.complete && point.z >0) {//
-            ctx.drawImage(moonImage,point.x+r,-point.y+r,1,1, x, y, 1, 1);
-        } else {
-            ctx.fillRect(x,y,1,1);
-        }
-       }
-      //tft.drawPixel(x + r, y + r, pixelColor);
-    }
-  }
+                    if (k > 0.5) {
+                        pixelActive = conditionX >= 0 || ellipse <= 0;
+                    } else {
+                        pixelActive = conditionX >= 0 && ellipse > 0;
+                    }
+
+                    if(pixelActive) {
+                        const z = Math.sqrt(r*r - x*x - y*y);
+                        const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
+                        //console.log("Punkt vor Rotation:",x,y,z);
+                        //console.log("Punkt nach Rotation:",point.x,point.y,point.z);
+
+                        //Normalisieren
+                        const len = Math.sqrt(point.x**2 + point.y**2 + point.z**2);
+                        point.x /= len;
+                        point.y /= len;
+                        point.z /= len;
+                        
+                        const lon_moon = Math.atan2(point.x, point.z);
+                        const lat_moon = Math.asin(Math.max(-1, Math.min(1, point.y)));
+
+                        //console.log("Mond Koordinaten:",lon_moon*rad2deg, lat_moon*rad2deg);
+
+                        if (moonImage2.complete) {
+                            const u = Math.floor((lon_moon + Math.PI) / (2 * Math.PI) * moonImage2.width);
+                            const v = Math.floor((Math.PI/2 - lat_moon) / Math.PI * moonImage2.height);
+                            //console.log("UV:",u,v);-0.389615
+                            ctx.drawImage(moonImage2, u, v, 1, 1, x, y, 1, 1);
+                        } else {
+                            ctx.fillRect(x,y,1,1);
+                        }
+                        // if(moonImage.complete && point.z >0) {
+                        //     ctx.drawImage(moonImage,point.x+r,-point.y+r,1,1, x, y, 1, 1);
+                        // } else {
+                        //     ctx.fillRect(x,y,1,1);
+                        // }
+                    }
+                }
+            }
             // ctx.rotate(-chi+q+Math.PI);
             // if(moonImage.complete) {
             //     const width = canvas.width;
@@ -873,8 +884,8 @@
         function fillTable() {
 
             let str ="";
-            for(let day = 0; day < 365; day++) {
-                datetime.setTime(datetime.getTime()+86400000);
+            for(let day = 0; day < 365; day += 1/24) {
+                datetime.setTime(datetime.getTime()+86400000/24);
                 const julianDate = calculateJulianDate(datetime);
                 const equationOfTimeFull = calculateEquationOfTime(julianDate,true);
                 const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDate,false);
@@ -883,7 +894,24 @@
                 const siderealTimeRelative = (((siderealTime - equatonOfTimeWithoutTilt/60 - datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
                 const eclipticalLength = calculateEclipticalLength(julianDate)*rad2deg;
                 const delta = normalizeAngleDegree(siderealTimeRelative*15-180);
-                str +=(julianDate).toString() + " " + String(eclipticalLength) + " " + String(delta) + " " +String(equatonOfTimeWithoutTilt)+"\n";
+                //str +=(julianDate).toString() + " " + String(eclipticalLength) + " " + String(delta) + " " +String(equatonOfTimeWithoutTilt)+"\n";
+                const moon = calculateMoon(julianDate);
+                const risingKnotMoon = calculateRisingKnotMoon(julianDate);
+                const moonDistanceEcliptic = moon.distance * Math.sin(moon.latitude);
+                const moonAxle = calculateMoonAxle(julianDate,moon);
+                const moonParallax = Math.asin(6378.14/moon.distance);
+
+                const moonRaDekRaw = calculateRaDek(moon.longitude, moon.latitude);
+                const moonRaDek = calculateParallax(moonRaDekRaw,moonParallax,siderealTime/12*Math.PI+longitude*deg2rad);
+
+                const sunRaDek = calculateRaDek(eclipticalLength,0);
+                const moonPhase = calculateMoonPhase(sunRaDek, 1*aeTokm, moonRaDek, moon.distance);
+                const moonAzimutHeight = calculateHAzFromRaDek(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
+
+
+                str += julianDate%1.0 + " " + moonPhase + " " + moonAxle.libration.longitude + " " + moonAxle.libration.latitude + "\n";
+                //moonRaDek.ra + " " + moonRaDek.dek + " " + moonAzimutHeight.azimut + " " + moonAzimutHeight.height + "\n";
+
             }
             document.getElementById("table").value = str;
 
