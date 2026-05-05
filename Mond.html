@@ -444,7 +444,7 @@
 
             const f = 1 - cosA;
             const rot = [
-                [axle.x*axle.x*f+       cosA, axle.x*axle.y*f-axle.z*sinA, axle.x*axle.y*f+axle.y*sinA],
+                [axle.x*axle.x*f+       cosA, axle.x*axle.y*f-axle.z*sinA, axle.x*axle.z*f+axle.y*sinA],
                 [axle.x*axle.y*f+axle.z*sinA, axle.y*axle.y*f+       cosA, axle.y*axle.z*f-axle.x*sinA],
                 [axle.x*axle.z*f-axle.y*sinA, axle.y*axle.z*f+axle.x*sinA, axle.z*axle.z*f+       cosA]
             ];
