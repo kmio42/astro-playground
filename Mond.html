@@ -66,6 +66,151 @@
             }
         }
 
+        function drawMoonPosition(jd) {
+            canvas = document.getElementById('moonPosition');
+            const ctx = canvas.getContext('2d');
+
+            ctx.resetTransform();
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
+            ctx.translate(canvas.width/2, canvas.height/2);
+
+            const r = canvas.width/2-10;
+
+
+            // Höhenskala: erst Streifen (abwechselnd weiß/grau), dann Ticks + Labels
+            // Projektion: z = -r * sin(h), daher Streifengrenzen über Sinusfunktion bestimmen
+            for (let deg = -90; deg < 90; deg += 10) {
+                const zy1 = -r * Math.sin(deg       * deg2rad);
+                const zy2 = -r * Math.sin((deg + 10) * deg2rad);
+                ctx.beginPath();
+                ctx.fillStyle = ((deg / 10) % 2 === 0) ? 'white' : 'lightgray';
+                ctx.rect(-r, Math.min(zy1, zy2), 2 * r, Math.abs(zy2 - zy1));
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            // Azimutlinien (Großkreise bei konstantem Azimut) via drawPolygonLine
+            // Projektion: x = r·cos(h)·sin(A), y = r·cos(h)·cos(A), z = r·sin(h)
+            // drawPolygonLine nutzt point.y zum Unterscheiden vorne/hinten
+            ctx.lineWidth = 0.5;
+            for (let aDeg = -80; aDeg <= 90; aDeg += 10) {
+                const A = aDeg * deg2rad;
+                const azLine = [];
+                for (let hDeg = -90; hDeg <= 90; hDeg += 3) {
+                    const h = hDeg * deg2rad;
+                    azLine.push({
+                        x: r * Math.cos(h) * Math.sin(A),
+                        y: r * Math.cos(h) * Math.cos(A),
+                        z: r * Math.sin(h)
+                    });
+                }
+                drawPolygonLine(ctx, azLine, 'grey', false);//#aaaaaa
+            }
+            ctx.lineWidth = 1;
+
+            ctx.strokeStyle = 'black';
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(-r, 0);
+            ctx.lineTo(r, 0);
+            ctx.stroke();
+            ctx.closePath();
+
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let deg = -90; deg <= 90; deg += 10) {
+                const zy = -r * Math.sin(deg * deg2rad);
+                ctx.beginPath();
+                ctx.strokeStyle = 'black';
+                ctx.moveTo(r - 8, zy);
+                ctx.lineTo(r,     zy);
+                ctx.stroke();
+                ctx.closePath();
+                ctx.fillStyle = 'black';
+                ctx.fillText(deg + '°', r - 10, zy);
+            }
+
+            // Azimutskala entlang des Horizonts (h=0)
+            // Projektion: x = r * cos(h) * sin(A)  →  bei h=0: x = r * sin(A)
+            // Astronomische Konvention: 0°=S, -90°=O, ±180°=N, +90°=W
+            const azCompass = { '-180': 'N', '-90': 'O', '0': 'S', '90': 'W', '180': 'N' };
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'center';
+            for (let deg = -180; deg <= 180; deg += 30) {
+                const zx = r * Math.sin(deg * deg2rad);
+                const isCardinal = (deg % 90 === 0);
+                const above = Math.abs(deg) <= 90; // Südliche Hälfte: Label über Horizont
+                ctx.setLineDash(above?[]:[2, 2]);
+                ctx.beginPath();
+                ctx.strokeStyle = 'black';
+                ctx.moveTo(zx, 0);
+                ctx.lineTo(zx, above ? -15 : 15);
+                ctx.stroke();
+                ctx.closePath();
+                ctx.fillStyle = 'black';
+                ctx.textBaseline = above ? 'bottom' : 'top';
+                const label = isCardinal ? azCompass[String(deg)] : normalizeAngleDegree(deg) + '°';
+                ctx.fillText(label, zx, above ? -18 : 18);
+            }
+
+            let polygonLine = [];
+
+            let moonMinus = calculateMoonSimple(jd - 12/24);
+            let moonCurrent = null;
+            let moonPlus = null;
+            // Jedes Fenster deckt t ∈ [-1, 1] ab → [jdCurrent-1h, jdCurrent+1h] -> 2-Stunden-Fenster
+            // Benachbarte Fenster teilen genau einen Endpunkt → C⁰-Stetigkeit
+            for (let i = -10; i <= 12; i += 2) {
+                const jdCurrent = jd + (i-1)/24;
+
+                moonCurrent = calculateMoonSimple(jdCurrent);
+                moonPlus = calculateMoonSimple(jdCurrent + 1/24);
+                const siderealtime = calculateSiderealTime(jdCurrent) / 12 * Math.PI + longitude * deg2rad;
+
+                // ra ist ein Winkel → Randwerte relativ zur Mitte normieren, damit kein Sprung
+                const raMinus = moonCurrent.ra + normalizeAngleDifferenceRad(moonMinus.ra - moonCurrent.ra);
+                const raPlus  = moonCurrent.ra + normalizeAngleDifferenceRad(moonPlus.ra  - moonCurrent.ra);
+                const interpolateRa  = calculateQuad(raMinus, moonCurrent.ra, raPlus);
+                const interpolateDek = calculateQuad(moonMinus.dek, moonCurrent.dek, moonPlus.dek);
+                
+                for (let t = -1; t < 1; t += 0.1) {
+                    const moon = {
+                        ra:  interpolateRa.a  * t*t + interpolateRa.b  * t + interpolateRa.c,
+                        dek: interpolateDek.a * t*t + interpolateDek.b * t + interpolateDek.c
+                    };
+
+                    const moonAzimutHeight = calculateHAzFromRaDek(moon, siderealtime + t/12*86164100/86400000*Math.PI);
+
+                    const point = {
+                       x: r * Math.cos(moonAzimutHeight.height) * Math.sin(moonAzimutHeight.azimut),
+                       y: r * Math.cos(moonAzimutHeight.height) * Math.cos(moonAzimutHeight.azimut),
+                       z: r * Math.sin(moonAzimutHeight.height)
+                    };
+                    polygonLine.push(point);
+                }
+                moonMinus = moonPlus;
+            }
+
+            drawPolygonLine(ctx, polygonLine, 'red', false);
+
+
+            moonCurrent = calculateMoonSimple(jd);
+            const siderealtime = calculateSiderealTime(jd)/12*Math.PI+longitude*deg2rad;
+            const moonAzimutHeight = calculateHAzFromRaDek(moonCurrent,siderealtime);
+
+            const point = {
+                x: r * Math.cos(moonAzimutHeight.height) * Math.sin(moonAzimutHeight.azimut),
+                y: r * Math.cos(moonAzimutHeight.height) * Math.cos(moonAzimutHeight.azimut),
+                z: r * Math.sin(moonAzimutHeight.height)
+            };
+
+            ctx.beginPath();
+            ctx.arc(point.x, -point.z, 5, 0, Math.PI * 2, false);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+        }
+
         function drawMoonPhase(sunRaDek, moonRaDek, moonAxle, libration, siderealtime) {
 
             const cosPsi = Math.sin(sunRaDek.dek)*Math.sin(moonRaDek.dek) +  Math.cos(sunRaDek.dek)*Math.cos(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra);
@@ -777,6 +922,7 @@
             drawMoonPhase(sunRaDek, moonRaDek,moonAxle.axle,moonAxle.libration, siderealTime/12*Math.PI+longitude*deg2rad);
 
             
+            drawMoonPosition(julianDate);
             
             //drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad,moon.latitude,moon.longitude,moon.distance);
             //fillTable();
@@ -1732,7 +1878,11 @@
         }
 
         //Quadratische Interpolation aus Montenbruck
+        // y_minus, y_0, y_plus: Werte der Funktion an den drei Stützstellen x = -1, x = 0, x = +1
         function calculateQuad(y_minus, y_0, y_plus) {
+            // y_minus = a*(-1)**2 + b*(-1) + c = a - b + c
+            // y_0     = a*0**2    + b*0    + c = c
+            // y_plus  = a*1**2    + b*1    + c = a + b + c
             const a   = 0.5 * (y_minus + y_plus) - y_0;
             const b   = 0.5 * (y_plus - y_minus);
             const c   = y_0;
@@ -1799,10 +1949,10 @@
                     else            { rs.utrise = hour + q.zero1; rs.utset = hour + q.zero2; }
                     rs.rise = true; rs.sett = true;
                     break;
-            }
+                }
 
-            y_minus = y_plus;
-            hour   += 2.0;
+                y_minus = y_plus;
+                hour   += 2.0;
 
             } while (hour < 25.0 && !(rs.rise && rs.sett));
             return rs;
@@ -2233,20 +2383,21 @@
                 changeTime(timeoffset);
             });
             elem.addEventListener('mousedown', () => {
+                clearInterval(intervalId);
                 intervalId = setInterval(changeTimeRepeat, 200);
                 addTimeOffset = timeoffset;
             });
 
-            // Intervall stoppen, wenn der Button losgelassen wird
-            elem.addEventListener('mouseup', () => {
-                clearInterval(intervalId);
-            });
-
-            // Intervall stoppen, wenn die Maus den Button verlässt
+            // Intervall stoppen, wenn der Button verlassen wird (Maus noch gedrückt)
             elem.addEventListener('mouseleave', () => {
                 clearInterval(intervalId);
             });
         }
+
+        // Intervall global stoppen – fängt mouseup auch außerhalb des Elements ab
+        document.addEventListener('mouseup', () => {
+            clearInterval(intervalId);
+        });
 
             // Funktion zum Speichern der Daten
         function saveData() {
@@ -2300,16 +2451,23 @@
             //addEvents(document.getElementById('button-1sh'),-86164100/24);
             addEvents(document.getElementById('button-1h'),-3600000);
             addEvents(document.getElementById('button-1d'),-86400000);
-            addEvents(document.getElementById('button-1sd'),-86164100);
+            //addEvents(document.getElementById('button-1sd'),-86164100);
             addEvents(document.getElementById('button-1m'), -60000);
+            addEvents(document.getElementById('button-1ld'),-(1+5/6/24)*86400000);
+            addEvents(document.getElementById('button1ld'),(1+5/6)*86400000);
+            addEvents(document.getElementById('button-1siM'),27.321661*86400000);
+            addEvents(document.getElementById('button-1syM'),29.530589*86400000);
 
 
             //addEvents(document.getElementById('button1sh'),86164100/24);
             addEvents(document.getElementById('button1h'),3600000);
             addEvents(document.getElementById('button1d'),86400000);
-            addEvents(document.getElementById('button1sd'),86164100);
+            //addEvents(document.getElementById('button1sd'),86164100); 86164100/86400000
             addEvents(document.getElementById('button1m'), 60000);
+            addEvents(document.getElementById('button1ld'),(1+5/6/24)*86400000);
 
+            addEvents(document.getElementById('button1siM'),27.321661*86400000);
+            addEvents(document.getElementById('button1syM'),29.530589*86400000);
 
         }
         window.onload = onLoad;
@@ -2393,10 +2551,7 @@
     </tr>
     </table>
     </div>
-    <!--
-    onClick="changeTime(-86164100/24)" onClick="changeTime(-3600000)" onClick="changeTime(-86400000)" onClick="changeTime(-86164100)"
-    onClick="changeTime(86164100/24)" onClick="changeTime(3600000)" onClick="changeTime(86400000)" onClick="changeTime(86164100)"
-    -->
+
 <div style ="float:left;">
 
     <canvas id="solarSystem" width="620" height="620"></canvas>
@@ -2418,6 +2573,7 @@
         <li>Der Mittelpunkt der sichtbaren Mondscheibe ist durch einen roten Punkt gekennzeichnet.</li>
         <li>Ausrichtung der Mondachse, Libration und sichtbarer Phase sind separat durch den Formelsatz von Jean Meeus berechnet - es findet keine Modulation von Mond, Erde und Sonne statt.</li>
     </ul>
+    <canvas id="moonPosition" width="500" height="500"></canvas>
 
 </div>
 <div style ="position: relative;margin: 20px 0;padding: 20px;height: 1000px;">
@@ -2428,7 +2584,10 @@
 <br>
 <button  id="button-1d" style = "float:left; margin: 2px; width: 8em;">-1 Tag</button> <button  id="button1d" style = "float:left; margin: 2px;width: 8em;">+1 Tag</button>
 <br>
-<button  id="button-1sd" style = "float:left; margin: 2px; width: 8em;">-1 Sterntag</button><button  id="button1sd" style = "float:left; margin: 2px;width: 8em;">+1 Sterntag</button>
+<button  id="button-1ld" style = "float:left; margin: 2px; width: 8em;">-1 Lunarer Tag</button><button  id="button1ld" style = "float:left; margin: 2px;width: 8em;">+1 lunarer Tag</button>
+<br>
+<button  id="button-1siM" style = "float:left; margin: 2px; width: 8em;">-1 siderischer Monat</button><button  id="button1siM" style = "float:left; margin: 2px;width: 8em;">+1 siderischer Monat</button>
+<button  id="button-1syM" style = "float:left; margin: 2px; width: 8em;">-1 synodischer Monat</button><button  id="button1syM" style = "float:left; margin: 2px;width: 8em;">+1 synodischer Monat</button>
 </div>
 </div>
      <table style="display:block;clear:left">
