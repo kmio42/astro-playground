@@ -28,7 +28,10 @@
         const deg2rad = Math.PI/180;
 
         const moonImage = new Image();
-        moonImage.src = "./lroc_color_2k.jpg";
+        moonImage.src = "./mond2.png";
+
+        const moonImage1 = new Image();
+        moonImage1.src = "./lroc_color_2k.jpg";
 
         // Grafik-Ausgabe
         var canvas,ctx;
@@ -211,7 +214,108 @@
             ctx.fill();
         }
 
-        function drawMoonPhase(sunRaDek, moonRaDek, moonAxle, libration, siderealtime) {
+    function drawMoonPhase(sunRaDek, moonRaDek, moonAxle, libration, siderealtime) {
+        drawMoonPhase1(sunRaDek, moonRaDek, moonAxle, libration, siderealtime);
+
+            const cosPsi = Math.sin(sunRaDek.dek)*Math.sin(moonRaDek.dek) +  Math.cos(sunRaDek.dek)*Math.cos(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra);
+
+            const i = Math.atan2(sunRaDek.distance*Math.sqrt(1-cosPsi**2),(moonRaDek.distance-sunRaDek.distance*cosPsi));
+            const k = (1 + Math.cos(i))/2;
+
+            const chi = Math.atan2(Math.cos(sunRaDek.dek)*Math.sin(sunRaDek.ra - moonRaDek.ra),
+            Math.sin(sunRaDek.dek)*Math.cos(moonRaDek.dek) - Math.cos(sunRaDek.dek)*Math.sin(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra));
+            // k = 0: a = max, k = 0.5 => a = 0.5, k = 1: a = max
+
+            const q = Math.atan2(Math.sin(siderealtime - moonRaDek.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDek.dek) - Math.sin(moonRaDek.dek)*Math.cos(siderealtime - moonRaDek.ra));
+
+            canvas = document.getElementById('moon');
+            const ctx = canvas.getContext('2d');
+
+            ctx.resetTransform();
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.translate(canvas.width/2, canvas.height/2);
+
+            const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxle+q+19.489*deg2rad);
+            //const libLongitudeRot = createRotationMatrix({x:0,y:-1,z:0},-libration.longitude+2.4*deg2rad);
+            //const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},-libration.latitude+5.99*deg2rad);
+            //let rotMatrix = multiplyMatrix(libLongitudeRot,libLatitudeRot);
+            //let    rotMatrix = multiplyMatrix(rotMatrix,axleRot);
+
+            const rotY1_1 = createRotationMatrix({x:0,y:-1,z:0},-libration.longitude);//+2.24*Math.PI/180);//2.4*Math.PI/180); //23/5   //Länge
+            const rotX1_1 = createRotationMatrix({x:1,y:0,z:0},-libration.latitude); //Breite
+            const rotZ1_1 = createRotationMatrix({x:0,y:0,z:1},-moonAxle+q);   //19,489° //Achse
+
+            //Korrekturwerte für Mond2.png
+            const rotX1_2 = createRotationMatrix({x:1,y:0,z:0},5.78*Math.PI/180);//5.99*Math.PI/180); //12/5  //Breite
+            const rotY1_2 = createRotationMatrix({x:0,y:-1,z:0},-2.24*Math.PI/180);//2.4*Math.PI/180); //23/5   //Länge
+            const rotZ1_2 = createRotationMatrix({x:0,y:0,z:1},9*Math.PI/180);   //19,489° //Achse
+
+
+            // let rotMatrix = multiplyMatrix(rotZ1_2,rotX1_2);
+            // rotMatrix = multiplyMatrix(rotMatrix,rotZ1_2);
+            // rotMatrix = multiplyMatrix(rotMatrix,rotY1_1);
+            // rotMatrix = multiplyMatrix(rotMatrix,rotX1_1);
+            // rotMatrix = multiplyMatrix(rotMatrix,rotZ1_1);
+            rotMatrix = axleRot;
+            //rotMatrix = [[1,0,0],[0,1,0],[0,0,1]];
+
+            ctx.fillStyle ="#afa89c";
+            const mask = (chi-q+Math.PI/2);
+            const r = 120;
+            const b = r * r;
+            let a = r * r;
+            if (k > 0.5) {
+                a *= (k * 2 - 1)**2;
+            } else {
+                a *= (1 - k * 2)**2;
+            }
+            const cosMask = Math.cos(-mask);
+            const sinMask = Math.sin(-mask);
+
+            for (let y = -r; y < r; y++) {
+                for (let x = -r; x < r; x++) {
+                    let circle = x * x + y * y - r * r;
+                    if (circle > 0) {
+                        continue;
+                    }
+                    let conditionX = x * cosMask + y * sinMask;
+                    let conditionY = -x * sinMask + y * cosMask;
+                    let ellipse = conditionX * conditionX * b + conditionY * conditionY * a - a * b;
+                    let pixelActive = false;
+
+                    if (k > 0.5) {
+                        pixelActive = conditionX >= 0 || ellipse <= 0;
+                    } else {
+                        pixelActive = conditionX >= 0 && ellipse > 0;
+                    }
+   
+                    if(pixelActive) {
+                        const z = Math.sqrt(r*r - x*x - y*y);
+                        const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
+                        if(moonImage.complete && point.z >0) {
+                            ctx.drawImage(moonImage,point.x+r,-point.y+r,1,1, x, y, 1, 1);
+                        } else {
+                        ctx.fillRect(x,y,1,1);
+                        }
+                    }
+                }
+            }
+
+            // ctx.save();
+            // ctx.rotate(-chi+q);
+            // ctx.beginPath();
+            // ctx.ellipse(0, 0, r, Math.abs(1-k*2)*r, 0, 0, Math.PI,(k <= 0.5)?true:false);
+            // ctx.arc(0, 0, r, Math.PI, 0, true);
+            // ctx.closePath();
+            // ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            // ctx.fill();
+            // ctx.restore();
+
+        }
+
+        function drawMoonPhase1(sunRaDek, moonRaDek, moonAxle, libration, siderealtime) {
 
             const cosPsi = Math.sin(sunRaDek.dek)*Math.sin(moonRaDek.dek) +  Math.cos(sunRaDek.dek)*Math.cos(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra);
 
@@ -237,7 +341,7 @@
                 rot1Matrix = multiplyMatrix(rot1Matrix, coordinateTransform);
 
 
-            canvas = document.getElementById('moon');
+            canvas = document.getElementById('moon1');
             const ctx = canvas.getContext('2d');
 
             ctx.resetTransform();
@@ -265,11 +369,11 @@
                     const lon_moon = Math.atan2(point.x, point.z);
                     const lat_moon = Math.asin(Math.max(-1, Math.min(1, point.y)));
 
-                    if (moonImage.complete) {
-                        const u = Math.floor((lon_moon + Math.PI) / (2 * Math.PI) * moonImage.width);
-                        const v = Math.floor((Math.PI/2 - lat_moon) / Math.PI * moonImage.height);
+                    if (moonImage1.complete) {
+                        const u = Math.floor((lon_moon + Math.PI) / (2 * Math.PI) * moonImage1.width);
+                        const v = Math.floor((Math.PI/2 - lat_moon) / Math.PI * moonImage1.height);
 
-                        ctx.drawImage(moonImage, u, v, 1, 1, x, y, 1, 1);
+                        ctx.drawImage(moonImage1, u, v, 1, 1, x, y, 1, 1);
                     }
                 }
             }
@@ -284,7 +388,7 @@
             ctx.fill();
             ctx.restore();
             
-            ctx.fillStyle = 'red';
+           /* ctx.fillStyle = 'red';
             ctx.fillRect(-2,-2,4,4);
 
             // Mondäquator
@@ -292,6 +396,7 @@
             
             // Nullmeridian
             drawPolygonLine(ctx,calculateLongitudePoints(r,Math.PI/2, rot1Matrix),'red',true);
+            */
         }
 
         /**
@@ -2565,7 +2670,9 @@
             <li>Der aufsteigende Knoten - der Punkt an dem der Mond die Ekliptik von "unten" nach "oben" schneidet - ist grün markiert.</li>
             <li>Der maximale Abstand des Mondes von der Erde ist auf der Mondbahn violett markiert. Entsprechend ist der geringste Abstand in etwa gegenübergesetzt.</li>
         </ul>
-    <canvas id="moon" width="500" height="500"></canvas>
+    <canvas id="moon" width="240" height="240"></canvas>
+    <canvas id="moon1" width="240" height="240"></canvas>
+
     Ansicht des Mondes von der Erde
     <ul>
         <li><input type="checkbox" id="parallacticAngle" checked onClick="berechneDaten();">Parallaktischen Winkel berücksichtigen</li>
