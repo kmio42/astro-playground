@@ -27,6 +27,7 @@
 
         const moonImage = new Image();
         moonImage.src = "./mond2.png";
+        let moonImageOffscreen = null;
 
         const moonImage1 = new Image();
         moonImage1.src = "./lroc_color_2k.jpg";
@@ -312,7 +313,15 @@
 
             ctx.fillStyle ="#afa89c";
             const mask = (chi-q+Math.PI/2);
-            const r = 120;
+            const r = canvas.width/2;
+            const imgSize = 2 * r;
+            if (!moonImageOffscreen && moonImage.complete) {
+                moonImageOffscreen = document.createElement('canvas');
+                moonImageOffscreen.width = imgSize;
+                moonImageOffscreen.height = imgSize;
+                moonImageOffscreen.getContext('2d').drawImage(moonImage, 0, 0, imgSize, imgSize);
+            }
+            // scaledPixels = moonImageOffscreen.getContext('2d').getImageData(...).data  →  erst bei HTTP-Serving nutzbar
             const b = r * r;
             let a = r * r;
             if (k > 0.5) {
@@ -343,8 +352,8 @@
                     if(pixelActive) {
                         const z = Math.sqrt(r*r - x*x - y*y);
                         const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
-                        if(moonImage.complete && point.z >0) {
-                            ctx.drawImage(moonImage,point.x+r,-point.y+r,1,1, x, y, 1, 1);
+                        if(moonImageOffscreen && point.z >0) {
+                            ctx.drawImage(moonImageOffscreen, Math.round(point.x+r), Math.round(-point.y+r), 1, 1, x, y, 1, 1);
                         } else {
                         ctx.fillRect(x,y,1,1);
                         }
@@ -722,22 +731,19 @@
 
         window.onload = function () {
             initUI();
-            addEvents(document.getElementById('button-1h'), -3600000);
-            addEvents(document.getElementById('button-1d'), -86400000);
-            addEvents(document.getElementById('button-1m'), -60000);
-            addEvents(document.getElementById('button-1ld'), -(1+5/6/24)*86400000);
-            addEvents(document.getElementById('button-1siM'), 27.321661*86400000);
-            addEvents(document.getElementById('button-1syM'), 29.530589*86400000);
-            addEvents(document.getElementById('button1h'), 3600000);
-            addEvents(document.getElementById('button1d'), 86400000);
-            addEvents(document.getElementById('button1m'), 60000);
-            addEvents(document.getElementById('button1ld'), (1+5/6/24)*86400000);
-            addEvents(document.getElementById('button1siM'), 27.321661*86400000);
-            addEvents(document.getElementById('button1syM'), 29.530589*86400000);
+            createTimeButtons('timeButtons', [
+                { label: '1 Minute',           zeitschritt: 60000 },
+                { label: '1 Stunde',           zeitschritt: 3600000 },
+                { label: '1 Tag',              zeitschritt: 86400000 },
+                { label: '1 Lunarer Tag',      zeitschritt: 89428000000 },
+                { label: '1 siderischer Monat',zeitschritt: 27.321661*86400000 },
+                { label: '1 synodischer Monat',zeitschritt: 29.530589*86400000 },
+            ]);
         };
     </script>
 </head>
 <body>
+    <h1>Der Mond</h1>
 
     Nach dem Vorhaben, die Bewegung der Erde um die Sonne zu verstehen (siehe <a href="https://blog.kmueller.dev/sternzeit-und-erdposition/">hier</a>), beschäftigt sich dieser Eintrag mit der Bewegung des Mondes um die Erde.
     Dabei gibt es deutlich mehr Aspekte zu berücksichtigen:
@@ -816,6 +822,7 @@
     </table>
     </div>
 
+<div style="display: flow-root;">
 <div style ="float:left; width:640px;">
 
     <canvas id="solarSystem" width="620" height="620"></canvas>
@@ -829,8 +836,8 @@
             <li>Der aufsteigende Knoten - der Punkt an dem der Mond die Ekliptik von "unten" nach "oben" schneidet - ist grün markiert.</li>
             <li>Der maximale Abstand des Mondes von der Erde ist auf der Mondbahn violett markiert. Entsprechend ist der geringste Abstand in etwa gegenübergesetzt.</li>
         </ul>
-    <canvas id="moon" width="240" height="240"></canvas>
-    <canvas id="moon1" width="240" height="240"></canvas>
+    <canvas id="moon" width="500" height="500"></canvas>
+    <canvas id="moon1" width="500" height="500"></canvas>
 
     Ansicht des Mondes von der Erde
     <ul>
@@ -842,21 +849,11 @@
     <canvas id="moonPosition" width="500" height="500"></canvas>
 
 </div>
-<div style ="position: relative;margin: 20px 0;padding: 20px;height: 1000px;">
 <div style ="position: sticky; top: 15px;padding: 10px;">
-<button  id="button-1m" style = "float:left; margin: 2px; width: 8em;">-1 Minute</button> <button  id="button1m" style = "float:left; margin: 2px;width: 8em;">+1 Minute</button><br>
-
-<button  id="button-1h" style = "float:left; margin: 2px; width: 8em;">-1 Stunde</button> <button  id="button1h" style = "float:left; margin: 2px;width: 8em;">+1 Stunde</button>
-<br>
-<button  id="button-1d" style = "float:left; margin: 2px; width: 8em;">-1 Tag</button> <button  id="button1d" style = "float:left; margin: 2px;width: 8em;">+1 Tag</button>
-<br>
-<button  id="button-1ld" style = "float:left; margin: 2px; width: 8em;">-1 Lunarer Tag</button><button  id="button1ld" style = "float:left; margin: 2px;width: 8em;">+1 lunarer Tag</button>
-<br>
-<button  id="button-1siM" style = "float:left; margin: 2px; width: 8em;">-1 siderischer Monat</button><button  id="button1siM" style = "float:left; margin: 2px;width: 8em;">+1 siderischer Monat</button>
-<button  id="button-1syM" style = "float:left; margin: 2px; width: 8em;">-1 synodischer Monat</button><button  id="button1syM" style = "float:left; margin: 2px;width: 8em;">+1 synodischer Monat</button>
-</div>
+<div id="timeButtons"></div>
 </div>
      <div id="outputTable" style="display:block;clear:left;"></div>
+</div>
 
     <h2>Hintergründe und Begriffe</h2>
     <table>

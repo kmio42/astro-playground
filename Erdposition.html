@@ -156,6 +156,7 @@
                 ctx.stroke();
                 ctx.closePath();
 
+
                 if(Math.abs(normalizeAngleDifferenceRad(vernalPoint+indicatorDirection-eclipticalLength)) < 10*deg2rad) {
                     ctx.beginPath();
                     const endSunIndicatorX = -(radius*earth.orbit.radius+30)*Math.cos(indicatorDirection);
@@ -523,14 +524,12 @@
 
         window.onload = function () {
             initUI();
-            addEvents(document.getElementById('button-1h'), -3600000);
-            addEvents(document.getElementById('button-1d'), -86400000);
-            addEvents(document.getElementById('button-1sd'), -86164100);
-            addEvents(document.getElementById('button-1m'), -60000);
-            addEvents(document.getElementById('button1h'), 3600000);
-            addEvents(document.getElementById('button1d'), 86400000);
-            addEvents(document.getElementById('button1sd'), 86164100);
-            addEvents(document.getElementById('button1m'), 60000);
+            createTimeButtons('timeButtons', [
+                { label: 'Minute',   zeitschritt: 60000 },
+                { label: 'Stunde',   zeitschritt: 3600000 },
+                { label: 'Tag',      zeitschritt: 86400000 },
+                { label: 'Sterntag', zeitschritt: 86164100 },
+            ]);
         };
     </script>
 </head>
@@ -591,6 +590,7 @@
     onClick="changeTime(-86164100/24)" onClick="changeTime(-3600000)" onClick="changeTime(-86400000)" onClick="changeTime(-86164100)"
     onClick="changeTime(86164100/24)" onClick="changeTime(3600000)" onClick="changeTime(86400000)" onClick="changeTime(86164100)"
     -->
+<div style="display: flow-root;">
 <div style ="float:left;">
 
     <canvas id="solarSystem" width="620" height="620"></canvas>
@@ -604,18 +604,11 @@
     <canvas id="moon" width="200" height="200"></canvas>
 
 </div>
-<div style ="position: relative;margin: 20px 0;padding: 20px;height: 1000px;">
 <div style ="position: sticky; top: 15px;padding: 10px;">
-<button  id="button-1m" style = "float:left; margin: 2px; width: 8em;">-1 Minute</button> <button  id="button1m" style = "float:left; margin: 2px;width: 8em;">+1 Minute</button><br>
-
-<button  id="button-1h" style = "float:left; margin: 2px; width: 8em;">-1 Stunde</button> <button  id="button1h" style = "float:left; margin: 2px;width: 8em;">+1 Stunde</button>
-<br>
-<button  id="button-1d" style = "float:left; margin: 2px; width: 8em;">-1 Tag</button> <button  id="button1d" style = "float:left; margin: 2px;width: 8em;">+1 Tag</button>
-<br>
-<button  id="button-1sd" style = "float:left; margin: 2px; width: 8em;">-1 Sterntag</button><button  id="button1sd" style = "float:left; margin: 2px;width: 8em;">+1 Sterntag</button>
-</div>
+<div id="timeButtons"></div>
 </div>
      <div id="outputTable" style="display:block;clear:left;"></div>
+</div>
 
     <textarea id="table"></textarea>
 

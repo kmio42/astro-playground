@@ -248,6 +248,30 @@
             elem.addEventListener('mouseleave', () => { clearInterval(intervalId); });
         }
 
+        /**
+         * Erzeugt Button-Paare (minus/plus) für die Zeitsteuerung im angegebenen Container.
+         * buttons: Array von { label, step }
+         *   label:       Beschriftung (wird zu "-{label}" und "+{label}")
+         *   step: Zeitversatz in Millisekunden (positiv)
+         */
+        function createTimeButtons(containerId, buttons) {
+            const container = document.getElementById(containerId);
+            const btnStyle = 'float:left; margin: 2px; width: 8em;';
+            buttons.forEach(({ label, step }) => {
+                const btnMinus = document.createElement('button');
+                btnMinus.textContent = '-' + label;
+                btnMinus.style.cssText = btnStyle;
+                addEvents(btnMinus, -step);
+                const btnPlus = document.createElement('button');
+                btnPlus.textContent = '+' + label;
+                btnPlus.style.cssText = btnStyle;
+                addEvents(btnPlus, step);
+                container.appendChild(btnMinus);
+                container.appendChild(btnPlus);
+                container.appendChild(document.createElement('br'));
+            });
+        }
+
     /////////////////////////////////////////////////////////////////
     //              Lokale Datenspeicherung                        //
     /////////////////////////////////////////////////////////////////
