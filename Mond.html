@@ -274,7 +274,10 @@
             Math.sin(sunRaDec.dec)*Math.cos(moonRaDec.dec) - Math.cos(sunRaDec.dec)*Math.sin(moonRaDec.dec)*Math.cos(sunRaDec.ra - moonRaDec.ra));
             // k = 0: a = max, k = 0.5 => a = 0.5, k = 1: a = max
 
-            const q = Math.atan2(Math.sin(siderealtime - moonRaDec.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDec.dec) - Math.sin(moonRaDec.dec)*Math.cos(siderealtime - moonRaDec.ra));
+            const considerParallacticAngle = document.getElementById("parallacticAngle").checked;
+            const q = (considerParallacticAngle) ? Math.atan2(Math.sin(siderealtime - moonRaDec.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDec.dec) - Math.sin(moonRaDec.dec)*Math.cos(siderealtime - moonRaDec.ra)) : 0;
+            
+            const considerLibration = document.getElementById("libration").checked;
 
             const canvas = document.getElementById('moon');
             const ctx = canvas.getContext('2d');
@@ -286,13 +289,10 @@
             ctx.translate(canvas.width/2, canvas.height/2);
 
             const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q+6.388*deg2rad);//19.489*deg2rad);
-            //const libLongitudeRot = createRotationMatrix({x:0,y:-1,z:0},-libration.longitude+2.4*deg2rad);
-            //const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},-libration.latitude+5.99*deg2rad);
-            //let rotMatrix = multiplyMatrix(libLongitudeRot,libLatitudeRot);
-            //let    rotMatrix = multiplyMatrix(rotMatrix,axleRot);
 
-            const rotY1_1 = createRotationMatrix({x:0,y:-1,z:0},-libration.longitude);//+2.24*Math.PI/180);//2.4*Math.PI/180); //23/5   //Länge
-            const rotX1_1 = createRotationMatrix({x:1,y:0,z:0},-libration.latitude); //Breite
+
+            const rotY1_1 = createRotationMatrix({x:0,y:-1,z:0},considerLibration?-libration.longitude:0);//+2.24*Math.PI/180);//2.4*Math.PI/180); //23/5   //Länge
+            const rotX1_1 = createRotationMatrix({x:1,y:0,z:0},considerLibration?-libration.latitude:0); //Breite
             const rotZ1_1 = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q);   //19,489° //Achse
 
             //Korrekturwerte für Mond2.png
@@ -352,7 +352,7 @@
                     if(pixelActive) {
                         const z = Math.sqrt(r*r - x*x - y*y);
                         const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
-                        if(moonImageOffscreen && point.z >0) {
+                        if(moonImageOffscreen && point.z >=0) {
                             ctx.drawImage(moonImageOffscreen, Math.round(point.x+r), Math.round(-point.y+r), 1, 1, x, y, 1, 1);
                         } else {
                         ctx.fillRect(x,y,1,1);
@@ -375,11 +375,12 @@
             const considerParallacticAngle = document.getElementById("parallacticAngle").checked;
             const q = (considerParallacticAngle) ? Math.atan2(Math.sin(siderealtime - moonRaDec.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDec.dec) - Math.sin(moonRaDec.dec)*Math.cos(siderealtime - moonRaDec.ra)) : 0;
             
+            const considerLibration = document.getElementById("libration").checked;
 
 
             const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q);//axleRot -moonAxis+q -0.389615
-            const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},-libration.latitude); //Negativ +0.64*deg2rad
-            const libLongitudeRot = createRotationMatrix({x:0,y:-1,z:0},-libration.longitude); //Negativ +2.009*deg2rad
+            const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},considerLibration?-libration.latitude:0); //Negativ +0.64*deg2rad
+            const libLongitudeRot = createRotationMatrix({x:0,y:-1,z:0},considerLibration?-libration.longitude:0); //Negativ +2.009*deg2rad
             let rotMatrix = multiplyMatrix(libLongitudeRot,libLatitudeRot);
                 rotMatrix = multiplyMatrix(rotMatrix,axleRot);
 
@@ -842,6 +843,7 @@
     Ansicht des Mondes von der Erde
     <ul>
         <li><input type="checkbox" id="parallacticAngle" checked onClick="update();">Parallaktischen Winkel berücksichtigen</li>
+        <li><input type="checkbox" id="libration" checked onClick="update();">Libration berücksichtigen</li>
         <li>Mondäquator und Nullmeridian sind rot dargestellt.</li>
         <li>Der Mittelpunkt der sichtbaren Mondscheibe ist durch einen roten Punkt gekennzeichnet.</li>
         <li>Ausrichtung der Mondachse, Libration und sichtbarer Phase sind separat durch den Formelsatz von Jean Meeus berechnet - es findet keine Modulation von Mond, Erde und Sonne statt.</li>
