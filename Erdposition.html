@@ -35,7 +35,7 @@
     
         // Zeichne Bild 1 "Erdposition"
         function drawSolarSystem({ springEquinoxLength, summerSolsticeAnomaly, autumnEquinoxAnomaly, winterSolsticeAnomaly,
-                                   orbitRadiusEarth, orbitLengthEarth, siderealTime, moonLongitude, risingKnotMoon }) {
+                                   orbitRadiusEarth, orbitLengthEarth, siderealTime, moonLongitude, ascendingNodeMoon }) {
 
             //Darstellungsparameter
             const sun = {
@@ -75,7 +75,7 @@
                 ctx.closePath();
             }
 
-            function drawMoon(ctx, eclipticalLongitude, risingKnotMoon) {
+            function drawMoon(ctx, eclipticalLongitude, ascendingNodeMoon) {
                 const moonX = moon.orbit.radius*Math.cos(eclipticalLongitude);
                 const moonY = moon.orbit.radius*Math.sin(eclipticalLongitude);
                 ctx.beginPath();
@@ -85,10 +85,10 @@
                 ctx.closePath();
 
                 //Indikator
-                IndicatorXStart = -moon.orbit.radius*Math.cos(risingKnotMoon);
-                IndicatorYStart = moon.orbit.radius*Math.sin(risingKnotMoon);
-                IndicatorXEnd = -(moon.orbit.radius+10)*Math.cos(risingKnotMoon);
-                IndicatorYEnd = (moon.orbit.radius+10)*Math.sin(risingKnotMoon);
+                IndicatorXStart = -moon.orbit.radius*Math.cos(ascendingNodeMoon);
+                IndicatorYStart = moon.orbit.radius*Math.sin(ascendingNodeMoon);
+                IndicatorXEnd = -(moon.orbit.radius+10)*Math.cos(ascendingNodeMoon);
+                IndicatorYEnd = (moon.orbit.radius+10)*Math.sin(ascendingNodeMoon);
                 ctx.beginPath();
                 ctx.moveTo(IndicatorXStart, IndicatorYStart);
                 ctx.lineTo(IndicatorXEnd, IndicatorYEnd);
@@ -128,7 +128,7 @@
                 return lambda-Math.PI/2;
             }
 
-            function drawEarthWithIndicatorAndMoon(ctx, radius, eclipticalLength, vernalPoint, indicatorDirection, moonLongitude, risingKnotMoon) {
+            function drawEarthWithIndicatorAndMoon(ctx, radius, eclipticalLength, vernalPoint, indicatorDirection, moonLongitude, ascendingNodeMoon) {
                 // Position der Erde um die Umlaufbahn
                 const earthX = sun.x + radius*earth.orbit.radius * Math.cos(eclipticalLength);
                 const earthY = sun.y - radius*earth.orbit.radius * Math.sin(eclipticalLength);
@@ -142,7 +142,7 @@
                 ctx.fill();
                 ctx.closePath();
 
-                drawMoon(ctx, -moonLongitude+Math.PI, risingKnotMoon);
+                drawMoon(ctx, -moonLongitude+Math.PI, ascendingNodeMoon);
 
                 //Indikator
                 indicatorDirection = siderealDirectionCorrection(indicatorDirection);
@@ -247,7 +247,7 @@
             drawOrbit(ctx);
 
             drawEarthWithIndicatorAndMoon(ctx, orbitRadiusEarth, orbitLengthEarth, springEquinoxLength,
-                siderealTime/12*Math.PI+longitude*deg2rad, moonLongitude, risingKnotMoon);
+                siderealTime/12*Math.PI+longitude*deg2rad, moonLongitude, ascendingNodeMoon);
             drawOrbit(ctx);
             drawPerihelAphel(ctx);
         }
@@ -382,7 +382,7 @@
     //          Berechnungen und Tabellarische Ausgabe             //
     /////////////////////////////////////////////////////////////////
 
-        function berechneDaten() {
+        function update() {
 
             //Julianisches Datum
             const julianDate = calculateJulianDate(datetime);
@@ -416,18 +416,18 @@
             //const eclipticalLength = orbitLengthEarth-springEquinoxLength;
             const eclipticalLength = calculateEclipticalLength(julianDate);
 
-            const sunRaDek = calculateRaDek(eclipticalLength,0);
+            const sunRaDec = calculateRaDec(eclipticalLength,0);
 
-            const sunAzimutheight = calculateHAzFromRaDek(sunRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
+            const sunAzimuthAltitude = calculateHAzFromRaDec(sunRaDec,siderealTime/12*Math.PI+longitude*deg2rad);
 
             const moon = calculateMoon(julianDate);
-            const risingKnotMoon = calculateRisingKnotMoon(julianDate);
+            const ascendingNodeMoon = calculateAscendingNodeMoon(julianDate);
             const moonDistanceEcliptic = moon.distance * Math.sin(moon.latitude);
 
-            const moonRaDek = calculateRaDek(moon.longitude, moon.latitude);
-            const moonAzimutHeight = calculateHAzFromRaDek(moonRaDek,siderealTime/12*Math.PI+longitude*deg2rad);
-            //sunRaDek, sunDistance, moonRaDek, moonDistance
-            const moonPhase = calculateMoonPhase(sunRaDek, 1*aeTokm, moonRaDek, moon.distance);
+            const moonRaDec = calculateRaDec(moon.longitude, moon.latitude);
+            const moonAzimuthAltitude = calculateHAzFromRaDec(moonRaDec,siderealTime/12*Math.PI+longitude*deg2rad);
+            //sunRaDec, sunDistance, moonRaDec, moonDistance
+            const moonPhase = calculateMoonPhase(sunRaDec, 1*aeTokm, moonRaDec, moon.distance);
 
             //console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
 
@@ -461,17 +461,17 @@
                 { type: 'row', key: 'Ekliptikale Breite', value: (moon.latitude*rad2deg).toFixed(2)+'°' },
                 { type: 'row', key: 'Abstand zur Erde', value: Math.round(moon.distance)+' km' },
                 { type: 'row', key: 'Abstand zur Ekliptik', value: Math.round(moonDistanceEcliptic)+' km' },
-                { type: 'row', key: 'Aufsteigender Knoten', value: radToDegString(risingKnotMoon)+' ('+normalizeAngleDegree(risingKnotMoon*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'RA / DEK', value: normalizeAngleDegree(moonRaDek.ra*rad2deg).toFixed(4)+'° / '+(moonRaDek.dek*rad2deg).toFixed(4)+'°' },
+                { type: 'row', key: 'Aufsteigender Knoten', value: radToDegString(ascendingNodeMoon)+' ('+normalizeAngleDegree(ascendingNodeMoon*rad2deg).toFixed(4)+'°)' },
+                { type: 'row', key: 'RA / DEK', value: normalizeAngleDegree(moonRaDec.ra*rad2deg).toFixed(4)+'° / '+(moonRaDec.dec*rad2deg).toFixed(4)+'°' },
                 { type: 'row', key: 'Mondphase', value: (moonPhase*100).toFixed(2)+'%' },
                 { type: 'category', text: 'Ortsbezogene Daten' },
-                { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimutheight.azimut)+' ('+(sunAzimutheight.azimut*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'Höhe Sonne', value: (sunAzimutheight.height*rad2deg).toFixed(2)+'°' },
+                { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*rad2deg).toFixed(4)+'°)' },
+                { type: 'row', key: 'Höhe Sonne', value: (sunAzimuthAltitude.altitude*rad2deg).toFixed(2)+'°' },
                 { type: 'row', key: 'Sonnenaufgang', value: (sunriseSet !== false) ? hoursToString(sunriseSet.rising) : '-' },
                 { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: (sunriseSet !== false) ? hoursToString(sunriseSet.zenit) : '-' },
                 { type: 'row', key: 'Sonnenuntergang', value: (sunriseSet !== false) ? hoursToString(sunriseSet.setting) : '-' },
-                { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimutHeight.azimut)+' ('+(moonAzimutHeight.azimut*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'Höhe Mond', value: (moonAzimutHeight.height*rad2deg).toFixed(2)+'°' },
+                { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*rad2deg).toFixed(4)+'°)' },
+                { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*rad2deg).toFixed(2)+'°' },
             ];
             renderOutputTable('outputTable', tableData);
 
@@ -486,7 +486,7 @@
                 orbitLengthEarth,
                 siderealTime,
                 moonLongitude: moon.longitude,
-                risingKnotMoon
+                ascendingNodeMoon
             });
 
             drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad,moon.latitude,moon.longitude,moon.distance);
@@ -525,10 +525,10 @@
         window.onload = function () {
             initUI();
             createTimeButtons('timeButtons', [
-                { label: 'Minute',   zeitschritt: 60000 },
-                { label: 'Stunde',   zeitschritt: 3600000 },
-                { label: 'Tag',      zeitschritt: 86400000 },
-                { label: 'Sterntag', zeitschritt: 86164100 },
+                { label: 'Minute',   step: 60000 },
+                { label: 'Stunde',   step: 3600000 },
+                { label: 'Tag',      step: 86400000 },
+                { label: 'Sterntag', step: 86164100 },
             ]);
         };
     </script>
@@ -586,10 +586,6 @@
     </tr>
     </table>
     </div>
-    <!--
-    onClick="changeTime(-86164100/24)" onClick="changeTime(-3600000)" onClick="changeTime(-86400000)" onClick="changeTime(-86164100)"
-    onClick="changeTime(86164100/24)" onClick="changeTime(3600000)" onClick="changeTime(86400000)" onClick="changeTime(86164100)"
-    -->
 <div style="display: flow-root;">
 <div style ="float:left;">
 

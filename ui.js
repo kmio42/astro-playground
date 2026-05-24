@@ -166,10 +166,10 @@
                 longitude = value;
                 const julianDate = calculateJulianDate(datetime);
                 fillSiderealTime(calculateSiderealTime(julianDate));
-                berechneDaten();
+                update();
             } else if (type === 'latitude' && !isNaN(value)) {
                 latitude = value;
-                berechneDaten();
+                update();
             }
         }
 
@@ -183,7 +183,7 @@
             datetime = calculateGregorianDateFromJulianDate(jdInput);
             fillGregorianDate(datetime);
             fillSiderealTime(calculateSiderealTime(jdInput));
-            berechneDaten();
+            update();
         }
 
         function changeGregorianDate() {
@@ -200,7 +200,7 @@
             const julianDate = calculateJulianDate(datetime);
             fillJulianDate(julianDate);
             fillSiderealTime(calculateSiderealTime(julianDate));
-            berechneDaten();
+            update();
         }
 
         function changeSiderealTime() {
@@ -222,7 +222,7 @@
             datetime.setTime(datetime.getTime()+timediffInMs);
             fillGregorianDate(datetime);
             fillJulianDate(calculateJulianDate(datetime));
-            berechneDaten();
+            update();
         }
 
         function changeTime(offset) {
@@ -231,7 +231,7 @@
             const julianDate = calculateJulianDate(datetime);
             fillJulianDate(julianDate);
             fillSiderealTime(calculateSiderealTime(julianDate));
-            berechneDaten();
+            update();
         }
 
         function changeTimeRepeat() {

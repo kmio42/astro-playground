@@ -326,36 +326,36 @@
         /**
          * Berechnung der äquatorialen Koordinaten aus Ekliptischen Koordinaten
          */
-        function calculateRaDek(eclipticalLongitude,eclipticalLatitude) {
+        function calculateRaDec(eclipticalLongitude,eclipticalLatitude) {
             const ra = Math.atan2(Math.cos(epsilon*deg2rad)*Math.sin(eclipticalLongitude) - Math.tan(eclipticalLatitude)*Math.sin(epsilon*deg2rad),Math.cos(eclipticalLongitude));
             const dek = Math.asin(Math.sin(eclipticalLatitude)* Math.cos(epsilon*deg2rad) + Math.cos(eclipticalLatitude)*Math.sin(epsilon*deg2rad)*Math.sin(eclipticalLongitude));
             return {
                 "ra": ra,
-                "dek": dek
+                "dec": dek
             };
         }
 
         /**
          * Berechnung der horizontalen Sonnenkoordinaten aus äquatorialen Koordinaten
          */
-        function calculateHAzFromRaDek(radek, siderealTime) {
-            const H = siderealTime - radek.ra;
+        function calculateHAzFromRaDec(raDec, siderealTime) {
+            const H = siderealTime - raDec.ra;
             const A = Math.atan2(Math.sin(H),
                         Math.cos(H)*Math.sin(latitude*deg2rad)
-                       -Math.tan(radek.dek)*Math.cos(latitude*deg2rad));
-            const h = Math.asin( Math.sin(latitude*deg2rad)*Math.sin(radek.dek)
-                                +Math.cos(latitude*deg2rad)*Math.cos(radek.dek)*Math.cos(H));
+                       -Math.tan(raDec.dec)*Math.cos(latitude*deg2rad));
+            const h = Math.asin( Math.sin(latitude*deg2rad)*Math.sin(raDec.dec)
+                                +Math.cos(latitude*deg2rad)*Math.cos(raDec.dec)*Math.cos(H));
             return {
-                "azimut": A,
-                "height": h
+                "azimuth": A,
+                "altitude": h
             };
         }
 
         /**
          * Berechnung parallaktischer Winkel - wie ein Himmelskörper während einer bestimmten Zeit am Himmel gedreht erscheint
          */
-         function calculateParallacticAngle(radek,siderealTime) {
-            const q = Math.atan2(Math.sin(siderealTime - radek.ra), Math.tan(latitude*deg2rad)*Math.cos(radek.dek) - Math.sin(radek.dek)*Math.cos(siderealTime - radek.ra));
+         function calculateParallacticAngle(raDec,siderealTime) {
+            const q = Math.atan2(Math.sin(siderealTime - raDec.ra), Math.tan(latitude*deg2rad)*Math.cos(raDec.dec) - Math.sin(raDec.dec)*Math.cos(siderealTime - raDec.ra));
             return q;
          }
 
@@ -386,15 +386,15 @@
             const length2 = calculateEclipticalLength(jd);
             //const length3 = calculateEclipticalLength(jd+1);
 
-            //const radek1 = calculateRaDekSun(length1);
-            const radek2 = calculateRaDek(length2,0);
-            //const radek3 = calculateRaDekSun(length3);
+            //const radek1 = calculateRaDecSun(length1);
+            const radek2 = calculateRaDec(length2,0);
+            //const radek3 = calculateRaDecSun(length3);
 
             const siderealTime = calculateSiderealTime(jd)*180/12;
 
             //Abweichung Zenit zu Sonnenaufgang/Untergang
-            const cH0 = (Math.sin(h0*deg2rad) - Math.sin(latitude*deg2rad)*Math.sin(radek2.dek))/
-            (Math.cos(latitude*deg2rad)*Math.cos(radek2.dek));
+            const cH0 = (Math.sin(h0*deg2rad) - Math.sin(latitude*deg2rad)*Math.sin(radek2.dec))/
+            (Math.cos(latitude*deg2rad)*Math.cos(radek2.dec));
 
             //cH0 > 1: Objekt immer sichtbar
             //cH0 < 1: Objekt ganzen Tag nicht sichtbar
@@ -429,9 +429,9 @@
             // for(let i = 0; i < 0; i++) {
             //     const t1 = siderealTime + 360.985647*m1;
             //     const ra1 = radek2.ra;//interpolate(radek1.ra,radek2.ra,radek3.ra,m1 + DT/86400);
-            //     const dek1 = radek2.dek;//interpolate(radek1.dek,radek2.dek,radek3.dek,m1 + DT/86400);
+            //     const dek1 = radek2.dec;//interpolate(radek1.dec,radek2.dec,radek3.dec,m1 + DT/86400);
             //     const DH1 = t1 + longitude;
-            //     const az_rise = calculateHAzFromRaDek({ra:ra1,dek:dek1},DH1/180*12);
+            //     const az_rise = calculateHAzFromRaDec({ra:ra1,dek:dek1},DH1/180*12);
             //     const Dm = (az_rise.height*rad2deg - h0)/(360*Math.cos(dek1)*Math.cos(latitude*deg2rad)*Math.sin(DH1*deg2rad-ra1));
             //     m1 += Dm;
             // }
@@ -785,7 +785,7 @@
             const l_moon = 2 * Math.PI * ((((l0 + dl / 1296000.0)%1)+1)%1); /* ekliptikale Laenge [rad] */
             const b_moon = (18520.0 * Math.sin(s) + n) / ARC;   /* ekliptikale Breite [rad] */
 
-            const rd = calculateRaDek(l_moon, b_moon);
+            const rd = calculateRaDec(l_moon, b_moon);
             return rd;
         }
 
@@ -825,7 +825,7 @@
         {
             const moon  = calculateMoonSimple(jd);
             const tau   = calculateSiderealTime(jd)*Math.PI/12 + longitude*deg2rad - moon.ra;  /* Stundenwinkel [Rad] */
-            return sphi * Math.sin(moon.dek) + cphi * Math.cos(moon.dek) * Math.cos(tau);
+            return sphi * Math.sin(moon.dec) + cphi * Math.cos(moon.dec) * Math.cos(tau);
         }
 
 
@@ -870,10 +870,10 @@
             return rs;
     }
 
-        function calculateRisingKnotMoon(jd) {
+        function calculateAscendingNodeMoon(jd) {
             const T = calculateJulianEpoch(jd);
-            const risingKnot = 125.0445550 - 1934.1361849*T + 0.0020762*T**2 + T**3/467410 - T**4/60616000;
-            return normalizeAngleDegree(risingKnot)*deg2rad;
+            const ascendingNode = 125.0445550 - 1934.1361849*T + 0.0020762*T**2 + T**3/467410 - T**4/60616000;
+            return normalizeAngleDegree(ascendingNode)*deg2rad;
         }
 
         function findNearestRisingNodeMoon(jd) {
@@ -941,16 +941,16 @@
             return jd;
         }
 
-        function calculateMoonPhase(sunRaDek, sunDistance, moonRaDek, moonDistance) {
+        function calculateMoonPhase(sunRaDec, sunDistance, moonRaDec, moonDistance) {
 
-            const cosPsi = Math.sin(sunRaDek.dek)*Math.sin(moonRaDek.dek) +  Math.cos(sunRaDek.dek)*Math.cos(moonRaDek.dek)*Math.cos(sunRaDek.ra - moonRaDek.ra);
+            const cosPsi = Math.sin(sunRaDec.dec)*Math.sin(moonRaDec.dec) +  Math.cos(sunRaDec.dec)*Math.cos(moonRaDec.dec)*Math.cos(sunRaDec.ra - moonRaDec.ra);
 
             const i = Math.atan2(sunDistance*Math.sin(Math.acos(cosPsi)),(moonDistance-sunDistance*cosPsi));
             const k = (1 + Math.cos(i))/2;
             //console.log("MondPhase:" + k, k-(1-cosPsi)/2);
 
-//             //const chi = Math.atan2(Math.cos(sunRadek.dek)*Math.sin(sunRadek.ra - moonRaDek.ra),
-//             Math.sin(sunRadek.dek)*Math.cos(moonRaDek.dek) - Math.cos(sunRadek.dek)*Math.sin(moonRaDek.dek)*Math.cos(sunRadek.ra - moonRaDek.ra)
+//             //const chi = Math.atan2(Math.cos(sunRadek.dec)*Math.sin(sunRadek.ra - moonRaDec.ra),
+//             Math.sin(sunRadek.dec)*Math.cos(moonRaDec.dec) - Math.cos(sunRadek.dec)*Math.sin(moonRaDec.dec)*Math.cos(sunRadek.ra - moonRaDec.ra)
 //             )
 //             // k = 0: a = max, k = 0.5 => a = 0.5, k = 1: a = max
 //             const a = Math.abs(1-k*2);
@@ -966,7 +966,7 @@
             return k;
         }
 
-        function calculateParallax(objRaDek, parallax, direction) {
+        function calculateParallax(objRaDec, parallax, direction) {
 
             const ba = 0.99664719;
             const H = 0;
@@ -974,21 +974,21 @@
             const rhoSinPhi = ba*Math.sin(u) + H/6378140 * Math.sin(latitude*deg2rad);
             const rhoCosPhi =    Math.cos(u) + H/6378140 * Math.cos(latitude*deg2rad);
 
-            const alpha = Math.atan(-rhoCosPhi*Math.sin(parallax)*Math.sin(direction-objRaDek.ra)/(Math.cos(objRaDek.dek) - rhoCosPhi*Math.sin(parallax)*Math.cos(direction-objRaDek.ra)));
+            const alpha = Math.atan(-rhoCosPhi*Math.sin(parallax)*Math.sin(direction-objRaDec.ra)/(Math.cos(objRaDec.dec) - rhoCosPhi*Math.sin(parallax)*Math.cos(direction-objRaDec.ra)));
 
             const dek = Math.atan2(
-                (Math.sin(objRaDek.dek) - rhoSinPhi*Math.sin(parallax))*Math.cos(alpha),(Math.cos(objRaDek.dek) - rhoCosPhi*Math.sin(parallax)*Math.cos(direction-objRaDek.ra)));
-            //console.log("Parallaxe",parallax*rad2deg,alpha*rad2deg,(dek-objRaDek.dek)*rad2deg);
+                (Math.sin(objRaDec.dec) - rhoSinPhi*Math.sin(parallax))*Math.cos(alpha),(Math.cos(objRaDec.dec) - rhoCosPhi*Math.sin(parallax)*Math.cos(direction-objRaDec.ra)));
+            //console.log("Parallaxe",parallax*rad2deg,alpha*rad2deg,(dek-objRaDec.dec)*rad2deg);
             return {
-                "ra": objRaDek.ra + alpha,
-                "dek": dek
+                "ra": objRaDec.ra + alpha,
+                "dec": dek
             };
         }
 
-        function calculateMoonAxle(jd,moon) {
+        function calculateMoonAxis(jd,moon) {
             const T = calculateJulianEpoch(jd);
 
-            const risingKnot = calculateRisingKnotMoon(jd);
+            const ascendingNode = calculateAscendingNodeMoon(jd);
             const I = 1.54242*deg2rad; //Winkel Mondäquator - Ekliptik 1,54242°
             const lambda = moon.longitude; //scheinbare geozentrische Länge Mond
             const beta = moon.latitude; //scheinbare geozentrische Breite Mond
@@ -1011,7 +1011,7 @@
             // Mittlere Abstand des Mondes vom aufsteigenden Knoten (45.5)
             const F = normalizeAngleDegree(93.2720993 + T*(483202.0175273 - 0.0034029*T) - T**3/3526000 + T**4/863310000)*deg2rad;
 
-            const W = lambda - risingKnot;
+            const W = lambda - ascendingNode;
 
             //Formel 51.1
             const A = Math.atan2(Math.sin(W)*Math.cos(beta)*Math.cos(I) - Math.sin(beta)*Math.sin(I), Math.cos(W)*Math.cos(beta));
@@ -1057,7 +1057,7 @@
                 -.00467 * Math.sin(m) +
                  .00396 * Math.sin(K1) +
                  .00276 * Math.sin(2*(m-D)) +
-                 .00196 * Math.sin(risingKnot) +
+                 .00196 * Math.sin(ascendingNode) +
                 -.00183 * Math.cos(m-F) +
                  .00115 * Math.sin(m-2*D) +
                 -.00096 * Math.sin(m-D) +
@@ -1076,14 +1076,14 @@
             const b2 = sigma * Math.cos(A) - rho * Math.sin(A);
             //console.log("Libration:",b1*rad2deg,b2*rad2deg,l1*rad2deg,l2*rad2deg);
 
-            const moonRadek = calculateRaDek(moon.longitude,moon.latitude);
+            const moonRaDec = calculateRaDec(moon.longitude,moon.latitude);
 
-            const V = risingKnot + sigma/Math.sin(I);
+            const V = ascendingNode + sigma/Math.sin(I);
             const X = Math.sin(I + rho)*Math.sin(V);
             const Y = Math.sin(I + rho)*Math.cos(V)*Math.cos(epsilon*deg2rad) - Math.cos(I + rho)*Math.sin(epsilon*deg2rad);
 
             const w = Math.atan2(X,Y);
-            const P = Math.asin(Math.sqrt(X**2+Y**2)*Math.cos(moonRadek.ra - w)/Math.cos(moon.latitude));
+            const P = Math.asin(Math.sqrt(X**2+Y**2)*Math.cos(moonRaDec.ra - w)/Math.cos(moon.latitude));
 
             //console.log("Mondachse:",normalizeAngleDegree(P*rad2deg));
             return {
