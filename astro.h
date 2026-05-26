@@ -23,7 +23,6 @@ constexpr double RAD2DEG = 180.0 / M_PI;
 struct RaDek {
     double ra;
     double dek;
-    double distance; // optional, für drawMoonPhase
 };
 
 struct AzimutHeight {
@@ -119,17 +118,6 @@ Mat3 createRotationMatrix(const Vec3& axle, double angle);
 Mat3 multiplyMatrix(const Mat3& m1, const Mat3& m2);
 Vec3 applyMatrix(const Vec3& point, const Mat3& matrix);
 
-// Mondphasen-Rendering
-// Rendert die Mondphase in einen RGBA-Pixel-Buffer der Größe (2*radius) x (2*radius).
-// moonTexture: optionaler Pointer auf Textur (RGBA, quadratisch, texSize x texSize), oder nullptr.
-// Gibt die Anzahl der beleuchteten Pixel zurück.
-int drawMoonPhase(const RaDek& sunRaDek, const RaDek& moonRaDek,
-                  double moonAxleAngle, const Libration& libration,
-                  double siderealTime, double latitude,
-                  int radius,
-                  MoonPhasePixel* outputBuffer,
-                  const MoonPhasePixel* moonTexture = nullptr,
-                  int texSize = 0);
 
 } // namespace astro
 

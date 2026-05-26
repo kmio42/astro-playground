@@ -36,7 +36,7 @@ double normalizeAngleDifferenceRad(double angle) {
 
 /**
  * Berechnet das Julianische Datum für ein gegebenes Datum und Uhrzeit.
- * Formeln: 7.1 aus "Astronomical Algorithms" von Jean Meeus.
+ * Formeln: 7.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
  * Julianischer Tag (JD) fortlaufende Zählung der Tage seit 1. Januar 4712 v. Chr. um 12:00 Uhr UT
  * Julianischer Ephemeris-Tag (JDE) fortlaufende Zählung der Tage seit 1. Januar 4712 v. Chr. um 12:00 Uhr ET
  * @param year Jahr
@@ -48,7 +48,7 @@ double normalizeAngleDifferenceRad(double angle) {
  * @param millisecond Millisekunde (0-999)
  * @return Julianisches Datum als double
  * 
- * @note Formel 7.1 aus "Astronomical Algorithms" von Jean Meeus
+ * @note Formel 7.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus
  */
 double calculateJulianDate(int year, int month, int day,
                            int hour, int minute, int second, int millisecond) {
@@ -81,8 +81,8 @@ double calculateJulianDate(int year, int month, int day,
 /**
  * Berechnet das Julianische Jahrhundert seit J2000.0.
  * Formel: 
- *  - 11.1 aus "Astronomical Algorithms" von Jean Meeus.
- *  - 21.1 aus "Astronomical Algorithms" von Jean Meeus.
+ *  - 11.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
+ *  - 21.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
  * @param jd Julianisches Datum
  * @return Julianisches Jahrhundert
  */
@@ -96,7 +96,7 @@ double calculateJulianEpoch(double jd) {
 
 /**
  * Berechnet die Greenwich Mean Sidereal Time (GMST) in Stunden für ein gegebenes Julianisches Datum.
- * Formeln: 11.4 aus "Astronomical Algorithms" von Jean Meeus.
+ * Formeln: 11.4 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
  * @return GMST in Stunden, normalisiert auf den Bereich [0, 24)
  */
 double calculateSiderealTime(double jd) {
@@ -119,7 +119,7 @@ double calculateSiderealTime(double jd) {
 inline double gradToRad(double grad, double minute = 0, double second = 0 ) {
     return (grad + minute / 60.0 + second / 3600.0) * DEG2RAD;
 }
-    // Formel 21.2 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 21.2 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     // gradToRad(23,26,21.448) - T * (gradToRad(0,0,46.8150) + T * (gradToRad(0,0,0.00059) - T * gradToRad(0,0,0.001813)));
 
 /**
@@ -128,7 +128,7 @@ inline double gradToRad(double grad, double minute = 0, double second = 0 ) {
  * @param jd Julianisches Datum
  * @return Exzentrizität der Erdbahn
  * 
- * @note Formel 24.4 aus "Astronomical Algorithms" von Jean Meeus.
+ * @note Formel 24.4 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
  */
 double calculateCurrentExcentric(double jd) {
     double T = calculateJulianEpoch(jd);
@@ -138,11 +138,11 @@ double calculateCurrentExcentric(double jd) {
 /**
  * Berechnet die ekliptikale Länge der Sonne für ein gegebenes Julianisches Datum.
  * Wahre Länge der Sonne bezogen auf mittleres Äquinoktium des Datums
- * Formeln: 24.3 aus "Astronomical Algorithms" von Jean Meeus.
+ * Formeln: 24.3 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
  * @param jd Julianisches Datum
  * @return Ekliptikale Länge in Bogenmaß
  * 
- * @note Formel 24.3 aus "Astronomical Algorithms" von Jean Meeus.
+ * @note Formel 24.3 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
  */
 double calculateEclipticalLength(double jd) {
     double T = calculateJulianEpoch(jd);
@@ -182,7 +182,7 @@ double calculateTrueAnomaly(double jd) {
     }
 
     // Berechnung der wahren Anomalie (ν) in Bogenmaß
-    // umgestellte Formel 29.1 aus "Astronomical Algorithms" von Jean Meeus.
+    // umgestellte Formel 29.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     double nu = 2.0 * atan2(sqrt(1 + e_current) * sin(E / 2),
                              sqrt(1 - e_current) * cos(E / 2));
     return nu;
@@ -254,15 +254,15 @@ double calculateEquationOfTime(double jd, bool withEarthTilt) {
  * @return Äquatoriale Koordinaten (RA in Bogenmaß, Dek in Bogenmaß, Distanz 0)
  */
 RaDek calculateRaDek(double eclipticalLongitude, double eclipticalLatitude) {
-    // Formel 12.3 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 12.3 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     double ra = atan2(
         cos(EPSILON * DEG2RAD) * sin(eclipticalLongitude) - tan(eclipticalLatitude) * sin(EPSILON * DEG2RAD),
         cos(eclipticalLongitude));
-    // Formel 12.4 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 12.4 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     double dek = asin(
         sin(eclipticalLatitude) * cos(EPSILON * DEG2RAD)
       + cos(eclipticalLatitude) * sin(EPSILON * DEG2RAD) * sin(eclipticalLongitude));
-    return {ra, dek, 0.0};
+    return {ra, dek};
 }
 
 /**
@@ -274,14 +274,14 @@ RaDek calculateRaDek(double eclipticalLongitude, double eclipticalLatitude) {
  */
 AzimutHeight calculateHAzFromRaDek(const RaDek& radek, double siderealTime, double latitude) {
     double H = siderealTime - radek.ra;
-    // Formel 12.5 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 12.5 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     double A = atan2(sin(H),
-                     cos(H) * sin(latitude * DEG2RAD)
-                   - tan(radek.dek) * cos(latitude * DEG2RAD));
+                     cos(H) * sin(latitude)
+                   - tan(radek.dek) * cos(latitude));
     
-    // Formel 12.6 aus "Astronomical Algorithms" von Jean Meeus.
-    double h = asin(sin(latitude * DEG2RAD) * sin(radek.dek)
-                  + cos(latitude * DEG2RAD) * cos(radek.dek) * cos(H));
+    // Formel 12.6 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
+    double h = asin(sin(latitude) * sin(radek.dek)
+                  + cos(latitude) * cos(radek.dek) * cos(H));
     return {A, h};
 }
 
@@ -292,11 +292,11 @@ AzimutHeight calculateHAzFromRaDek(const RaDek& radek, double siderealTime, doub
  * @param latitude Breitengrad in Grad
  * @return Parallaktischer Winkel in Bogenmaß
  * 
- * @note Formel 13.1 aus "Astronomical Algorithms" von Jean Meeus.
+ * @note Formel 13.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
  */
 double calculateParallacticAngle(const RaDek& radek, double siderealTime, double latitude) {
     return atan2(sin(siderealTime - radek.ra),
-                 tan(latitude * DEG2RAD) * cos(radek.dek) - sin(radek.dek) * cos(siderealTime - radek.ra));
+                 tan(latitude) * cos(radek.dek) - sin(radek.dek) * cos(siderealTime - radek.ra));
 }
 
 /**
@@ -309,24 +309,24 @@ double calculateParallacticAngle(const RaDek& radek, double siderealTime, double
  */
 RaDek calculateParallax(const RaDek& objRaDek, double parallax, double direction, double latitude) {
     
-    // Kapitel 10 aus "Astronomical Algorithms" von Jean Meeus.
+    // Kapitel 10 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     constexpr double ba = 0.99664719;
     constexpr double H = 0; // Höhe über Meeresspiegel
 
-    double u = atan(ba * tan(latitude * DEG2RAD));
-    double rhoSinPhi = ba * sin(u) + H / 6378140.0 * sin(latitude * DEG2RAD);
-    double rhoCosPhi = cos(u) + H / 6378140.0 * cos(latitude * DEG2RAD);
+    double u = atan(ba * tan(latitude));
+    double rhoSinPhi = ba * sin(u) + H / 6378140.0 * sin(latitude);
+    double rhoCosPhi = cos(u) + H / 6378140.0 * cos(latitude);
 
-    // Formel 39.2 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 39.2 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     double alpha = atan(-rhoCosPhi * sin(parallax) * sin(direction - objRaDek.ra)
                        / (cos(objRaDek.dek) - rhoCosPhi * sin(parallax) * cos(direction - objRaDek.ra)));
 
-    // Formel 39.3 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 39.3 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     double dek = atan2(
         (sin(objRaDek.dek) - rhoSinPhi * sin(parallax)) * cos(alpha),
          cos(objRaDek.dek) - rhoCosPhi * sin(parallax) * cos(direction - objRaDek.ra));
 
-    return {objRaDek.ra + alpha, dek, 0.0};
+    return {objRaDek.ra + alpha, dek};
 }
 
 // ---------------------------------------------------------------
@@ -342,11 +342,11 @@ RaDek calculateParallax(const RaDek& objRaDek, double parallax, double direction
  * @return Interpolierter Wert
  */
 double interpolate(double y1, double y2, double y3, double n) {
-    // Formel 3.1 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 3.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     double a = y2 - y1;
     double b = y3 - y2;
     double c = b - a;
-    // Formel 3.3 aus "Astronomical Algorithms" von Jean Meeus.
+    // Formel 3.3 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     return y2 + n / 2.0 * (a + b + n * c);
 }
 
@@ -370,9 +370,9 @@ SunriseSunset calculateSunriseSunset(double jd, double latitude, double longitud
     RaDek radek2 = calculateRaDek(length2, 0);
     double siderealTime = calculateSiderealTime(jd) * 180.0 / 12.0;
 
-    // Formel 14.1 aus "Astronomical Algorithms" von Jean Meeus.
-    double cH0 = (sin(h0 * DEG2RAD) - sin(latitude * DEG2RAD) * sin(radek2.dek))
-               / (cos(latitude * DEG2RAD) * cos(radek2.dek));
+    // Formel 14.1 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
+    double cH0 = (sin(h0 * DEG2RAD) - sin(latitude) * sin(radek2.dek))
+               / (cos(latitude) * cos(radek2.dek));
 
     if (cH0 < -1 || cH0 > 1) {
         return {0, 0, 0, false};
@@ -380,8 +380,8 @@ SunriseSunset calculateSunriseSunset(double jd, double latitude, double longitud
 
     double H0 = acos(cH0) * RAD2DEG;
 
-    // Formel 14.2 aus "Astronomical Algorithms" von Jean Meeus.
-    double m0 = fmod((radek2.ra * RAD2DEG - longitude - siderealTime) / 360.0, 1.0);
+    // Formel 14.2 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
+    double m0 = fmod((radek2.ra * RAD2DEG - longitude*RAD2DEG - siderealTime) / 360.0, 1.0);
     m0 = fmod(m0 + 1.0, 1.0);
 
     double m1 = fmod(m0 - H0 / 360.0 + 1.0, 1.0);
@@ -402,9 +402,9 @@ SunriseSunset calculateSunriseSunset(double jd, double latitude, double longitud
  */
 double calculateJDOfPoint(int year, EquinoxType type) {
 
-    //Kapitel 26 aus "Astronomical Algorithms" von Jean Meeus.
+    //Kapitel 26 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     
-    //Tabelle 26.3 aus "Astronomical Algorithms" von Jean Meeus.
+    //Tabelle 26.3 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     static const double factors[][3] = {
         {485, 324.96,   1934.136},
         {203, 337.23,  32964.467},
@@ -432,7 +432,7 @@ double calculateJDOfPoint(int year, EquinoxType type) {
         {  8,  15.45,  16859.074},
     };
 
-    // Tabelle 26.2 aus "Astronomical Algorithms" von Jean Meeus.
+    // Tabelle 26.2 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.
     // Die Werte für die Jahre 1000–3000 wurden hier auf 2000 zentriert, um die Genauigkeit zu verbessern.
     static const double parameters[4][5] = {
         {2451623.80984, 365242.37404,  0.05169, -0.00411, -0.00057}, // Frühling
@@ -732,6 +732,8 @@ double calculateRisingKnotMoon(double jd) {
  */
 double calculateMoonPhase(const RaDek& sunRaDek, double sunDistance,
                           const RaDek& moonRaDek, double moonDistance) {
+    // Geozenrische Elongation zwischen Sonne und Mond
+    // Formel 46.2 aus "Astronomische Algorithmen, 2. Auflage" von Jean Meeus.                        
     double cosPsi = sin(sunRaDek.dek) * sin(moonRaDek.dek)
                   + cos(sunRaDek.dek) * cos(moonRaDek.dek) * cos(sunRaDek.ra - moonRaDek.ra);
 
@@ -780,7 +782,7 @@ MoonAxle calculateMoonAxle(double jd, const MoonPosition& moon) {
 
     double rho = (-.02752 * cos(m)
                 + -.02245 * sin(F)
-                + .00684 * cos(m - 2 * F)
+                +  .00684 * cos(m - 2 * F)
                 + -.00293 * cos(2 * F)
                 + -.00085 * cos(2 * (F - D))
                 + -.00054 * cos(m - 2 * D)
@@ -902,123 +904,6 @@ Vec3 applyMatrix(const Vec3& point, const Mat3& matrix) {
         point.x * matrix.m[1][0] + point.y * matrix.m[1][1] + point.z * matrix.m[1][2],
         point.x * matrix.m[2][0] + point.y * matrix.m[2][1] + point.z * matrix.m[2][2]
     };
-}
-
-// ---------------------------------------------------------------
-//  Mondphasen-Rendering
-// ---------------------------------------------------------------
-
-/**
- * Rendert die Mondphase in einen Pixelbuffer.
- * @param sunRaDek Äquatoriale Koordinaten der Sonne
- * @param moonRaDek Äquatoriale Koordinaten des Mondes
- * @param moonAxleAngle Achsenwinkel des Mondes
- * @param libration Libration des Mondes
- * @param siderealTime Sternzeit in Stunden
- * @param latitude Breitengrad in Grad
- * @param radius Radius des Mondes in Pixeln
- * @param outputBuffer Ausgabepuffer für Pixel
- * @param moonTexture Mondtextur (optional)
- * @param texSize Größe der Textur
- * @return Anzahl der beleuchteten Pixel
- */
-int drawMoonPhase(const RaDek& sunRaDek, const RaDek& moonRaDek,
-                  double moonAxleAngle, const Libration& libration,
-                  double siderealTime, double latitude,
-                  int radius,
-                  MoonPhasePixel* outputBuffer,
-                  const MoonPhasePixel* moonTexture,
-                  int texSize) {
-
-    double cosPsi = sin(sunRaDek.dek) * sin(moonRaDek.dek)
-                  + cos(sunRaDek.dek) * cos(moonRaDek.dek) * cos(sunRaDek.ra - moonRaDek.ra);
-
-    double i = atan2(sunRaDek.distance * sin(acos(cosPsi)),
-                     moonRaDek.distance - sunRaDek.distance * cosPsi);
-    double k = (1 + cos(i)) / 2.0;
-
-    double chi = atan2(cos(sunRaDek.dek) * sin(sunRaDek.ra - moonRaDek.ra),
-                       sin(sunRaDek.dek) * cos(moonRaDek.dek)
-                     - cos(sunRaDek.dek) * sin(moonRaDek.dek) * cos(sunRaDek.ra - moonRaDek.ra));
-
-    double q = atan2(sin(siderealTime - moonRaDek.ra),
-                     tan(latitude * DEG2RAD) * cos(moonRaDek.dek)
-                   - sin(moonRaDek.dek) * cos(siderealTime - moonRaDek.ra));
-
-    // Rotationsmatrizen für Textur-Mapping
-    Mat3 axleRot = createRotationMatrix({0, 0, 1}, -moonAxleAngle + q + 0.389615);
-    Mat3 libLongitudeRot = createRotationMatrix({0, 1, 0}, libration.longitude - 2.009 * DEG2RAD);
-    Mat3 libLatitudeRot = createRotationMatrix({1, 0, 0}, libration.latitude - 0.64 * DEG2RAD);
-    Mat3 rotMatrix = multiplyMatrix(libLongitudeRot, libLatitudeRot);
-    rotMatrix = multiplyMatrix(axleRot, rotMatrix);
-
-    double mask = chi - q + M_PI / 2.0;
-    int r = radius;
-    double bb = static_cast<double>(r) * r;
-    double aa = static_cast<double>(r) * r;
-
-    if (k > 0.5) {
-        double f = k * 2 - 1;
-        aa *= f * f;
-    } else {
-        double f = 1 - k * 2;
-        aa *= f * f;
-    }
-
-    double cosMask = cos(-mask);
-    double sinMask = sin(-mask);
-
-    int width = 2 * r;
-    int litPixels = 0;
-
-    // Mondfarbe für Pixel ohne Textur
-    constexpr MoonPhasePixel moonColor = {175, 168, 156, 255}; // #afa89c
-    constexpr MoonPhasePixel black = {0, 0, 0, 0};
-
-    for (int y = -r; y < r; y++) {
-        for (int x = -r; x < r; x++) {
-            int bufIdx = (y + r) * width + (x + r);
-
-            double circle = static_cast<double>(x) * x + static_cast<double>(y) * y - static_cast<double>(r) * r;
-            if (circle > 0) {
-                outputBuffer[bufIdx] = black;
-                continue;
-            }
-
-            double conditionX = x * cosMask + y * sinMask;
-            double conditionY = -x * sinMask + y * cosMask;
-            double ellipse = conditionX * conditionX * bb + conditionY * conditionY * aa - aa * bb;
-            bool pixelActive = false;
-
-            if (k > 0.5) {
-                pixelActive = conditionX >= 0 || ellipse <= 0;
-            } else {
-                pixelActive = conditionX >= 0 && ellipse > 0;
-            }
-
-            if (pixelActive) {
-                double z = sqrt(static_cast<double>(r) * r - static_cast<double>(x) * x - static_cast<double>(y) * y);
-                Vec3 point = applyMatrix({static_cast<double>(x), static_cast<double>(-y), z}, rotMatrix);
-
-                if (moonTexture && texSize > 0 && point.z > 0) {
-                    int texX = static_cast<int>(point.x + r);
-                    int texY = static_cast<int>(-point.y + r);
-                    if (texX >= 0 && texX < texSize && texY >= 0 && texY < texSize) {
-                        outputBuffer[bufIdx] = moonTexture[texY * texSize + texX];
-                    } else {
-                        outputBuffer[bufIdx] = moonColor;
-                    }
-                } else {
-                    outputBuffer[bufIdx] = moonColor;
-                }
-                litPixels++;
-            } else {
-                outputBuffer[bufIdx] = black;
-            }
-        }
-    }
-
-    return litPixels;
 }
 
 } // namespace astro

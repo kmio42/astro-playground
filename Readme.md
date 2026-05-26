@@ -18,7 +18,7 @@ The main calculation library (~780 lines, no external dependencies). Implements:
 - Lunar position with 60+ periodic correction terms, moon phase, ascending node
 - Helper utilities: angle normalization, interpolation
 
-### `astro.c` / `astro.cpp` / `astro.h`
+### `astro.cpp` / `astro.h`
 Partial C/C++ reimplementations of the same algorithms (not integrated into any build, standalone files).
 
 ### `render.js`
