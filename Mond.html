@@ -291,25 +291,22 @@
             const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q+6.388*deg2rad);//19.489*deg2rad);
 
 
-            const rotY1_1 = createRotationMatrix({x:0,y:-1,z:0},considerLibration?-libration.longitude:0);//+2.24*Math.PI/180);//2.4*Math.PI/180); //23/5   //Länge
+            const rotY1_1 = createRotationMatrix({x:0,y:-1,z:0},considerLibration?-libration.longitude:0); //Länge
             const rotX1_1 = createRotationMatrix({x:1,y:0,z:0},considerLibration?-libration.latitude:0); //Breite
-            const rotZ1_1 = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q);   //19,489° //Achse
+            const rotZ1_1 = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q); //Achse
 
             //Korrekturwerte für Mond2.png
-            const rotX1_2 = createRotationMatrix({x:1,y:0,z:0},5.78*Math.PI/180);//5.99*Math.PI/180); //12/5  //Breite
-            const rotY1_2 = createRotationMatrix({x:0,y:-1,z:0},-2.24*Math.PI/180);//2.4*Math.PI/180); //23/5   //Länge
-            const rotZ1_2 = createRotationMatrix({x:0,y:0,z:1},9*Math.PI/180);   //19,489° //Achse
+            const rotX1_2 = createRotationMatrix({x:1,y:0,z:0},  5.78*deg2rad);   //Breite
+            const rotY1_2 = createRotationMatrix({x:0,y:-1,z:0},-2.24*deg2rad); //Länge
+            const rotZ1_2 = createRotationMatrix({x:0,y:0,z:1},  9   *deg2rad);      //Achse
 
 
             let rotMatrix = multiplyMatrix(rotZ1_2,rotX1_2);
-             rotMatrix = multiplyMatrix(rotMatrix,rotY1_2);
+            rotMatrix = multiplyMatrix(rotMatrix,rotY1_2);
 
-             rotMatrix = multiplyMatrix(rotMatrix,rotY1_1);
-             rotMatrix = multiplyMatrix(rotMatrix,rotX1_1);
-             rotMatrix = multiplyMatrix(rotMatrix,rotZ1_1);
-
-             console.log(rotMatrix);
- 
+            rotMatrix = multiplyMatrix(rotMatrix,rotY1_1);
+            rotMatrix = multiplyMatrix(rotMatrix,rotX1_1);
+            rotMatrix = multiplyMatrix(rotMatrix,rotZ1_1); 
 
             ctx.fillStyle ="#afa89c";
             const mask = (chi-q+Math.PI/2);
@@ -556,12 +553,12 @@
                 const raMinus = moonCurrent.ra + normalizeAngleDifferenceRad(moonMinus.ra - moonCurrent.ra);
                 const raPlus  = moonCurrent.ra + normalizeAngleDifferenceRad(moonPlus.ra  - moonCurrent.ra);
                 const interpolateRa  = calculateQuad(raMinus, moonCurrent.ra, raPlus);
-                const interpolateDek = calculateQuad(moonMinus.dec, moonCurrent.dec, moonPlus.dec);
+                const interpolateDec = calculateQuad(moonMinus.dec, moonCurrent.dec, moonPlus.dec);
                 
                 for (let t = -1; t < 1; t += 0.1) {
                     const moon = {
                         ra:  interpolateRa.a  * t*t + interpolateRa.b  * t + interpolateRa.c,
-                        dek: interpolateDek.a * t*t + interpolateDek.b * t + interpolateDek.c
+                        dec: interpolateDec.a * t*t + interpolateDec.b * t + interpolateDec.c
                     };
 
                     const moonAzimuthAltitude = calculateHAzFromRaDec(moon, siderealtime + t/12*86164100/86400000*Math.PI);
@@ -775,53 +772,9 @@
     ist bewusst einfach gehalten (keine Nutzung der Höheninformation, keine Rendering-Engine), um es später besser auf Mikrocontroller portieren zu können.
     Im Vergleich mit einem Computerpgrogramm wie Stellarium fallen leichte Unterschiede auf: Es ist davon auszugehen, dass dort genauere Modelle verwendet werden.
 
-    <div style="background-color: #EEEEEE;padding:5px">Beobachtungsort auf Erde
-    <table style="margin-left:1em">
-        <tr>
-            <td><label for="latitude">Breitengrad</label></td>
-            <td><input type="text" id="latitude" placeholder="" value = "0"> (z.B. 48.8566 oder 48°51'22"N)</td>
-            <td><span id="latitude-feedback" class="feedback"></span></td>
-        </tr>
-        <tr>
-            <td><label for="longitude">Längengrad</label></td>
-            <td><input type="text" id="longitude" placeholder="" value = "0"> (z.B. 2.3522 oder 2°20'15"E)</td>
-            <td><span id="longitude-feedback" class="feedback"></span></td>
-        </tr>
-    </table>
-    <button onClick="saveData()" style="margin-left:1em;width: fit-content;">Ort für nächsten Seitenaufruf lokal merken</button>
-    </div>
+    <div id="locationControls"></div>
 <p></p>
-    <div style="background-color: #EEEEEE;padding:5px">Zeit
-    <table style="margin-left:1em">
-        <tr>
-            <td></td>
-            <td>Tag.Monat.Jahr</td>
-            <td>HH:MM</td>
-            <td>Sekunde.Millisekunde</td>
-        </tr>
-    <tr>
-        <td>Datum und Uhrzeit</td>
-        <td><input type="date" id="date" /></td>
-        <td><input type="time" id="time" /></td>
-        <td><input id="seconds" style="width:100%"/></td>
-    </tr>
-    <tr>
-    <td>Sternzeit (Greenwich)</td>
-    <td></td>
-    <td><input id="siderealTime" type="time"/></td>
-    <td><input id="siderealSeconds" style="width:100%"/></td>
-    </tr>
-    <td>Sternzeit Lokal</td>
-    <td></td>
-    <td><span id="siderealTimeLocal" ></span></td>
-    <td><span id="siderealSecondsLocal" ></span></td>
-    </tr>
-    <tr>
-    <td><label for="julianDate" >Julianisches Datum</label></td>
-    <td colspan="3"><input id="julianDate" style="width:100%"/></td>
-    </tr>
-    </table>
-    </div>
+    <div id="timeControls"></div>
 
 <div style="display: flow-root;">
 <div style ="float:left; width:640px;">

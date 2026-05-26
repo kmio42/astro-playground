@@ -4,6 +4,7 @@
         var addTimeOffset;
         var latitude = 0;  // Breitengrad Ort
         var longitude = 0; // Längengrad Ort
+        var useLocalTime = false;
 
     /////////////////////////////////////////////////////////////////
     //              Formatierungsfunktionen                        //
@@ -100,9 +101,18 @@
     /////////////////////////////////////////////////////////////////
 
         function fillGregorianDate(date) {
-            document.getElementById('date').value = date.toISOString().substring(0, 10);
-            document.getElementById('time').value = date.getUTCHours().toString().padStart(2, '0')+':'+date.getUTCMinutes().toString().padStart(2, '0');
-            document.getElementById('seconds').value = date.getUTCSeconds() + '.' + date.getUTCMilliseconds();
+            if (useLocalTime) {
+                const y = date.getFullYear();
+                const mo = (date.getMonth()+1).toString().padStart(2,'0');
+                const d = date.getDate().toString().padStart(2,'0');
+                document.getElementById('date').value = `${y}-${mo}-${d}`;
+                document.getElementById('time').value = date.getHours().toString().padStart(2,'0')+':'+date.getMinutes().toString().padStart(2,'0');
+                document.getElementById('seconds').value = date.getSeconds() + '.' + date.getMilliseconds();
+            } else {
+                document.getElementById('date').value = date.toISOString().substring(0, 10);
+                document.getElementById('time').value = date.getUTCHours().toString().padStart(2, '0')+':'+date.getUTCMinutes().toString().padStart(2, '0');
+                document.getElementById('seconds').value = date.getUTCSeconds() + '.' + date.getUTCMilliseconds();
+            }
         }
 
         function fillJulianDate(jd) {
@@ -190,7 +200,9 @@
             const dateInput = document.getElementById('date').value;
             const timeInput = document.getElementById('time').value;
             const secondInput = document.getElementById('seconds').value;
-            const datetime_new = new Date(`${dateInput}T${timeInput}Z`);
+            const datetime_new = useLocalTime
+                ? new Date(`${dateInput}T${timeInput}`)   // local time
+                : new Date(`${dateInput}T${timeInput}Z`); // UTC
             if (isNaN(datetime_new.getTime())) return;
             const seconds = parseFloat(secondInput);
             if (isNaN(seconds)) return;
@@ -273,6 +285,67 @@
         }
 
     /////////////////////////////////////////////////////////////////
+    //              Formulargenerierung                           //
+    /////////////////////////////////////////////////////////////////
+
+        function createLocationControls(containerId) {
+            document.getElementById(containerId).innerHTML = `
+    <div style="background-color: #EEEEEE;padding:5px">Beobachtungsort auf Erde
+    <table style="margin-left:1em">
+        <tr>
+            <td><label for="latitude">Breitengrad</label></td>
+            <td><input type="text" id="latitude" placeholder="" value="0"> (z.B. 48.8566 oder 48°51'22"N)</td>
+            <td><span id="latitude-feedback" class="feedback"></span></td>
+        </tr>
+        <tr>
+            <td><label for="longitude">Längengrad</label></td>
+            <td><input type="text" id="longitude" placeholder="" value="0"> (z.B. 2.3522 oder 2°20'15"E)</td>
+            <td><span id="longitude-feedback" class="feedback"></span></td>
+        </tr>
+    </table>
+    <button onclick="saveData()" style="margin-left:1em;width:fit-content;">Ort für nächsten Seitenaufruf lokal merken</button>
+    </div>`;
+        }
+
+        function createTimeControls(containerId) {
+            const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            document.getElementById(containerId).innerHTML = `
+    <div style="background-color: #EEEEEE;padding:5px">Zeit
+    <label style="margin-left:1em"><input type="checkbox" id="localTime"> Lokalzeit (${tzName})</label>
+    <table style="margin-left:1em">
+        <tr>
+            <td></td>
+            <td>Tag.Monat.Jahr</td>
+            <td>HH:MM</td>
+            <td>Sekunde.Millisekunde</td>
+        </tr>
+        <tr>
+            <td>Datum und Uhrzeit</td>
+            <td><input type="date" id="date" /></td>
+            <td><input type="time" id="time" /></td>
+            <td><input id="seconds" style="width:100%" /></td>
+        </tr>
+        <tr>
+            <td>Sternzeit (Greenwich)</td>
+            <td></td>
+            <td><input id="siderealTime" type="time" /></td>
+            <td><input id="siderealSeconds" style="width:100%" /></td>
+        </tr>
+        <tr>
+            <td>Sternzeit Lokal</td>
+            <td></td>
+            <td><span id="siderealTimeLocal"></span></td>
+            <td><span id="siderealSecondsLocal"></span></td>
+        </tr>
+        <tr>
+            <td><label for="julianDate">Julianisches Datum</label></td>
+            <td colspan="3"><input id="julianDate" style="width:100%" /></td>
+        </tr>
+    </table>
+    </div>`;
+        }
+
+    /////////////////////////////////////////////////////////////////
     //              Lokale Datenspeicherung                        //
     /////////////////////////////////////////////////////////////////
 
@@ -295,11 +368,17 @@
     /////////////////////////////////////////////////////////////////
 
         function initUI() {
+            createLocationControls('locationControls');
+            createTimeControls('timeControls');
             document.getElementById('latitude').addEventListener('input', function () {
                 validateCoordinate(this.value.trim(), 'latitude');
             });
             document.getElementById('longitude').addEventListener('input', function () {
                 validateCoordinate(this.value.trim(), 'longitude');
+            });
+            document.getElementById('localTime').addEventListener('change', function () {
+                useLocalTime = this.checked;
+                fillGregorianDate(datetime);
             });
             loadData();
             datetime = new Date();

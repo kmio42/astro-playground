@@ -525,10 +525,10 @@
         window.onload = function () {
             initUI();
             createTimeButtons('timeButtons', [
-                { label: 'Minute',   step: 60000 },
-                { label: 'Stunde',   step: 3600000 },
-                { label: 'Tag',      step: 86400000 },
-                { label: 'Sterntag', step: 86164100 },
+                { label: '1 Minute',   step: 60000 },
+                { label: '1 Stunde',   step: 3600000 },
+                { label: '1 Tag',      step: 86400000 },
+                { label: '1 Sterntag', step: 86164100 },
             ]);
         };
     </script>
@@ -539,53 +539,9 @@
     </p>
     <p>Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Alle Angaben beziehen sich auf Weltzeit (UTC), Zeitverschiebung und Sommerzeit werden nicht berücksichtigt. Die Knöpfe für Modifikation der Zeit können gedrückt gehalten werden.</p>
 
-    <div style="background-color: #EEEEEE;padding:5px">Beobachtungsort auf Erde
-    <table style="margin-left:1em">
-        <tr>
-            <td><label for="latitude">Breitengrad</label></td>
-            <td><input type="text" id="latitude" placeholder="" value = "0"> (z.B. 48.8566 oder 48°51'22"N)</td>
-            <td><span id="latitude-feedback" class="feedback"></span></td>
-        </tr>
-        <tr>
-            <td><label for="longitude">Längengrad</label></td>
-            <td><input type="text" id="longitude" placeholder="" value = "0"> (z.B. 2.3522 oder 2°20'15"E)</td>
-            <td><span id="longitude-feedback" class="feedback"></span></td>
-        </tr>
-    </table>
-    <button onClick="saveData()" style="margin-left:1em;width: fit-content;">Ort für nächsten Seitenaufruf lokal merken</button>
-    </div>
+    <div id="locationControls"></div>
 <p></p>
-    <div style="background-color: #EEEEEE;padding:5px">Zeit
-    <table style="margin-left:1em">
-        <tr>
-            <td></td>
-            <td>Tag.Monat.Jahr</td>
-            <td>HH:MM</td>
-            <td>Sekunde.Millisekunde</td>
-        </tr>
-    <tr>
-        <td>Datum und Uhrzeit</td>
-        <td><input type="date" id="date" /></td>
-        <td><input type="time" id="time" /></td>
-        <td><input id="seconds" style="width:100%"/></td>
-    </tr>
-    <tr>
-    <td>Sternzeit (Greenwich)</td>
-    <td></td>
-    <td><input id="siderealTime" type="time"/></td>
-    <td><input id="siderealSeconds" style="width:100%"/></td>
-    </tr>
-    <td>Sternzeit Lokal</td>
-    <td></td>
-    <td><span id="siderealTimeLocal" ></span></td>
-    <td><span id="siderealSecondsLocal" ></span></td>
-    </tr>
-    <tr>
-    <td><label for="julianDate" >Julianisches Datum</label></td>
-    <td colspan="3"><input id="julianDate" style="width:100%"/></td>
-    </tr>
-    </table>
-    </div>
+    <div id="timeControls"></div>
 <div style="display: flow-root;">
 <div style ="float:left;">
 
