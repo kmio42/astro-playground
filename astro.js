@@ -97,7 +97,6 @@
             const minutes = Math.floor((dayFraction * 24 - hour) * 60);
             const seconds = Math.floor((((dayFraction * 24 - hour) * 60) - minutes) * 60);
             const milliseconds = Math.round((((((dayFraction * 24 - hour) * 60) - minutes) * 60)- seconds)*60);
-            //console.log(stunden,minuten,sekunden);
             // Erzeugt ein Datum mit Jahr, Monat, Tag, Stunden, Minuten und Sekunden
             return new Date(Date.UTC(year, month - 1, Math.floor(day), hour, minutes, seconds,milliseconds));
         }
@@ -136,7 +135,7 @@
             ];
 
             const parameters = {
-                "spring": [2451623.80984, 365242.37404, 0.05169, 0.00411, 0.00057], //
+                "spring": [2451623.80984, 365242.37404, 0.05169, 0.00411, 0.00057],
                 "summer": [2451716.56767, 365241.62603, 0.00325, 0.00888, 0.00030],
                 "autumn": [2451810.21715, 365242.01767, 0.11575, 0.00337, 0.00078],
                 "winter": [2451900.05952, 365242.74049, 0.06223, 0.00823, 0.00032]
@@ -522,9 +521,6 @@
             // Mittlere Abstand des Mondes vom aufsteigenden Knoten (45.5)
             const F = normalizeAngleDegree(93.2720993 + T*(483202.0175273 - 0.0034029*T) - T**3/3526000 + T**4/863310000)*deg2rad;
 
-            //console.log("Mond L', D, M, M',F:",l*rad2deg,D*rad2deg,M*rad2deg,m*rad2deg,F*rad2deg);
-
-
             const A1 = normalizeAngleDegree(119.75 +    131.849*T)*deg2rad;
             const A2 = normalizeAngleDegree( 53.09 + 479264.290*T)*deg2rad;
             const A3 = normalizeAngleDegree(313.45 + 481266.484*T)*deg2rad;
@@ -744,15 +740,11 @@
             sumb +=   127 * Math.sin(l-m);
             sumb +=  -115 * Math.sin(l+m);
 
-            //console.log("Mond suml, sumb, sumr:",suml,sumb, sumr);
-
             return {
                 "longitude": l + (suml/1000000)*deg2rad,
                 "latitude" : (sumb/1000000)*deg2rad,
                 "distance" : 385000.56 + sumr/1000
             }
-
-            //const sinPi = 0.999953253*(3422.7 +1sin II
         }
 
         /**
@@ -849,7 +841,6 @@
                 let y_plus = calculateMoonSinAlt(jd + (hour + 1)/24, longitude, cos_lat, sin_lat) - sinh0;
 
                 let q = calculateQuad(y_minus, y_0, y_plus);
-                //console.log(`(x>=${hour - 1.0} && x<=${hour + 1.0} ? ${q.a}*(x-${hour - 1.0})**2 + ${q.b}*(x-${hour - 1.0}) + ${q.c}:1/0) \\`);
 
                 switch (q.nz) {
                 case 1:
@@ -904,8 +895,8 @@
         }
         function calculateTimeOfNodeMoon(k, risingNode) {
             const h = (risingNode)?0.0:0.5;
-	        k = Math.floor(k-h+.5) + h   // snap to half orbit
-	        const T = k / 1342.23
+	        k = Math.floor(k-h+.5) + h;   // snap to half orbit
+	        const T = k / 1342.23;
 	        const D = (183.638 + 331.73735682*k + T*T*(.0014852 + T*(.00000209 + T*(-.00000001))))*deg2rad;
 	        const M = (17.4006 + 26.8203725*k + T*T*(.0001186 + T*(-.00000006)))*deg2rad;
 	        const Md = (38.3776 + 355.52747313*k + T*T*(.0123499 + T*(.000014627 + T*(-.000000069))))*deg2rad;
@@ -947,7 +938,6 @@
 
             const i = Math.atan2(sunDistance*Math.sin(Math.acos(cosPsi)),(moonDistance-sunDistance*cosPsi));
             const k = (1 + Math.cos(i))/2;
-            //console.log("MondPhase:" + k, k-(1-cosPsi)/2);
 
 //             //const chi = Math.atan2(Math.cos(sunRadek.dec)*Math.sin(sunRadek.ra - moonRaDec.ra),
 //             Math.sin(sunRadek.dec)*Math.cos(moonRaDec.dec) - Math.cos(sunRadek.dec)*Math.sin(moonRaDec.dec)*Math.cos(sunRadek.ra - moonRaDec.ra)
@@ -978,7 +968,6 @@
 
             const dek = Math.atan2(
                 (Math.sin(objRaDec.dec) - rhoSinPhi*Math.sin(parallax))*Math.cos(alpha),(Math.cos(objRaDec.dec) - rhoCosPhi*Math.sin(parallax)*Math.cos(direction-objRaDec.ra)));
-            //console.log("Parallaxe",parallax*rad2deg,alpha*rad2deg,(dek-objRaDec.dec)*rad2deg);
             return {
                 "ra": objRaDec.ra + alpha,
                 "dec": dek
@@ -1016,7 +1005,6 @@
             //Formel 51.1
             const A = Math.atan2(Math.sin(W)*Math.cos(beta)*Math.cos(I) - Math.sin(beta)*Math.sin(I), Math.cos(W)*Math.cos(beta));
 
-            //console.log("W, A, F",normalizeAngleDegree(W*rad2deg), normalizeAngleDegree( A*rad2deg), normalizeAngleDegree(F*rad2deg));
             //optische Liberation
             const l1 = A - F;
             const b1 = Math.asin(-Math.sin(W)*Math.cos(beta)*Math.sin(I)-Math.sin(beta)*Math.cos(I));
@@ -1074,7 +1062,6 @@
 
             const l2 = -tau  + (rho * Math.cos(A) + sigma * Math.sin(A))* Math.tan(b1);
             const b2 = sigma * Math.cos(A) - rho * Math.sin(A);
-            //console.log("Libration:",b1*rad2deg,b2*rad2deg,l1*rad2deg,l2*rad2deg);
 
             const moonRaDec = calculateRaDec(moon.longitude,moon.latitude);
 
@@ -1085,7 +1072,6 @@
             const w = Math.atan2(X,Y);
             const P = Math.asin(Math.sqrt(X**2+Y**2)*Math.cos(moonRaDec.ra - w)/Math.cos(moon.latitude));
 
-            //console.log("Mondachse:",normalizeAngleDegree(P*rad2deg));
             return {
                 libration: {
                     longitude: (l1+l2),
@@ -1094,23 +1080,3 @@
                 axle: P
             }
         }
-
-
-
-        // function interpolateQuad(ym,y0,yp) {
-        //     const a = (yp + ym)/2 - y0;
-        //     const b = (yp-ym)/2;
-        //     const c = y0;
-
-        //     const xe = -b/(2*a)
-        //     const ye = (a*xe +b)*xe+c;
-        //     const dis = b*b - 4*a*c;
-        //     if (dis >= 0) {
-        //         const dx = 0.5*Math.sqrt(dis)/Math.abs(a);
-        //         const zero1 = xe-dx;
-        //         const zero2 = xe+dx;
-        //         if(zero1 < -1) {
-        //             zero1 = zero2;
-        //         }
-        //     }
-        // }
