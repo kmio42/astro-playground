@@ -95,9 +95,14 @@ async function main() {
     const pathLroc = path.join(dir, 'lroc_color_2k.jpg');
     const pathMond = path.join(dir, 'mond2.png');
 
+    let moonTexData = null;
     if (fs.existsSync(pathLroc)) {
         moonImage1 = await loadImage(pathLroc);
         console.log(`Textur: lroc_color_2k.jpg (${moonImage1.width}×${moonImage1.height})`);
+        const texCanvas = createCanvas(moonImage1.width, moonImage1.height);
+        texCanvas.getContext('2d').drawImage(moonImage1, 0, 0);
+        const imgData = texCanvas.getContext('2d').getImageData(0, 0, moonImage1.width, moonImage1.height);
+        moonTexData = { pixels: imgData.data, width: moonImage1.width, height: moonImage1.height };
     } else {
         console.warn('lroc_color_2k.jpg nicht gefunden – Grauton-Fallback.');
     }
@@ -119,7 +124,7 @@ async function main() {
         canvas1.getContext('2d'),
         sunRaDec, moonRaDec, moonAxis.axle, moonAxis.libration,
         siderealRad, opts.lat,
-        { moonImage1, ...renderOpts }
+        { moonImage1, texData: moonTexData, ...renderOpts }
     );
 
     const canvas2 = createCanvas(opts.size, opts.size);

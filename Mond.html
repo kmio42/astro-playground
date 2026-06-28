@@ -31,6 +31,19 @@
         let moonImageOffscreen = null;
 
         const moonImage1 = new Image();
+        let moonTexData = null;
+        moonImage1.onload = function() {
+            const off = document.createElement('canvas');
+            off.width  = moonImage1.width;
+            off.height = moonImage1.height;
+            try {
+                off.getContext('2d').drawImage(moonImage1, 0, 0);
+                const id = off.getContext('2d').getImageData(0, 0, off.width, off.height);
+                moonTexData = { pixels: id.data, width: off.width, height: off.height };
+            } catch (e) {
+                // file://-CORS: getImageData gesperrt → Fallback auf per-Pixel-drawImage
+            }
+        };
         moonImage1.src = "./lroc_color_2k.jpg";
 
 
@@ -273,7 +286,7 @@
             drawMoonPhaseTexture(
                 document.getElementById('moon1').getContext('2d'),
                 sunRaDec, moonRaDec, moonAxis, libration, siderealtime, latitude,
-                { moonImage1, ...opts }
+                { moonImage1, texData: moonTexData, ...opts }
             );
 
             // mond2.png-Darstellung mit pixelweiser Schattenmaske
