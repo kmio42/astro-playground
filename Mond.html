@@ -675,6 +675,8 @@
                 { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*rad2deg).toFixed(2)+'°' },
                 { type: 'row', key: 'Mond \u2013 parallaktischer Winkel', value: (moonParallacticAngle*rad2deg).toFixed(2)+'°' },
                 { type: 'row', key: 'Mondaufgang', value: (moonRiseSet.rise !== false) ? hoursToString(moonRiseSet.utrise)+' UTC' : '-' },
+                { type: 'row', key: 'Monddurchgang', value: (moonRiseSet.zenit !== false) ? hoursToString(moonRiseSet.zenit)+' UTC' : '-' },
+                { type: 'row', key: 'Kulmination', value: (moonRiseSet.maxalt_time !== false) ? hoursToString(moonRiseSet.maxalt_time)+' UTC' : '-' },
                 { type: 'row', key: 'Monduntergang', value: (moonRiseSet.sett !== false) ? hoursToString(moonRiseSet.utset)+' UTC' : '-' },
             ];
             renderOutputTable('outputTable', tableData);

@@ -798,14 +798,17 @@
 
 
             q.nz = 0;
-            q.xe = -b / (2.0 * a);
-            q.ye    = (a * q.xe + b) * q.xe + c;
+            // Scheitelpunkt: y' = 2*a*x + b = 0  =>  xe = -b/(2*a)
+            //                ye = a*xe^2 + b*xe + c   (hier per Horner-Schema)
+            q.vertex_x = -b / (2.0 * a);
+            q.vertex_y = (a * q.vertex_x + b) * q.vertex_x + c;
+
             q.zero1 = q.zero2 = 0.0;
             const dis = b * b - 4.0 * a * c;
             if (dis >= 0.0) {
                 const dx = 0.5 * Math.sqrt(dis) / Math.abs(a);
-                q.zero1 = q.xe - dx;
-                q.zero2 = q.xe + dx;
+                q.zero1 = q.vertex_x - dx;
+                q.zero2 = q.vertex_x + dx;
                 if (Math.abs(q.zero1) <= 1.0) q.nz++;
                 if (Math.abs(q.zero2) <= 1.0) q.nz++;
                 if (q.zero1 < -1.0) q.zero1 = q.zero2;  /* nur zero2 liegt im Intervall */
@@ -813,18 +816,18 @@
             return q;
         }
 
-        function calculateMoonSinAlt(jd, longitude, cphi, sphi)
-        {
-            const moon  = calculateMoonSimple(jd);
-            const tau   = calculateSiderealTime(jd)*Math.PI/12 + longitude*deg2rad - moon.ra;  /* Stundenwinkel [Rad] */
-            return sphi * Math.sin(moon.dec) + cphi * Math.cos(moon.dec) * Math.cos(tau);
-        }
+        //function calculateMoonSinAlt(jd, longitude, cos_lat, sin_lat)
+        //{
+        //    const moon  = calculateMoonSimple(jd);
+        //    const tau   = calculateSiderealTime(jd)*Math.PI/12 + longitude*deg2rad - moon.ra;  /* Stundenwinkel [Rad] */
+        //    return sin_lat * Math.sin(moon.dec) + cos_lat * Math.cos(moon.dec) * Math.cos(tau);
+        //}
 
 
         function calculateMoonRiseSet(jd, longitude, latitude) {
 
-            const cos_lat = Math.cos(latitude * deg2rad);
-            const sin_lat = Math.sin(latitude * deg2rad);
+            //const cos_lat = Math.cos(latitude * deg2rad);
+            //const sin_lat = Math.sin(latitude * deg2rad);
 
             /* Horizonthoehe fuer Mondaufgang: h = +8' (Mondparallaxe minus Refraktion) */
             const sinh0 = 0.0023271; /* sin(+8/60 Grad) */
@@ -832,34 +835,82 @@
             //Mitternacht des aktuellen Datums finden
             jd = Math.round(jd)-0.5;
 
-            let hour    = 1.0;
-            let y_minus = calculateMoonSinAlt( jd + (hour - 1)/24, longitude, cos_lat, sin_lat) - sinh0;
-            let rs     = { utrise: 0, utset: 0, above: (y_minus > 0.0), rise:false, sett: false };
+            // Schleifenvariablen:
+            //
+            let hour = 1.0;
+            let moon0 = calculateMoonSimple(jd);
+            let t0 = calculateSiderealTime(jd)*Math.PI/12 + longitude*deg2rad;
+            let alt0 = calculateHAzFromRaDec(moon0, t0).altitude -sinh0;
+
+            let result = { utrise: 0, utset: 0, above: (alt0 > 0.0), rise:false, sett: false,
+                           zenit: 0, maxalt: -Infinity, maxalt_time: 0 };
 
             do {
-                let y_0    = calculateMoonSinAlt(jd + hour/24, longitude, cos_lat, sin_lat) - sinh0;
-                let y_plus = calculateMoonSinAlt(jd + (hour + 1)/24, longitude, cos_lat, sin_lat) - sinh0;
 
-                let q = calculateQuad(y_minus, y_0, y_plus);
+                const moon1 = calculateMoonSimple(jd + hour/24);
+                const t1 = calculateSiderealTime(jd + hour/24)*Math.PI/12 + longitude*deg2rad;
+                const alt1 = calculateHAzFromRaDec(moon1, t1).altitude - sinh0;
 
-                switch (q.nz) {
+                const moon2 = calculateMoonSimple(jd + (hour + 1)/24);
+                const t2 = calculateSiderealTime(jd + (hour + 1)/24)*Math.PI/12 + longitude*deg2rad;
+                const alt2 = calculateHAzFromRaDec(moon2, t2).altitude - sinh0;
+
+                // Stundenwinkel t - ra: 2π-Sprünge relativ zur mittleren Stützstelle entfernen,
+                // damit die quadratische Interpolation eine glatte Funktion sieht.
+                const ha1 = normalizeAngleDifferenceRad(t1 - moon1.ra);
+                const ha0 = ha1 + normalizeAngleDifferenceRad((t0 - moon0.ra) - ha1);
+                const ha2 = ha1 + normalizeAngleDifferenceRad((t2 - moon2.ra) - ha1);
+                const q_zenit = calculateQuad(ha0, ha1, ha2);
+                if (result.zenit === 0 && q_zenit.nz > 0) {
+                    const z = (Math.abs(q_zenit.zero1) <= 1.0) ? q_zenit.zero1 : q_zenit.zero2;
+                    result.zenit = hour + z;
+                }
+
+                const q_alt = calculateQuad(alt0, alt1, alt2);
+
+                // Scheitel ist nur dann ein Maximum, wenn a < 0; und er muss im Intervall liegen.
+                if (q_alt.a < 0 && Math.abs(q_alt.vertex_x) <= 1.0 && q_alt.vertex_y > result.maxalt) {
+                    result.maxalt = q_alt.vertex_y;
+                    result.maxalt_time = hour + q_alt.vertex_x;
+                }
+
+                /*
+                    * 1. Fall: 1 Nullstelle im Intervall, wenn alt0 < 0.0, dann ist die Nullstelle der Aufgang, sonst der Untergang
+                    * 2. Fall: 2 Nullstellen im Intervall, wenn vertex_y < 0.0, dann ist die Nullstelle mit der kleineren x-Koordinate der Aufgang, die andere der Untergang
+                */
+                switch (q_alt.nz) {
                 case 1:
-                    if (y_minus < 0.0) { rs.utrise = hour + q.zero1; rs.rise = true; }
-                    else               { rs.utset  = hour + q.zero1; rs.sett = true; }
+                    if (alt0 < 0.0) {
+                        result.utrise = hour + q_alt.zero1;
+                        result.rise = true;
+                    }
+                    else {
+                        result.utset  = hour + q_alt.zero1;
+                        result.sett = true;
+                    }
                     break;
                 case 2:
-                    if (q.ye < 0.0) { rs.utrise = hour + q.zero2; rs.utset = hour + q.zero1; }
-                    else            { rs.utrise = hour + q.zero1; rs.utset = hour + q.zero2; }
-                    rs.rise = true; rs.sett = true;
+                    if (q_alt.vertex_y < 0.0) {
+                        result.utrise = hour + q_alt.zero2;
+                        result.utset = hour + q_alt.zero1;
+                    }
+                    else {
+                        result.utrise = hour + q_alt.zero1;
+                        result.utset = hour + q_alt.zero2;
+                    }
+                    result.rise = true;
+                    result.sett = true;
                     break;
                 }
 
-                y_minus = y_plus;
-                hour   += 2.0;
+                alt0 = alt2;
+                t0 = t2;
+                moon0 = moon2;
+                hour += 2.0;
 
-            } while (hour < 25.0 && !(rs.rise && rs.sett));
-            return rs;
-    }
+            } while (hour < 25.0);
+            return result;
+        }
 
         function calculateAscendingNodeMoon(jd) {
             const T = calculateJulianEpoch(jd);
