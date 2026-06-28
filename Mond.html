@@ -22,6 +22,7 @@
     </style>
     <script src="astro.js"></script>
     <script src="render.js"></script>
+    <script src="moonRender.js"></script>
     <script src="ui.js"></script>
     <script>
 
@@ -263,184 +264,31 @@
  
 
     function drawMoonPhase(sunRaDec, moonRaDec, moonAxis, libration, siderealtime) {
-        drawMoonPhase1(sunRaDec, moonRaDec, moonAxis, libration, siderealtime);
+            const opts = {
+                considerParallacticAngle: document.getElementById("parallacticAngle").checked,
+                considerLibration:        document.getElementById("libration").checked,
+            };
 
-            const cosPsi = Math.sin(sunRaDec.dec)*Math.sin(moonRaDec.dec) +  Math.cos(sunRaDec.dec)*Math.cos(moonRaDec.dec)*Math.cos(sunRaDec.ra - moonRaDec.ra);
+            // Photografische Darstellung (lroc-Textur)
+            drawMoonPhaseTexture(
+                document.getElementById('moon1').getContext('2d'),
+                sunRaDec, moonRaDec, moonAxis, libration, siderealtime, latitude,
+                { moonImage1, ...opts }
+            );
 
-            const i = Math.atan2(sunRaDec.distance*Math.sqrt(1-cosPsi**2),(moonRaDec.distance-sunRaDec.distance*cosPsi));
-            const k = (1 + Math.cos(i))/2;
-
-            const chi = Math.atan2(Math.cos(sunRaDec.dec)*Math.sin(sunRaDec.ra - moonRaDec.ra),
-            Math.sin(sunRaDec.dec)*Math.cos(moonRaDec.dec) - Math.cos(sunRaDec.dec)*Math.sin(moonRaDec.dec)*Math.cos(sunRaDec.ra - moonRaDec.ra));
-            // k = 0: a = max, k = 0.5 => a = 0.5, k = 1: a = max
-
-            const considerParallacticAngle = document.getElementById("parallacticAngle").checked;
-            const q = (considerParallacticAngle) ? Math.atan2(Math.sin(siderealtime - moonRaDec.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDec.dec) - Math.sin(moonRaDec.dec)*Math.cos(siderealtime - moonRaDec.ra)) : 0;
-            
-            const considerLibration = document.getElementById("libration").checked;
-
-            const canvas = document.getElementById('moon');
-            const ctx = canvas.getContext('2d');
-
-            ctx.resetTransform();
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.translate(canvas.width/2, canvas.height/2);
-
-            const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q+6.388*deg2rad);//19.489*deg2rad);
-
-
-            const rotY1_1 = createRotationMatrix({x:0,y:-1,z:0},considerLibration?-libration.longitude:0); //Länge
-            const rotX1_1 = createRotationMatrix({x:1,y:0,z:0},considerLibration?-libration.latitude:0); //Breite
-            const rotZ1_1 = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q); //Achse
-
-            //Korrekturwerte für Mond2.png
-            const rotX1_2 = createRotationMatrix({x:1,y:0,z:0},  5.78*deg2rad);   //Breite
-            const rotY1_2 = createRotationMatrix({x:0,y:-1,z:0},-2.24*deg2rad); //Länge
-            const rotZ1_2 = createRotationMatrix({x:0,y:0,z:1},  9   *deg2rad);      //Achse
-
-
-            let rotMatrix = multiplyMatrix(rotZ1_2,rotX1_2);
-            rotMatrix = multiplyMatrix(rotMatrix,rotY1_2);
-
-            rotMatrix = multiplyMatrix(rotMatrix,rotY1_1);
-            rotMatrix = multiplyMatrix(rotMatrix,rotX1_1);
-            rotMatrix = multiplyMatrix(rotMatrix,rotZ1_1); 
-
-            ctx.fillStyle ="#afa89c";
-            const mask = (chi-q+Math.PI/2);
-            const r = canvas.width/2;
-            const imgSize = 2 * r;
+            // mond2.png-Darstellung mit pixelweiser Schattenmaske
             if (!moonImageOffscreen && moonImage.complete) {
+                const size = document.getElementById('moon').width;
                 moonImageOffscreen = document.createElement('canvas');
-                moonImageOffscreen.width = imgSize;
-                moonImageOffscreen.height = imgSize;
-                moonImageOffscreen.getContext('2d').drawImage(moonImage, 0, 0, imgSize, imgSize);
+                moonImageOffscreen.width  = size;
+                moonImageOffscreen.height = size;
+                moonImageOffscreen.getContext('2d').drawImage(moonImage, 0, 0, size, size);
             }
-            // scaledPixels = moonImageOffscreen.getContext('2d').getImageData(...).data  →  erst bei HTTP-Serving nutzbar
-            const b = r * r;
-            let a = r * r;
-            if (k > 0.5) {
-                a *= ((k * 2 - 1)**2);
-            } else {
-                a *= ((1 - k * 2)**2);
-            }
-            const cosMask = Math.cos(-mask);
-            const sinMask = Math.sin(-mask);
-
-            for (let y = -r; y < r; y++) {
-                for (let x = -r; x < r; x++) {
-                    let circle = x * x + y * y - r * r;
-                    if (circle > 0) {
-                        continue;
-                    }
-                    let conditionX = Math.floor(x * cosMask + y * sinMask);
-                    let conditionY = Math.floor(-x * sinMask + y * cosMask);
-                    let ellipse = conditionX * conditionX * b + conditionY * conditionY * a - a * b;
-                    let pixelActive = false;
-
-                    if (k > 0.5) {
-                        pixelActive = conditionX >= 0 || ellipse <= 0;
-                    } else {
-                        pixelActive = conditionX >= 0 && ellipse > 0;
-                    }
-   
-                    if(pixelActive) {
-                        const z = Math.sqrt(r*r - x*x - y*y);
-                        const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
-                        if(moonImageOffscreen && point.z >=0) {
-                            ctx.drawImage(moonImageOffscreen, Math.round(point.x+r), Math.round(-point.y+r), 1, 1, x, y, 1, 1);
-                        } else {
-                        ctx.fillRect(x,y,1,1);
-                        }
-                    }
-                }
-            }
-        }
-
-        function drawMoonPhase1(sunRaDec, moonRaDec, moonAxis, libration, siderealtime) {
-
-            const cosPsi = Math.sin(sunRaDec.dec)*Math.sin(moonRaDec.dec) +  Math.cos(sunRaDec.dec)*Math.cos(moonRaDec.dec)*Math.cos(sunRaDec.ra - moonRaDec.ra);
-
-            const i = Math.atan2(sunRaDec.distance*Math.sqrt(1-cosPsi**2),(moonRaDec.distance-sunRaDec.distance*cosPsi));
-            const k = (1 + Math.cos(i))/2;
-
-            const chi = Math.atan2(Math.cos(sunRaDec.dec)*Math.sin(sunRaDec.ra - moonRaDec.ra),
-                            Math.sin(sunRaDec.dec)*Math.cos(moonRaDec.dec) - Math.cos(sunRaDec.dec)*Math.sin(moonRaDec.dec)*Math.cos(sunRaDec.ra - moonRaDec.ra));
-
-            const considerParallacticAngle = document.getElementById("parallacticAngle").checked;
-            const q = (considerParallacticAngle) ? Math.atan2(Math.sin(siderealtime - moonRaDec.ra), Math.tan(latitude*deg2rad)*Math.cos(moonRaDec.dec) - Math.sin(moonRaDec.dec)*Math.cos(siderealtime - moonRaDec.ra)) : 0;
-            
-            const considerLibration = document.getElementById("libration").checked;
-
-
-            const axleRot = createRotationMatrix({x:0,y:0,z:1},-moonAxis+q);//axleRot -moonAxis+q -0.389615
-            const libLatitudeRot = createRotationMatrix({x:1,y:0,z:0},considerLibration?-libration.latitude:0); //Negativ +0.64*deg2rad
-            const libLongitudeRot = createRotationMatrix({x:0,y:-1,z:0},considerLibration?-libration.longitude:0); //Negativ +2.009*deg2rad
-            let rotMatrix = multiplyMatrix(libLongitudeRot,libLatitudeRot);
-                rotMatrix = multiplyMatrix(rotMatrix,axleRot);
-
-            const coordinateTransform = [[1,0,0],[0,0,1],[0,1,0]];
-            let rot1Matrix = multiplyMatrix(coordinateTransform, transposeMatrix(rotMatrix));
-                rot1Matrix = multiplyMatrix(rot1Matrix, coordinateTransform);
-
-
-            const canvas = document.getElementById('moon1');
-            const ctx = canvas.getContext('2d');
-
-            ctx.resetTransform();
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
-            ctx.translate(canvas.width/2, canvas.height/2);
-
-            const r = Math.floor(Math.min(canvas.width/2,moonOrbitRadius/moonRaDec.distance*canvas.width/2*0.93));
-
-            for (let y = -r; y < r; y++) {
-                for (let x = -r; x < r; x++) {
-                    let circle = x * x + y * y - r * r;
-                    if (circle > 0) {
-                        continue;
-                    }
-
-                    const z = Math.sqrt(r*r - x*x - y*y);
-                    const point = applyMatrix({x:x,y:-y,z:z},rotMatrix);
-
-                    //Normalisieren
-                    const len = Math.sqrt(point.x**2 + point.y**2 + point.z**2);
-                    point.x /= len;
-                    point.y /= len;
-                    point.z /= len;
-                       
-                    const lon_moon = Math.atan2(point.x, point.z);
-                    const lat_moon = Math.asin(Math.max(-1, Math.min(1, point.y)));
-
-                    if (moonImage1.complete) {
-                        const u = Math.floor((lon_moon + Math.PI) / (2 * Math.PI) * moonImage1.width);
-                        const v = Math.floor((Math.PI/2 - lat_moon) / Math.PI * moonImage1.height);
-
-                        ctx.drawImage(moonImage1, u, v, 1, 1, x, y, 1, 1);
-                    }
-                }
-            }
-
-            ctx.save();
-            ctx.rotate(-chi+q);
-            ctx.beginPath();
-            ctx.ellipse(0, 0, r, Math.abs(1-k*2)*r, 0, 0, Math.PI,(k <= 0.5)?true:false);
-            ctx.arc(0, 0, r, Math.PI, 0, true);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fill();
-            ctx.restore();
-            
-            ctx.fillStyle = 'red';
-            ctx.fillRect(-2,-2,4,4);
-
-            // Mondäquator
-            drawPolygonLine(ctx,calculateLatitudePoints(r,0, rot1Matrix),'red',true);
-            
-            // Nullmeridian
-            drawPolygonLine(ctx,calculateLongitudePoints(r,Math.PI/2, rot1Matrix),'red',true);
+            drawMoonPhaseShaded(
+                document.getElementById('moon').getContext('2d'),
+                sunRaDec, moonRaDec, moonAxis, libration, siderealtime, latitude,
+                { moonImageOffscreen, ...opts }
+            );
         }
 
 
