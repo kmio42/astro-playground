@@ -171,3 +171,10 @@
             }
             return polygonLine;
         }
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        createRotationMatrix, multiplyMatrix, transposeMatrix, applyMatrix,
+        drawPolygonLine, calculateLatitudePoints, calculateLongitudePoints,
+    };
+}

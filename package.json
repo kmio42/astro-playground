@@ -1,7 +1,9 @@
 {
   "name": "mondansicht-datenverarbeitung",
   "version": "1.0.0",
-  "type": "module",
   "description": "Liest Mondephemeriden-Datei ein, berechnet Zusatzwerte via astro.js und exportiert als CSV.",
-  "main": "parseMoonFile.js"
+  "main": "parseMoonFile.js",
+  "dependencies": {
+    "canvas": "^3.2.3"
+  }
 }
