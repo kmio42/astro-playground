@@ -11,15 +11,8 @@ A personal sandbox for experimenting with astronomical calculations and visualiz
 No build step required. HTML files run directly in a browser:
 
 ```bash
-firefox Astro-Berechnungen.html
 firefox Mond.html
 firefox Erdposition.html
-```
-
-If local image files (e.g. `mond.png`, `lroc_color_2k.jpg`) need to load, serve via HTTP:
-
-```bash
-python3 -m http.server 8000
 ```
 
 The C++ files (`astro.cpp`, `astro.h`) have no Makefile and are not integrated into any HTML page — they are a standalone partial reimplementation in the `astro::` namespace.
@@ -49,10 +42,8 @@ The C++ files (`astro.cpp`, `astro.h`) have no Makefile and are not integrated i
 
 | File | Uses shared JS | Description |
 |------|----------------|-------------|
-| `Astro-Berechnungen.html` | no (embeds its own calculation copy) | solar position, rise/set times, equation of time, solstices/equinoxes |
 | `Erdposition.html` | yes (`astro.js`, `render.js`, `ui.js`) | 2D Earth orbit, sidereal time, moon orbit around Earth |
 | `Mond.html` | yes (`astro.js`, `render.js`, `ui.js`) | 3D moon phase rendering with matrix transforms, libration, pixel-by-pixel surface mapping |
-| `astroled.html` | no | LED ring visualization |
 
 Pages that do not load `astro.js` embed (an older copy of) the calculation logic inline. When changing algorithms, check whether the inline copy in `Astro-Berechnungen.html` also needs updating.
 
