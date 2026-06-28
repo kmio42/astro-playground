@@ -442,8 +442,8 @@
 
             const tableData = [
                 { type: 'category', text: 'Zeitgleichung', value: hoursToString(equationOfTimeFull)+' Minuten ('+equationOfTimeFull.toFixed(2)+' Minuten)' },
-                { type: 'row', key: 'Anteil durch Neigung der Erdachse', value: hoursToString(equatonOfTimeWithoutTilt)+' Minuten ('+equatonOfTimeWithoutTilt.toFixed(2)+' Minuten)' },
-                { type: 'row', key: 'Anteil durch Exzentrität', value: hoursToString(equationOfTimeWithoutExcentric)+' Minuten ('+equationOfTimeWithoutExcentric.toFixed(2)+' Minuten)' },
+                { type: 'row', key: 'Anteil durch Exzentrität', value: hoursToString(equatonOfTimeWithoutTilt)+' Minuten ('+equatonOfTimeWithoutTilt.toFixed(2)+' Minuten)' },
+                { type: 'row', key: 'Anteil durch Neigung der Erdachse', value: hoursToString(equationOfTimeWithoutExcentric)+' Minuten ('+equationOfTimeWithoutExcentric.toFixed(2)+' Minuten)' },
                 { type: 'category', text: 'Position der Erde' },
                 { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(eclipticalLength)+' ('+normalizeAngleDegree(eclipticalLength*rad2deg).toFixed(4)+'°)' },
                 { type: 'row', key: 'Wahre Anomalie<br>(Winkel zum Perihel)', value: radToDegString(orbitLengthEarth)+' ('+normalizeAngleDegree(orbitLengthEarth*rad2deg).toFixed(4)+'°)' },
