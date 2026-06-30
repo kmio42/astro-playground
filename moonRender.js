@@ -9,8 +9,7 @@
 //               drawPolygonLine, calculateLatitudePoints, calculateLongitudePoints
 
 /**
- * Rendert realistische Mondansicht (lroc-Textur + Phasenüberlagerung + Gitternetz).
- * Entspricht drawMoonPhase1 aus Mond.html; ctx ersetzt document.getElementById.
+ * Rendert realistische Mondansicht aus Nasa-Bildmaterial (LROC)
  *
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} sunRaDec   {ra, dec, distance}  ra/dec in Rad, distance in km
@@ -31,6 +30,8 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     const texData = opts.texData || null;
     const considerParallacticAngle = opts.considerParallacticAngle !== false;
     const considerLibration        = opts.considerLibration !== false;
+    const drawCross                = opts.drawCross !== false;
+    const considerDistance         = opts.considerDistance !== false;
 
     const cosPsi = Math.sin(sunRaDec.dec) * Math.sin(moonRaDec.dec) +
         Math.cos(sunRaDec.dec) * Math.cos(moonRaDec.dec) * Math.cos(sunRaDec.ra - moonRaDec.ra);
@@ -62,8 +63,8 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     let rot1Matrix = multiplyMatrix(coordinateTransform, transposeMatrix(rotMatrix));
     rot1Matrix     = multiplyMatrix(rot1Matrix, coordinateTransform);
 
-    const r = Math.floor(Math.min(ctx.canvas.width / 2,
-        moonOrbitRadius / moonRaDec.distance * ctx.canvas.width / 2 * 0.93));
+    const r = considerDistance?Math.floor(Math.min(ctx.canvas.width / 2,
+        moonOrbitRadius / moonRaDec.distance * ctx.canvas.width / 2 * 0.93)):ctx.canvas.width / 2;
 
     const cx = Math.floor(ctx.canvas.width / 2);
     const cy = Math.floor(ctx.canvas.height / 2);
@@ -141,10 +142,12 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     ctx.restore();
 
     // Mittelpunkt + Gitternetz (Äquator, Nullmeridian)
-    ctx.fillStyle = 'red';
-    ctx.fillRect(-2, -2, 4, 4);
-    drawPolygonLine(ctx, calculateLatitudePoints(r, 0, rot1Matrix), 'red', true);
-    drawPolygonLine(ctx, calculateLongitudePoints(r, Math.PI / 2, rot1Matrix), 'red', true);
+    if(drawCross) {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(-2, -2, 4, 4);
+        drawPolygonLine(ctx, calculateLatitudePoints(r, 0, rot1Matrix), 'red', true);
+        drawPolygonLine(ctx, calculateLongitudePoints(r, Math.PI / 2, rot1Matrix), 'red', true);
+    }
 }
 
 /**
@@ -163,7 +166,7 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
  * @param {boolean} [opts.considerParallacticAngle=true]
  * @param {boolean} [opts.considerLibration=true]
  */
-function drawMoonPhaseShaded(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration, siderealtime, latitude, opts) {
+function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration, siderealtime, latitude, opts) {
     opts = opts || {};
     const moonImageOffscreen       = opts.moonImageOffscreen || null;
     const considerParallacticAngle = opts.considerParallacticAngle !== false;
@@ -194,8 +197,8 @@ function drawMoonPhaseShaded(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration,
     const rotX1_1 = createRotationMatrix({x:1, y:0, z:0},  considerLibration ? -libration.latitude  : 0);
     const rotZ1_1 = createRotationMatrix({x:0, y:0, z:1},  -moonAxisAngle + q);
     const rotX1_2 = createRotationMatrix({x:1, y:0, z:0},   5.78 * deg2rad);
-    const rotY1_2 = createRotationMatrix({x:0, y:-1, z:0}, -2.24 * deg2rad);
-    const rotZ1_2 = createRotationMatrix({x:0, y:0, z:1},   9    * deg2rad);
+    const rotY1_2 = createRotationMatrix({x:0, y:-1, z:0},  1.24 * deg2rad);
+    const rotZ1_2 = createRotationMatrix({x:0, y:0, z:1},   10   * deg2rad);
 
     let rotMatrix = multiplyMatrix(rotZ1_2, rotX1_2);
     rotMatrix = multiplyMatrix(rotMatrix, rotY1_2);
@@ -307,5 +310,5 @@ function drawMoonPhaseShaded(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration,
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { drawMoonPhaseTexture, drawMoonPhaseShaded };
+    module.exports = { drawMoonPhaseTexture, drawMoonPhasePicture };
 }

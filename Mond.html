@@ -297,7 +297,7 @@
                 moonImageOffscreen.height = size;
                 moonImageOffscreen.getContext('2d').drawImage(moonImage, 0, 0, size, size);
             }
-            drawMoonPhaseShaded(
+            drawMoonPhasePicture(
                 document.getElementById('moon').getContext('2d'),
                 sunRaDec, moonRaDec, moonAxis, libration, siderealtime, latitude,
                 { moonImageOffscreen, ...opts }
