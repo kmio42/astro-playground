@@ -242,14 +242,13 @@ function buildFrames(opts) {
 // ── JD → human-readable timestamp ─────────────────────────────────────────────
 
 function jdToLabel(jd) {
-    const g        = astro.calculateGregorianDateFromJulianDate(jd);
-    const y        = String(g.year).padStart(4, '0');
-    const mo       = String(g.month).padStart(2, '0');
-    const d        = String(Math.floor(g.day)).padStart(2, '0');
-    const totalMin = Math.round((g.day - Math.floor(g.day)) * 1440);
-    const h        = String(Math.floor(totalMin / 60)).padStart(2, '0');
-    const mi       = String(totalMin % 60).padStart(2, '0');
-    return `${y}-${mo}-${d}T${h}:${mi}Z  (JD ${jd.toFixed(4)})`;
+    const d  = astro.calculateGregorianDateFromJulianDate(jd);
+    const y  = String(d.getUTCFullYear()).padStart(4, '0');
+    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const h  = String(d.getUTCHours()).padStart(2, '0');
+    const mi = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${y}-${mo}-${dd}T${h}:${mi}Z  (JD ${jd.toFixed(4)})`;
 }
 
 // ── Astronomical calculations for one frame ────────────────────────────────────

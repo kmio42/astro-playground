@@ -32,6 +32,8 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     const considerLibration        = opts.considerLibration !== false;
     const drawCross                = opts.drawCross !== false;
     const considerDistance         = opts.considerDistance !== false;
+    const noShade                  = opts.noShade === true;
+
 
     const cosPsi = Math.sin(sunRaDec.dec) * Math.sin(moonRaDec.dec) +
         Math.cos(sunRaDec.dec) * Math.cos(moonRaDec.dec) * Math.cos(sunRaDec.ra - moonRaDec.ra);
@@ -73,6 +75,7 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     // ── Textur per ImageData (schnell) oder fallback drawImage (langsam) ──
+    let resultImageData = null;
     if (texData || !moonImage1) {
         const diameter = 2 * r;
         const out   = ctx.createImageData(diameter, diameter);
@@ -109,6 +112,7 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
         }
         // putImageData ignoriert die Canvas-Transformation → absolute Koordinaten
         ctx.putImageData(out, cx - r, cy - r);
+        resultImageData = out;
     } else {
         // Fallback: moonImage1 vorhanden, aber kein texData (z.B. CORS-gesperrter Browser)
         ctx.translate(cx, cy);
@@ -128,18 +132,21 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
         }
         ctx.resetTransform();
     }
-
     // Phasenüberlagerung + Gitternetz brauchen zentrierte Transformation
     ctx.translate(cx, cy);
-    ctx.save();
-    ctx.rotate(-chi + q);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r, Math.abs(1 - k * 2) * r, 0, 0, Math.PI, k <= 0.5);
-    ctx.arc(0, 0, r, Math.PI, 0, true);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fill();
-    ctx.restore();
+
+
+    if(!noShade) {
+        ctx.save();
+        ctx.rotate(-chi + q);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r, Math.abs(1 - k * 2) * r, 0, 0, Math.PI, k <= 0.5);
+        ctx.arc(0, 0, r, Math.PI, 0, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fill();
+        ctx.restore();
+    }
 
     // Mittelpunkt + Gitternetz (Äquator, Nullmeridian)
     if(drawCross) {
@@ -148,6 +155,7 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
         drawPolygonLine(ctx, calculateLatitudePoints(r, 0, rot1Matrix), 'red', true);
         drawPolygonLine(ctx, calculateLongitudePoints(r, Math.PI / 2, rot1Matrix), 'red', true);
     }
+    return resultImageData;
 }
 
 /**
@@ -165,12 +173,21 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
  * @param {*}       opts.moonImageOffscreen  Canvas mit mond2.png in Ausgabegröße (oder null → Grauton)
  * @param {boolean} [opts.considerParallacticAngle=true]
  * @param {boolean} [opts.considerLibration=true]
+ * @param {number}  [opts.offsetX=5.78]   Ausrichtungsoffset X-Achse [Grad]
+ * @param {number}  [opts.offsetY=1.24]   Ausrichtungsoffset Y-Achse [Grad]
+ * @param {number}  [opts.offsetZ=10]     Ausrichtungsoffset Z-Achse [Grad]
+ * @param {boolean} [opts.transparentBackground=false]  Wenn true: Hintergrund und Schattenpixel transparent lassen
  */
 function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration, siderealtime, latitude, opts) {
     opts = opts || {};
     const moonImageOffscreen       = opts.moonImageOffscreen || null;
     const considerParallacticAngle = opts.considerParallacticAngle !== false;
     const considerLibration        = opts.considerLibration !== false;
+    const offsetX                  = opts.offsetX !== undefined ? opts.offsetX : 5.78;
+    const offsetY                  = opts.offsetY !== undefined ? opts.offsetY : -1.24;
+    const offsetZ                  = opts.offsetZ !== undefined ? opts.offsetZ : 19.72;//19;
+    const transparentBackground    = opts.transparentBackground === true;
+    const noShade                  = opts.noShade === true;
 
     const cosPsi = Math.sin(sunRaDec.dec) * Math.sin(moonRaDec.dec) +
         Math.cos(sunRaDec.dec) * Math.cos(moonRaDec.dec) * Math.cos(sunRaDec.ra - moonRaDec.ra);
@@ -196,9 +213,9 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     const rotY1_1 = createRotationMatrix({x:0, y:-1, z:0}, considerLibration ? -libration.longitude : 0);
     const rotX1_1 = createRotationMatrix({x:1, y:0, z:0},  considerLibration ? -libration.latitude  : 0);
     const rotZ1_1 = createRotationMatrix({x:0, y:0, z:1},  -moonAxisAngle + q);
-    const rotX1_2 = createRotationMatrix({x:1, y:0, z:0},   5.78 * deg2rad);
-    const rotY1_2 = createRotationMatrix({x:0, y:-1, z:0},  1.24 * deg2rad);
-    const rotZ1_2 = createRotationMatrix({x:0, y:0, z:1},   10   * deg2rad);
+    const rotX1_2 = createRotationMatrix({x:1, y:0, z:0},   offsetX * deg2rad);
+    const rotY1_2 = createRotationMatrix({x:0, y:-1, z:0},  offsetY * deg2rad);
+    const rotZ1_2 = createRotationMatrix({x:0, y:0, z:1},   offsetZ * deg2rad);
 
     let rotMatrix = multiplyMatrix(rotZ1_2, rotX1_2);
     rotMatrix = multiplyMatrix(rotMatrix, rotY1_2);
@@ -241,7 +258,9 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
         const diameter = ctx.canvas.width;
         const out   = ctx.createImageData(diameter, diameter);
         const outPx = out.data;
-        for (let i = 3; i < outPx.length; i += 4) outPx[i] = 255;  // alle Pixel opak schwarz
+        if (!transparentBackground) {
+            for (let i = 3; i < outPx.length; i += 4) outPx[i] = 255;  // alle Pixel opak schwarz
+        }
 
         for (let yi = 0; yi < diameter; yi++) {
             const y  = yi - r;
@@ -255,7 +274,7 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
                 const pixelActive = k > 0.5
                     ? (conditionX >= 0 || ellipse <= 0)
                     : (conditionX >= 0 && ellipse > 0);
-                if (!pixelActive) continue;
+                if (!noShade && !pixelActive) continue;
 
                 const dstIdx = (yi * diameter + xi) * 4;
                 const z      = Math.sqrt(r * r - x * x - yy);
@@ -268,7 +287,7 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
                         outPx[dstIdx]     = offPx[srcIdx];
                         outPx[dstIdx + 1] = offPx[srcIdx + 1];
                         outPx[dstIdx + 2] = offPx[srcIdx + 2];
-                        outPx[dstIdx + 3] = offPx[srcIdx + 3];
+                        outPx[dstIdx + 3] = 255;
                         continue;
                     }
                 }
@@ -279,8 +298,14 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
             }
         }
         ctx.putImageData(out, 0, 0);
+        return out;
     } else {
         // ── Fallback: per-Pixel drawImage (file://-CORS hat getImageData gesperrt) ──
+        // Paralleles ImageData mit Graupixeln für Schärfe-Berechnung (ohne CORS-Zugriff)
+        const diameter    = ctx.canvas.width;
+        const fallbackOut = ctx.createImageData(diameter, diameter);
+        const fallbackPx  = fallbackOut.data;
+
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2);
@@ -294,7 +319,7 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
                 const pixelActive = k > 0.5
                     ? (conditionX >= 0 || ellipse <= 0)
                     : (conditionX >= 0 && ellipse > 0);
-                if (!pixelActive) continue;
+                if (!noShade && !pixelActive) continue;
                 const z     = Math.sqrt(r * r - x * x - y * y);
                 const point = applyMatrix({x, y: -y, z}, rotMatrix);
                 if (moonImageOffscreen && point.z >= 0) {
@@ -304,8 +329,14 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
                 } else {
                     ctx.fillRect(x, y, 1, 1);
                 }
+                const dstIdx          = ((y + r) * diameter + (x + r)) * 4;
+                fallbackPx[dstIdx]     = 0xaf;
+                fallbackPx[dstIdx + 1] = 0xa8;
+                fallbackPx[dstIdx + 2] = 0x9c;
+                fallbackPx[dstIdx + 3] = 255;
             }
         }
+        return fallbackOut;
     }
 }
 

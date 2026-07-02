@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mond – Überblendung</title>
+    <style>
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+        }
+        button {
+            width: 100px;
+        }
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+        }
+        .slider-row label {
+            width: 12em;
+        }
+        .slider-row input[type=range] {
+            flex: 1;
+        }
+        .slider-val {
+            width: 5em;
+            font-family: monospace;
+            text-align: right;
+        }
+    </style>
+    <script src="astro.js"></script>
+    <script src="render.js"></script>
+    <script src="moonRender.js"></script>
+    <script src="ui.js"></script>
+    <script>
+        const SIZE = 500;
+
+        const moonImage = new Image();
+        moonImage.src = './mond2.png';
+        let moonImageOffscreen = null;
+
+        const moonImage1 = new Image();
+        let moonTexData = null;
+        moonImage1.onload = function () {
+            const off = document.createElement('canvas');
+            off.width  = moonImage1.width;
+            off.height = moonImage1.height;
+            try {
+                off.getContext('2d').drawImage(moonImage1, 0, 0);
+                const id = off.getContext('2d').getImageData(0, 0, off.width, off.height);
+                moonTexData = { pixels: id.data, width: off.width, height: off.height };
+            } catch (e) {
+                // file://-CORS: getImageData gesperrt → Fallback
+            }
+        };
+        moonImage1.src = './lroc_color_2k.jpg';
+
+        // Offscreen-Canvas für die beiden Einzel-Render
+        const offTexCanvas = document.createElement('canvas');
+        offTexCanvas.width = offTexCanvas.height = SIZE;
+        const offPicCanvas = document.createElement('canvas');
+        offPicCanvas.width = offPicCanvas.height = SIZE;
+
+        function getOffsets() {
+            return {
+                offsetX: parseFloat(document.getElementById('slider-x').value),
+                offsetY: parseFloat(document.getElementById('slider-y').value),
+                offsetZ: parseFloat(document.getElementById('slider-z').value),
+            };
+        }
+
+        function updateSliderLabel(id) {
+            const v = parseFloat(document.getElementById(id).value).toFixed(2);
+            document.getElementById(id + '-val').textContent = v + '°';
+        }
+
+        /**
+ * Berechnet einen Schärfe-Score für ein Canvas mittels Laplace-Varianz.
+ * @param {HTMLCanvasElement} canvas
+ * @returns {number} Schärfe-Score (höher = schärfer)
+ */
+function getSharpnessScore(imageData) {
+  const { data, width, height } = imageData;
+
+  // 1. In Graustufen umwandeln
+  const gray = new Float32Array(width * height);
+  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+    // Standard-Luminanz-Gewichtung
+    gray[j] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+
+  // 2. Laplace-Kernel anwenden (3x3, Standard-4-Nachbarschaft)
+  //    0  1  0
+  //    1 -4  1
+  //    0  1  0
+  const laplacian = new Float32Array(width * height);
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const idx = y * width + x;
+      const value =
+        gray[idx - width] +      // oben
+        gray[idx + width] +      // unten
+        gray[idx - 1] +          // links
+        gray[idx + 1] -          // rechts
+        4 * gray[idx];           // Zentrum
+      laplacian[idx] = value;
+    }
+  }
+
+  // 3. Varianz der Laplace-Werte berechnen
+  let sum = 0;
+  let count = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      sum += laplacian[y * width + x];
+      count++;
+    }
+  }
+  const mean = sum / count;
+
+  let variance = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const diff = laplacian[y * width + x] - mean;
+      variance += diff * diff;
+    }
+  }
+  variance /= count;
+
+  return variance;
+}
+
+        function blendImageData(base, overlay, alpha) {
+            if (!base && !overlay) return null;
+            const w  = base ? base.width  : overlay.width;
+            const h  = base ? base.height : overlay.height;
+            const out = new Uint8ClampedArray(w * h * 4);
+            const bp = base    ? base.data    : null;
+            const op = overlay ? overlay.data : null;
+            for (let i = 0; i < out.length; i += 4) {
+                const ba = bp ? bp[i + 3] / 255 : 0;
+                const oa = op ? op[i + 3] / 255 * alpha : 0;
+                const ra = oa + ba * (1 - oa);
+                if (ra > 0) {
+                    out[i]     = Math.round((oa * (op ? op[i]     : 0) + ba * (bp ? bp[i]     : 0) * (1 - oa)) / ra);
+                    out[i + 1] = Math.round((oa * (op ? op[i + 1] : 0) + ba * (bp ? bp[i + 1] : 0) * (1 - oa)) / ra);
+                    out[i + 2] = Math.round((oa * (op ? op[i + 2] : 0) + ba * (bp ? bp[i + 2] : 0) * (1 - oa)) / ra);
+                    out[i + 3] = Math.round(ra * 255);
+                }
+            }
+            return new ImageData(out, w, h);
+        }
+
+        function drawBlend(sunRaDec, moonRaDec, moonAxisAngle, libration, siderealtime) {
+            if (!moonImageOffscreen && moonImage.complete) {
+                moonImageOffscreen = document.createElement('canvas');
+                moonImageOffscreen.width  = SIZE;
+                moonImageOffscreen.height = SIZE;
+                moonImageOffscreen.getContext('2d').drawImage(moonImage, 0, 0, SIZE, SIZE);
+            }
+
+            const { offsetX, offsetY, offsetZ } = getOffsets();
+            const opts = {
+                considerParallacticAngle: document.getElementById('parallacticAngle').checked,
+                considerLibration:        document.getElementById('libration').checked,
+                considerDistance: false,
+                noShade: true
+            };
+
+            // Textur-Render (LROC) auf Offscreen-Canvas
+            const texImageData = drawMoonPhaseTexture(
+                offTexCanvas.getContext('2d'),
+                sunRaDec, moonRaDec, moonAxisAngle, libration, siderealtime, latitude,
+                { moonImage1, texData: moonTexData, ...opts }
+            );
+
+            // Bild-Render (mond2.png) auf zweiten Offscreen-Canvas, Hintergrund transparent
+            const picImageData = drawMoonPhasePicture(
+                offPicCanvas.getContext('2d'),
+                sunRaDec, moonRaDec, moonAxisAngle, libration, siderealtime, latitude,
+                { moonImageOffscreen, ...opts, offsetX, offsetY, offsetZ, transparentBackground: true }
+            );
+
+            // Compositing: Textur voll, Bild 50 % darüber
+            const ctx = document.getElementById('moon').getContext('2d');
+            ctx.clearRect(0, 0, SIZE, SIZE);
+            ctx.globalAlpha = 1.0;
+            ctx.drawImage(offTexCanvas, 0, 0);
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(offPicCanvas, 0, 0);
+            ctx.globalAlpha = 1.0;
+
+            // Schärfe aus JS-seitigem Blend berechnen – kein getImageData, kein Taint-Problem
+            const blended = blendImageData(texImageData, picImageData, 0.5);
+            document.getElementById("laplace-score").innerHTML = blended
+                ? "Laplace-Score: " + getSharpnessScore(blended).toFixed(2)
+                : "Laplace-Score: N/A";
+        }
+
+        function update() {
+            const julianDate       = calculateJulianDate(datetime);
+            const siderealTime     = calculateSiderealTime(julianDate);
+            const eclipticalLength = calculateEclipticalLength(julianDate);
+            const trueAnomaly      = calculateTrueAnomaly(julianDate);
+            const orbitRadius      = calculateOrbitRadiusEarth(trueAnomaly);
+            const sunRaDec         = calculateRaDec(eclipticalLength, 0);
+            sunRaDec.distance      = orbitRadius * aeTokm;
+
+            const moonCoords    = calculateMoon(julianDate);
+            const moonAxis      = calculateMoonAxis(julianDate, moonCoords);
+            const moonParallax  = Math.asin(6378.14 / moonCoords.distance);
+            const siderealRad   = siderealTime / 12 * Math.PI + longitude * deg2rad;
+            const moonRaDecRaw  = calculateRaDec(moonCoords.longitude, moonCoords.latitude);
+            const moonRaDec     = calculateParallax(moonRaDecRaw, moonParallax, siderealRad);
+            moonRaDec.distance  = moonCoords.distance;
+
+            drawBlend(sunRaDec, moonRaDec, moonAxis.axle, moonAxis.libration, siderealRad);
+        }
+
+        window.onload = function () {
+            initUI();
+            createTimeButtons('timeButtons', [
+                { label: '1 Minute',            step: 60000 },
+                { label: '1 Stunde',            step: 3600000 },
+                { label: '1 Tag',               step: 86400000 },
+                { label: '1 siderischer Monat', step: 27.321661 * 86400000 },
+                { label: '1 synodischer Monat', step: 29.530589 * 86400000 },
+            ]);
+
+            ['slider-x', 'slider-y', 'slider-z'].forEach(id => {
+                document.getElementById(id).addEventListener('input', () => {
+                    updateSliderLabel(id);
+                    update();
+                });
+            });
+        };
+    </script>
+</head>
+<body>
+    <h1>Mond – Überblendung</h1>
+
+    <div id="locationControls"></div>
+    <p></p>
+    <div id="timeControls"></div>
+
+    <div style="display: flow-root;">
+        <div style="float: left; width: 540px;">
+
+            <canvas id="moon" width="500" height="500" style="background-color: black;"></canvas>
+
+            <ul>
+                <li><input type="checkbox" id="parallacticAngle" checked onclick="update();">Parallaktischen Winkel berücksichtigen</li>
+                <li><input type="checkbox" id="libration"        checked onclick="update();">Libration berücksichtigen</li>
+                <li>Überblendung: LROC-Textur (100&nbsp;%) + mond2.png (50&nbsp;%)</li>
+            </ul>
+
+            <span id="laplace-score"></span>
+
+            <fieldset>
+                <legend>Ausrichtungsoffsets für mond2.png</legend>
+                <div class="slider-row">
+                    <label for="slider-x">X-Rotation</label>
+                    <input type="range" id="slider-x" min="-20" max="20" step="0.01" value="5.78">
+                    <span class="slider-val" id="slider-x-val">5.78°</span>
+                </div>
+                <div class="slider-row">
+                    <label for="slider-y">Y-Rotation</label>
+                    <input type="range" id="slider-y" min="-20" max="20" step="0.01" value="1.24">
+                    <span class="slider-val" id="slider-y-val">1.24°</span>
+                </div>
+                <div class="slider-row">
+                    <label for="slider-z">Z-Rotation</label>
+                    <input type="range" id="slider-z" min="-40" max="40" step="0.01" value="19.72">
+                    <span class="slider-val" id="slider-z-val">19.72°</span>
+                </div>
+            </fieldset>
+
+        </div>
+        <div style="position: sticky; top: 15px; padding: 10px;">
+            <div id="timeButtons"></div>
+        </div>
+    </div>
+</body>
+</html>
