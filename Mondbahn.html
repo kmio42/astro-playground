@@ -330,7 +330,7 @@
     /////////////////////////////////////////////////////////////////
 
         function defaultScale(w, h) {
-            return Math.min(w, h) / 2 / 1.14;
+            return Math.min(w, h) / 2 / 1.22;
         }
 
         function currentView(w, h) {
@@ -372,8 +372,8 @@
             ctx.setLineDash([]);
             ctx.fillStyle = c.muted;
             ctx.textAlign = 'right';
-            ctx.textBaseline = 'bottom';
-            if (Y(0) > 0 && Y(0) < h) ctx.fillText('Richtung Frühlingspunkt ♈', w - 6, Y(0) - 3);
+            ctx.textBaseline = 'top';
+            if (Y(0) > 0 && Y(0) < h) ctx.fillText('Richtung Frühlingspunkt \u2648\uFE0E', w - 6, Y(0) + 4);
 
             // Sonne
             ctx.fillStyle = c.sun;
@@ -408,7 +408,7 @@
                 ctx.moveTo(px - ux * 4, py - uy * 4);
                 ctx.lineTo(px - ux * (inner - 6), py - uy * (inner - 6));
                 ctx.stroke();
-                ctx.fillText(s.label, px - ux * (inner + 32), py - uy * (inner + 6));
+                ctx.fillText(s.label, px - ux * (inner + 40), py - uy * (inner + 6) - 8);
             }
 
             // Erdbahn
@@ -670,15 +670,13 @@
                     }
                     return list;
                 },
+                // Bereich nach den realen Bahnen, die überhöhte Kurve wird abgeschnitten
                 range: () => {
-                    let lo = 0, hi = 0;
-                    for (const s of charts.curvature.series()) {
-                        for (const x of s.values) { lo = Math.min(lo, x); hi = Math.max(hi, x); }
+                    let hi = 0;
+                    for (const arr of [orbitData.kappaEarth, orbitData.kappaMoon]) {
+                        for (const x of arr) hi = Math.max(hi, x);
                     }
-                    lo = Math.max(lo, -4);
-                    hi = Math.min(hi, 4);
-                    const pad = (hi - lo) * 0.06;
-                    return [lo - pad, hi + pad];
+                    return [-0.5, hi * 1.15];
                 },
                 format: x => formatNumber(x, 3) + ' 1/AE (r = ' + (Math.abs(x) > 1e-3 ? formatNumber(1 / x, 2) + ' AE' : '∞') + ')',
                 tickFormat: (x, step) => formatNumber(x, Math.max(0, -Math.floor(Math.log10(step) + 1e-9))),
@@ -717,7 +715,7 @@
                 ctx.fillStyle = c.muted;
                 ctx.fillText(monthNames[m], (L.x(idx) + L.x(next)) / 2, h - L.bottom + 6);
             });
-            const { ticks, step } = niceTicks(lo, hi, 4);
+            const { ticks, step } = niceTicks(lo, hi, 5);
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
             for (const t of ticks) {
