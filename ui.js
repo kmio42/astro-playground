@@ -304,6 +304,8 @@
         </tr>
     </table>
     <button onclick="saveData()" style="margin-left:1em;width:fit-content;">Ort für nächsten Seitenaufruf lokal merken</button>
+    <button onclick="useGpsLocation()" style="margin-left:1em;width:fit-content;">Aktuelle GPS-Position verwenden</button>
+    <span id="gps-feedback" class="feedback"></span>
     </div>`;
         }
 
@@ -354,6 +356,33 @@
             const lon = document.getElementById('longitude').value.trim();
             if (lat) localStorage.setItem('latitude', lat);
             if (lon) localStorage.setItem('longitude', lon);
+        }
+
+        function useGpsLocation() {
+            const feedbackElement = document.getElementById('gps-feedback');
+            if (!navigator.geolocation) {
+                feedbackElement.className = 'feedback invalid';
+                feedbackElement.textContent = 'Geolokalisierung wird nicht unterstützt';
+                return;
+            }
+            feedbackElement.className = 'feedback';
+            feedbackElement.textContent = 'Position wird ermittelt...';
+            navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    const lat = position.coords.latitude.toString();
+                    const lon = position.coords.longitude.toString();
+                    document.getElementById('latitude').value = lat;
+                    document.getElementById('longitude').value = lon;
+                    validateCoordinate(lat, 'latitude');
+                    validateCoordinate(lon, 'longitude');
+                    feedbackElement.className = 'feedback valid';
+                    feedbackElement.textContent = 'Position übernommen';
+                },
+                function (error) {
+                    feedbackElement.className = 'feedback invalid';
+                    feedbackElement.textContent = 'Position konnte nicht ermittelt werden: ' + error.message;
+                }
+            );
         }
 
         function loadData() {

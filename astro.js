@@ -847,6 +847,7 @@ function calculateMoonRiseSet(jd, longitude, latitude) {
         zenit: 0, maxalt: -Infinity, maxalt_time: 0
     };
 
+    let zenit_found = false
     do {
 
         const moon1 = calculateMoonSimple(jd + hour / 24);
@@ -866,6 +867,7 @@ function calculateMoonRiseSet(jd, longitude, latitude) {
         if (result.zenit === 0 && q_zenit.nz > 0) {
             const z = (Math.abs(q_zenit.zero1) <= 1.0) ? q_zenit.zero1 : q_zenit.zero2;
             result.zenit = hour + z;
+            zenit_found = true;
         }
 
         const q_alt = calculateQuad(alt0, alt1, alt2);
@@ -877,7 +879,7 @@ function calculateMoonRiseSet(jd, longitude, latitude) {
         }
 
 
-        if (q_alt.nz == 1 && !(result.rise || result.sett)) {
+        if (q_alt.nz == 1 && !(result.rise && result.sett)) {
             if (alt0 < 0.0) {
                 result.utrise = hour + q_alt.zero1;
                 result.rise = true;
@@ -887,7 +889,7 @@ function calculateMoonRiseSet(jd, longitude, latitude) {
                 result.sett = true;
             }
         }
-        else if (q_alt.nz == 2 && !(result.rise || result.sett)) {
+        else if (q_alt.nz == 2 && !(result.rise && result.sett)) {
             if (q_alt.vertex_y < 0.0) {
                 result.utrise = hour + q_alt.zero2;
                 result.utset = hour + q_alt.zero1;
@@ -906,7 +908,7 @@ function calculateMoonRiseSet(jd, longitude, latitude) {
         moon0 = moon2;
         hour += 2.0;
 
-    } while (hour < 25.0);
+    } while (hour < 25.0 && !(result.rise && result.sett && zenit_found));
     return result;
 }
 
