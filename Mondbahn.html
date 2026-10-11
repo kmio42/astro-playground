@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mondbahn um die Sonne</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --muted: #8a8984;
+            --grid: #e6e5e1;
+            --axis: #b9b8b2;
+            --earth: #2a78d6;
+            --moon: #eb6834;
+            --sun: #eda100;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --muted: #8f8e86;
+                --grid: #2f2f2d;
+                --axis: #55544f;
+                --earth: #3987e5;
+                --moon: #d95926;
+                --sun: #c98500;
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --muted: #8f8e86;
+            --grid: #2f2f2d;
+            --axis: #55544f;
+            --earth: #3987e5;
+            --moon: #d95926;
+            --sun: #c98500;
+        }
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            touch-action: none;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 24px;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls input[type="number"] { width: 6em; }
+        .controls input[type="range"] { vertical-align: middle; }
+        #dateSlider { width: min(420px, 60vw); }
+        .value { font-variant-numeric: tabular-nums; color: var(--text-2); }
+        .figure { position: relative; margin-bottom: 8px; }
+        #orbit { max-width: 720px; aspect-ratio: 1; cursor: grab; }
+        #orbit.dragging { cursor: grabbing; }
+        .chart { height: 240px; cursor: crosshair; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            font-size: 0.9em;
+            color: var(--text-2);
+            margin: 4px 0 6px;
+        }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before {
+            background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px);
+        }
+        .legend .dot::before {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            box-sizing: border-box;
+            border: 2px solid var(--c);
+            background: var(--fill);
+        }
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--axis);
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 0.85em;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            display: none;
+            z-index: 2;
+        }
+        .tooltip b { font-weight: 600; }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 16px; }
+        .warning { color: var(--moon); }
+        #outputTable table { border-collapse: collapse; }
+        #outputTable td { padding: 1px 8px 1px 0; vertical-align: top; }
+        h2 { margin-top: 28px; }
+        button { padding: 3px 10px; }
+    </style>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script>
+
+    /////////////////////////////////////////////////////////////////
+    //                      Berechnung                             //
+    /////////////////////////////////////////////////////////////////
+
+        const earthMoonMassRatio = 81.3005678; // Masse Erde / Masse Mond
+        const stepDays = 1 / 24;               // Schrittweite der Bahnpunkte (1 Stunde)
+        const realSunRadius = 696000 / aeTokm; // Sonnenradius in AE
+
+        let orbitData = null;
+
+        /**
+         * Julianisches Datum für den 1. eines Monats (0 Uhr UTC)
+         */
+        function jdOfMonthStart(year, month) {
+            const date = new Date(0);
+            date.setUTCFullYear(year, month, 1);
+            date.setUTCHours(0, 0, 0, 0);
+            return calculateJulianDate(date);
+        }
+
+        /**
+         * Heliozentrische Bahn von Erde und Mond für ein ganzes Jahr berechnen.
+         * Koordinaten in AE in der Ekliptikebene, x-Achse Richtung Frühlingspunkt.
+         * Die ekliptikale Breite des Mondes (max. 5°) wird für die Projektion vernachlässigt.
+         */
+        function computeYear(year) {
+            const jdStart = jdOfMonthStart(year, 0);
+            const jdEnd = jdOfMonthStart(year + 1, 0);
+            const N = Math.round((jdEnd - jdStart) / stepDays) + 1;
+
+            const jd = new Float64Array(N);
+            const ex = new Float64Array(N), ey = new Float64Array(N);   // Erde heliozentrisch
+            const dx = new Float64Array(N), dy = new Float64Array(N);   // Mond geozentrisch
+            const elongation = new Float64Array(N);                     // Mond - Sonne in Grad
+
+            for (let i = 0; i < N; i++) {
+                const t = jdStart + i * stepDays;
+                const sunLongitude = calculateEclipticalLength(t);
+                const sunDistance = calculateOrbitRadiusEarth(calculateTrueAnomaly(t));
+                const moon = calculateMoon(t);
+
+                const moonDistance = moon.distance * Math.cos(moon.latitude) / aeTokm;
+                dx[i] = moonDistance * Math.cos(moon.longitude);
+                dy[i] = moonDistance * Math.sin(moon.longitude);
+
+                // Die einfache Sonnenformel beschreibt die Bahn des Schwerpunkts Erde-Mond,
+                // die Erde selbst steht um 1/82 des Mondabstands auf der Gegenseite
+                ex[i] = -sunDistance * Math.cos(sunLongitude) - dx[i] / (1 + earthMoonMassRatio);
+                ey[i] = -sunDistance * Math.sin(sunLongitude) - dy[i] / (1 + earthMoonMassRatio);
+
+                jd[i] = t;
+                elongation[i] = normalizeAngleDegree((moon.longitude - sunLongitude) * rad2deg);
+            }
+
+            // Geschwindigkeit und Beschleunigung über zentrale Differenzen (AE/Tag, AE/Tag²)
+            const vEx = new Float64Array(N), vEy = new Float64Array(N);
+            const aEx = new Float64Array(N), aEy = new Float64Array(N);
+            const vDx = new Float64Array(N), vDy = new Float64Array(N);
+            const aDx = new Float64Array(N), aDy = new Float64Array(N);
+            const h = stepDays;
+            for (let i = 1; i < N - 1; i++) {
+                vEx[i] = (ex[i + 1] - ex[i - 1]) / (2 * h);
+                vEy[i] = (ey[i + 1] - ey[i - 1]) / (2 * h);
+                aEx[i] = (ex[i + 1] - 2 * ex[i] + ex[i - 1]) / (h * h);
+                aEy[i] = (ey[i + 1] - 2 * ey[i] + ey[i - 1]) / (h * h);
+                vDx[i] = (dx[i + 1] - dx[i - 1]) / (2 * h);
+                vDy[i] = (dy[i + 1] - dy[i - 1]) / (2 * h);
+                aDx[i] = (dx[i + 1] - 2 * dx[i] + dx[i - 1]) / (h * h);
+                aDy[i] = (dy[i + 1] - 2 * dy[i] + dy[i - 1]) / (h * h);
+            }
+            for (const arr of [vEx, vEy, aEx, aEy, vDx, vDy, aDx, aDy]) {
+                arr[0] = arr[1];
+                arr[N - 1] = arr[N - 2];
+            }
+
+            // Neumond (Elongation 0°) und Vollmond (Elongation 180°) mit linearer Interpolation
+            const phases = [];
+            for (let i = 1; i < N; i++) {
+                const e0 = elongation[i - 1], e1 = elongation[i];
+                if (e0 > 270 && e1 < 90) {
+                    phases.push({ type: 'new', pos: i - 1 + (360 - e0) / (e1 + 360 - e0) });
+                } else if (e0 < 180 && e1 >= 180) {
+                    phases.push({ type: 'full', pos: i - 1 + (180 - e0) / (e1 - e0) });
+                }
+            }
+
+            const seasons = [
+                { type: 'spring', label: 'Frühlingsanfang' },
+                { type: 'summer', label: 'Sommeranfang' },
+                { type: 'autumn', label: 'Herbstanfang' },
+                { type: 'winter', label: 'Winteranfang' },
+            ].map(s => ({ ...s, pos: (calculateJDOfPoint(year, s.type) - jdStart) / stepDays }));
+
+            const months = [];
+            for (let m = 0; m < 12; m++) {
+                months.push(Math.round((jdOfMonthStart(year, m) - jdStart) / stepDays));
+            }
+
+            const data = { year, N, jd, ex, ey, dx, dy, elongation, vEx, vEy, aEx, aEy, vDx, vDy, aDx, aDy,
+                           phases, seasons, months };
+
+            data.kappaEarth = computeCurvature(data, 0);
+            data.kappaMoon = computeCurvature(data, 1);
+            data.rEarth = new Float64Array(N);
+            data.rMoon = new Float64Array(N);
+            for (let i = 0; i < N; i++) {
+                data.rEarth[i] = Math.hypot(ex[i], ey[i]);
+                data.rMoon[i] = Math.hypot(ex[i] + dx[i], ey[i] + dy[i]);
+            }
+            return data;
+        }
+
+        /**
+         * Krümmung der Bahn Erde + k·(Mond geozentrisch) in 1/AE.
+         * k = 0: Erde, k = 1: realer Mond, k > 1: überhöhte Darstellung.
+         * Positiv = zur Sonne hin gekrümmt (Linkskurve bei Umlauf gegen den Uhrzeigersinn).
+         */
+        function computeCurvature(d, k) {
+            const kappa = new Float64Array(d.N);
+            for (let i = 0; i < d.N; i++) {
+                const vx = d.vEx[i] + k * d.vDx[i], vy = d.vEy[i] + k * d.vDy[i];
+                const ax = d.aEx[i] + k * d.aDx[i], ay = d.aEy[i] + k * d.aDy[i];
+                kappa[i] = (vx * ay - vy * ax) / Math.hypot(vx, vy) ** 3;
+            }
+            return kappa;
+        }
+
+        /**
+         * Lineare Interpolation eines Arrays an einer Bruchteil-Position
+         */
+        function valueAt(arr, pos) {
+            const i = Math.min(Math.floor(pos), arr.length - 2);
+            const f = pos - i;
+            return arr[i] * (1 - f) + arr[i + 1] * f;
+        }
+
+        function jdToString(jd) {
+            return gregorianDateToString(calculateGregorianDateFromJulianDate(jd)).slice(0, 16) + ' UTC';
+        }
+
+        function formatNumber(value, digits) {
+            return value.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        }
+
+        function formatKm(km) {
+            if (km >= 1e6) return formatNumber(km / 1e6, km >= 1e7 ? 0 : 1) + ' Mio. km';
+            return Math.round(km).toLocaleString('de-DE') + ' km';
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zustand                                //
+    /////////////////////////////////////////////////////////////////
+
+        let exaggeration = 20;
+        let kappaShown = null;      // Krümmung der überhöhten Darstellung
+        let selectedIndex = 0;
+        let hoverIndex = null;      // gemeinsamer Fadenkreuz-Index der Diagramme
+        let showPhases = true;
+        let followEarth = false;
+        let playTimer = null;
+        const view = { cx: 0, cy: 0, scale: null }; // scale in Pixel pro AE, null = Gesamtansicht
+
+        function cssColor(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        function colors() {
+            return {
+                surface: cssColor('--surface'), text: cssColor('--text'), text2: cssColor('--text-2'),
+                muted: cssColor('--muted'), grid: cssColor('--grid'), axis: cssColor('--axis'),
+                earth: cssColor('--earth'), moon: cssColor('--moon'), sun: cssColor('--sun'),
+            };
+        }
+
+        /**
+         * Canvas an die angezeigte Größe und Pixeldichte anpassen
+         */
+        function prepareCanvas(canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.clientWidth, h = canvas.clientHeight;
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            return { ctx, w, h };
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                   Grafik Bahn um die Sonne                  //
+    /////////////////////////////////////////////////////////////////
+
+        function defaultScale(w, h) {
+            return Math.min(w, h) / 2 / 1.14;
+        }
+
+        function currentView(w, h) {
+            const scale = view.scale ?? defaultScale(w, h);
+            let cx = view.cx, cy = view.cy;
+            if (followEarth) {
+                cx = orbitData.ex[selectedIndex];
+                cy = orbitData.ey[selectedIndex];
+            }
+            return {
+                scale, cx, cy,
+                X: x => w / 2 + (x - cx) * scale,
+                Y: y => h / 2 - (y - cy) * scale,
+            };
+        }
+
+        function moonX(i) { return orbitData.ex[i] + exaggeration * orbitData.dx[i]; }
+        function moonY(i) { return orbitData.ey[i] + exaggeration * orbitData.dy[i]; }
+
+        function drawOrbit() {
+            const canvas = document.getElementById('orbit');
+            const { ctx, w, h } = prepareCanvas(canvas);
+            const c = colors();
+            const d = orbitData;
+            const v = currentView(w, h);
+            const { X, Y } = v;
+
+            ctx.font = '12px Arial, sans-serif';
+            ctx.lineJoin = 'round';
+
+            // Richtung Frühlingspunkt
+            ctx.strokeStyle = c.axis;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(X(0), Y(0));
+            ctx.lineTo(w, Y(0));
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = c.muted;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            if (Y(0) > 0 && Y(0) < h) ctx.fillText('Richtung Frühlingspunkt ♈', w - 6, Y(0) - 3);
+
+            // Sonne
+            ctx.fillStyle = c.sun;
+            ctx.beginPath();
+            ctx.arc(X(0), Y(0), Math.max(7, realSunRadius * v.scale), 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Monatsmarken und Jahreszeiten an der Erdbahn
+            ctx.strokeStyle = c.axis;
+            ctx.fillStyle = c.text2;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+            d.months.forEach((idx, m) => {
+                const r = Math.hypot(d.ex[idx], d.ey[idx]);
+                const ux = d.ex[idx] / r, uy = -d.ey[idx] / r;
+                const px = X(d.ex[idx]), py = Y(d.ey[idx]);
+                const outer = 14 + exaggeration * 0.0026 * v.scale;
+                ctx.beginPath();
+                ctx.moveTo(px + ux * 4, py + uy * 4);
+                ctx.lineTo(px + ux * (outer - 4), py + uy * (outer - 4));
+                ctx.stroke();
+                ctx.fillText(monthNames[m], px + ux * (outer + 10), py + uy * (outer + 10));
+            });
+            ctx.fillStyle = c.muted;
+            for (const s of d.seasons) {
+                const px = X(valueAt(d.ex, s.pos)), py = Y(valueAt(d.ey, s.pos));
+                const r = Math.hypot(px - X(0), py - Y(0));
+                const ux = (px - X(0)) / r, uy = (py - Y(0)) / r;
+                const inner = 16 + exaggeration * 0.0026 * v.scale;
+                ctx.beginPath();
+                ctx.moveTo(px - ux * 4, py - uy * 4);
+                ctx.lineTo(px - ux * (inner - 6), py - uy * (inner - 6));
+                ctx.stroke();
+                ctx.fillText(s.label, px - ux * (inner + 32), py - uy * (inner + 6));
+            }
+
+            // Erdbahn
+            ctx.strokeStyle = c.earth;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (let i = 0; i < d.N; i++) {
+                if (i === 0) ctx.moveTo(X(d.ex[i]), Y(d.ey[i]));
+                else ctx.lineTo(X(d.ex[i]), Y(d.ey[i]));
+            }
+            ctx.stroke();
+
+            // Mondbahn
+            ctx.strokeStyle = c.moon;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < d.N; i++) {
+                if (i === 0) ctx.moveTo(X(moonX(i)), Y(moonY(i)));
+                else ctx.lineTo(X(moonX(i)), Y(moonY(i)));
+            }
+            ctx.stroke();
+
+            // Neumond / Vollmond
+            if (showPhases) {
+                ctx.lineWidth = 2;
+                for (const p of d.phases) {
+                    const x = valueAt(d.ex, p.pos) + exaggeration * valueAt(d.dx, p.pos);
+                    const y = valueAt(d.ey, p.pos) + exaggeration * valueAt(d.dy, p.pos);
+                    ctx.beginPath();
+                    ctx.arc(X(x), Y(y), 4.5, 0, 2 * Math.PI);
+                    ctx.fillStyle = (p.type === 'new') ? c.text : c.surface;
+                    ctx.strokeStyle = (p.type === 'new') ? c.surface : c.moon;
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            // Ausgewählter Zeitpunkt: Erde und Mond
+            const i = selectedIndex;
+            ctx.strokeStyle = c.text2;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(X(d.ex[i]), Y(d.ey[i]));
+            ctx.lineTo(X(moonX(i)), Y(moonY(i)));
+            ctx.stroke();
+            for (const [x, y, r, col] of [[d.ex[i], d.ey[i], 6, c.earth], [moonX(i), moonY(i), 5, c.moon]]) {
+                ctx.beginPath();
+                ctx.arc(X(x), Y(y), r, 0, 2 * Math.PI);
+                ctx.fillStyle = col;
+                ctx.strokeStyle = c.surface;
+                ctx.lineWidth = 2;
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            drawScaleBar(ctx, w, h, v.scale, c);
+
+            const warning = document.getElementById('exaggerationWarning');
+            warning.style.display = (exaggeration > 1) ? '' : 'none';
+            document.getElementById('exaggerationText').textContent = '×' + exaggeration;
+        }
+
+        /**
+         * Maßstabsbalken mit "runder" Länge (1, 2, 5 × 10^n km)
+         */
+        function drawScaleBar(ctx, w, h, scale, c) {
+            const kmPerPx = aeTokm / scale;
+            const target = 120 * kmPerPx;
+            const magnitude = 10 ** Math.floor(Math.log10(target));
+            const nice = [1, 2, 5, 10].map(f => f * magnitude).filter(x => x <= target).pop();
+            const len = nice / kmPerPx;
+            const x0 = 12, y0 = h - 14;
+            ctx.strokeStyle = c.text2;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0 - 5);
+            ctx.lineTo(x0, y0);
+            ctx.lineTo(x0 + len, y0);
+            ctx.lineTo(x0 + len, y0 - 5);
+            ctx.stroke();
+            ctx.fillStyle = c.text2;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            let label = formatKm(nice);
+            if (exaggeration > 1) label += '  (Abstand Erde–Mond ×' + exaggeration + ')';
+            ctx.fillText(label, x0, y0 - 7);
+            ctx.textAlign = 'right';
+            ctx.fillText('Zoom ×' + formatNumber(scale / defaultScale(w, h), scale / defaultScale(w, h) < 10 ? 1 : 0), w - 8, h - 8);
+        }
+
+        /**
+         * Nächstgelegenen Bahnpunkt des Mondes zur Mausposition suchen
+         */
+        function findNearestOrbitPoint(canvas, mx, my) {
+            const v = currentView(canvas.clientWidth, canvas.clientHeight);
+            let best = -1, bestDist = 14 * 14;
+            for (let i = 0; i < orbitData.N; i++) {
+                for (const [x, y] of [[moonX(i), moonY(i)], [orbitData.ex[i], orbitData.ey[i]]]) {
+                    const ddx = v.X(x) - mx, ddy = v.Y(y) - my;
+                    const dist = ddx * ddx + ddy * ddy;
+                    if (dist < bestDist) { bestDist = dist; best = i; }
+                }
+            }
+            return best;
+        }
+
+        function setupOrbitInteraction() {
+            const canvas = document.getElementById('orbit');
+            const tooltip = document.getElementById('orbitTooltip');
+            let drag = null;
+
+            canvas.addEventListener('wheel', ev => {
+                ev.preventDefault();
+                const w = canvas.clientWidth, h = canvas.clientHeight;
+                const v = currentView(w, h);
+                const factor = Math.exp(-ev.deltaY * (ev.deltaMode === 1 ? 0.05 : 0.0015));
+                const newScale = Math.min(Math.max(v.scale * factor, defaultScale(w, h) * 0.5), defaultScale(w, h) * 20000);
+                if (followEarth) {
+                    view.scale = newScale;
+                } else {
+                    // Zoom um die Mausposition
+                    const rect = canvas.getBoundingClientRect();
+                    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+                    const ax = v.cx + (mx - w / 2) / v.scale, ay = v.cy - (my - h / 2) / v.scale;
+                    view.cx = ax - (mx - w / 2) / newScale;
+                    view.cy = ay + (my - h / 2) / newScale;
+                    view.scale = newScale;
+                }
+                drawOrbit();
+            }, { passive: false });
+
+            canvas.addEventListener('pointerdown', ev => {
+                const v = currentView(canvas.clientWidth, canvas.clientHeight);
+                drag = { x: ev.clientX, y: ev.clientY, cx: v.cx, cy: v.cy, moved: false };
+                canvas.setPointerCapture(ev.pointerId);
+            });
+            canvas.addEventListener('pointermove', ev => {
+                const rect = canvas.getBoundingClientRect();
+                const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+                if (drag) {
+                    const ddx = ev.clientX - drag.x, ddy = ev.clientY - drag.y;
+                    if (Math.abs(ddx) + Math.abs(ddy) > 3) drag.moved = true;
+                    if (drag.moved) {
+                        const v = currentView(canvas.clientWidth, canvas.clientHeight);
+                        if (followEarth) setFollowEarth(false);
+                        view.scale = v.scale;
+                        view.cx = drag.cx - ddx / v.scale;
+                        view.cy = drag.cy + ddy / v.scale;
+                        canvas.classList.add('dragging');
+                        tooltip.style.display = 'none';
+                        drawOrbit();
+                        return;
+                    }
+                }
+                const idx = findNearestOrbitPoint(canvas, mx, my);
+                if (idx < 0) {
+                    tooltip.style.display = 'none';
+                    return;
+                }
+                const d = orbitData;
+                tooltip.innerHTML = `<b>${jdToString(d.jd[idx])}</b><br>`
+                    + `Abstand Sonne–Erde: ${formatNumber(d.rEarth[idx], 5)} AE<br>`
+                    + `Abstand Sonne–Mond: ${formatNumber(d.rMoon[idx], 5)} AE<br>`
+                    + `Abstand Erde–Mond: ${formatKm(Math.hypot(d.dx[idx], d.dy[idx]) * aeTokm)}<br>`
+                    + `Elongation: ${formatNumber(d.elongation[idx], 1)}°<br>`
+                    + `<span class="value">Klick wählt diesen Zeitpunkt</span>`;
+                placeTooltip(tooltip, canvas, mx, my);
+            });
+            canvas.addEventListener('pointerup', ev => {
+                canvas.classList.remove('dragging');
+                if (drag && !drag.moved) {
+                    const rect = canvas.getBoundingClientRect();
+                    const idx = findNearestOrbitPoint(canvas, ev.clientX - rect.left, ev.clientY - rect.top);
+                    if (idx >= 0) setSelectedIndex(idx);
+                }
+                drag = null;
+            });
+            canvas.addEventListener('pointerleave', () => { tooltip.style.display = 'none'; });
+            canvas.addEventListener('dblclick', resetView);
+        }
+
+        function placeTooltip(tooltip, canvas, mx, my) {
+            tooltip.style.display = 'block';
+            const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+            let left = canvas.offsetLeft + mx + 14;
+            if (left + tw > canvas.offsetLeft + canvas.clientWidth) left = canvas.offsetLeft + mx - tw - 14;
+            let top = canvas.offsetTop + my + 14;
+            if (top + th > canvas.offsetTop + canvas.clientHeight) top = canvas.offsetTop + my - th - 14;
+            tooltip.style.left = Math.max(0, left) + 'px';
+            tooltip.style.top = Math.max(0, top) + 'px';
+        }
+
+        function resetView() {
+            setFollowEarth(false);
+            view.cx = 0;
+            view.cy = 0;
+            view.scale = null;
+            drawOrbit();
+        }
+
+        function zoomToEarth() {
+            const canvas = document.getElementById('orbit');
+            setFollowEarth(true);
+            // Ausschnitt von ca. ±0,06 AE (entspricht etwa ±3,5 Tagen Erdbewegung)
+            view.scale = Math.min(canvas.clientWidth, canvas.clientHeight) / 2 / 0.06;
+            drawOrbit();
+        }
+
+        function setFollowEarth(value) {
+            followEarth = value;
+            document.getElementById('followEarth').checked = value;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                   Zeitreihen-Diagramme                      //
+    /////////////////////////////////////////////////////////////////
+
+        /**
+         * "Runde" Achsenteilung
+         */
+        function niceTicks(min, max, count) {
+            const raw = (max - min) / count;
+            const magnitude = 10 ** Math.floor(Math.log10(raw));
+            const step = [1, 2, 2.5, 5, 10].map(f => f * magnitude).find(s => s >= raw);
+            const ticks = [];
+            for (let t = Math.ceil(min / step) * step; t <= max + step * 1e-9; t += step) ticks.push(t);
+            return { ticks, step };
+        }
+
+        const charts = {
+            distance: {
+                canvasId: 'distanceChart',
+                tooltipId: 'distanceTooltip',
+                series: () => [
+                    { name: 'Erde', values: orbitData.rEarth, color: 'earth', width: 2 },
+                    { name: 'Mond', values: orbitData.rMoon, color: 'moon', width: 1.5 },
+                ],
+                range: () => {
+                    let lo = Infinity, hi = -Infinity;
+                    for (const arr of [orbitData.rEarth, orbitData.rMoon]) {
+                        for (const x of arr) { lo = Math.min(lo, x); hi = Math.max(hi, x); }
+                    }
+                    const pad = (hi - lo) * 0.06;
+                    return [lo - pad, hi + pad];
+                },
+                format: x => formatNumber(x, 5) + ' AE',
+                tickFormat: (x, step) => formatNumber(x, Math.max(0, -Math.floor(Math.log10(step) + 1e-9))),
+            },
+            curvature: {
+                canvasId: 'curvatureChart',
+                tooltipId: 'curvatureTooltip',
+                series: () => {
+                    const list = [
+                        { name: 'Erde', values: orbitData.kappaEarth, color: 'earth', width: 2 },
+                        { name: 'Mond (real)', values: orbitData.kappaMoon, color: 'moon', width: 1.5 },
+                    ];
+                    if (exaggeration > 1) {
+                        list.push({ name: 'Mond (Darstellung ×' + exaggeration + ')', values: kappaShown, color: 'text2', width: 1, dash: [3, 3] });
+                    }
+                    return list;
+                },
+                range: () => {
+                    let lo = 0, hi = 0;
+                    for (const s of charts.curvature.series()) {
+                        for (const x of s.values) { lo = Math.min(lo, x); hi = Math.max(hi, x); }
+                    }
+                    lo = Math.max(lo, -4);
+                    hi = Math.min(hi, 4);
+                    const pad = (hi - lo) * 0.06;
+                    return [lo - pad, hi + pad];
+                },
+                format: x => formatNumber(x, 3) + ' 1/AE (r = ' + (Math.abs(x) > 1e-3 ? formatNumber(1 / x, 2) + ' AE' : '∞') + ')',
+                tickFormat: (x, step) => formatNumber(x, Math.max(0, -Math.floor(Math.log10(step) + 1e-9))),
+                zeroLine: true,
+            },
+        };
+
+        function chartLayout(w, h) {
+            return { left: 52, right: 10, top: 10, bottom: 24, w, h,
+                     x: i => 52 + (w - 62) * i / (orbitData.N - 1) };
+        }
+
+        function drawChart(chart) {
+            const canvas = document.getElementById(chart.canvasId);
+            const { ctx, w, h } = prepareCanvas(canvas);
+            const c = colors();
+            const L = chartLayout(w, h);
+            const [lo, hi] = chart.range();
+            const y = val => L.top + (h - L.top - L.bottom) * (hi - val) / (hi - lo);
+
+            ctx.font = '11px Arial, sans-serif';
+
+            // Gitter: Monate senkrecht, Werte waagrecht
+            const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+            ctx.lineWidth = 1;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            orbitData.months.forEach((idx, m) => {
+                const x = Math.round(L.x(idx)) + 0.5;
+                ctx.strokeStyle = c.grid;
+                ctx.beginPath();
+                ctx.moveTo(x, L.top);
+                ctx.lineTo(x, h - L.bottom);
+                ctx.stroke();
+                const next = (m < 11) ? orbitData.months[m + 1] : orbitData.N - 1;
+                ctx.fillStyle = c.muted;
+                ctx.fillText(monthNames[m], (L.x(idx) + L.x(next)) / 2, h - L.bottom + 6);
+            });
+            const { ticks, step } = niceTicks(lo, hi, 4);
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (const t of ticks) {
+                const yy = Math.round(y(t)) + 0.5;
+                ctx.strokeStyle = (chart.zeroLine && Math.abs(t) < step * 1e-6) ? c.axis : c.grid;
+                ctx.lineWidth = (chart.zeroLine && Math.abs(t) < step * 1e-6) ? 1.5 : 1;
+                ctx.beginPath();
+                ctx.moveTo(L.left, yy);
+                ctx.lineTo(w - L.right, yy);
+                ctx.stroke();
+                ctx.fillStyle = c.muted;
+                ctx.fillText(chart.tickFormat(t, step), L.left - 6, yy);
+            }
+
+            // Datenreihen (Werte außerhalb des Bereichs werden abgeschnitten)
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(L.left, L.top, w - L.left - L.right, h - L.top - L.bottom);
+            ctx.clip();
+            const series = chart.series();
+            for (const s of series) {
+                ctx.strokeStyle = c[s.color];
+                ctx.lineWidth = s.width;
+                ctx.setLineDash(s.dash || []);
+                ctx.beginPath();
+                for (let i = 0; i < orbitData.N; i++) {
+                    if (i === 0) ctx.moveTo(L.x(i), y(s.values[i]));
+                    else ctx.lineTo(L.x(i), y(s.values[i]));
+                }
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            ctx.restore();
+
+            // Ausgewählter Zeitpunkt
+            ctx.strokeStyle = c.text2;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            ctx.moveTo(Math.round(L.x(selectedIndex)) + 0.5, L.top);
+            ctx.lineTo(Math.round(L.x(selectedIndex)) + 0.5, h - L.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Fadenkreuz
+            if (hoverIndex !== null) {
+                const x = Math.round(L.x(hoverIndex)) + 0.5;
+                ctx.strokeStyle = c.axis;
+                ctx.beginPath();
+                ctx.moveTo(x, L.top);
+                ctx.lineTo(x, h - L.bottom);
+                ctx.stroke();
+                for (const s of series) {
+                    const yy = y(s.values[hoverIndex]);
+                    if (yy < L.top || yy > h - L.bottom) continue;
+                    ctx.beginPath();
+                    ctx.arc(x, yy, 4, 0, 2 * Math.PI);
+                    ctx.fillStyle = c[s.color];
+                    ctx.strokeStyle = c.surface;
+                    ctx.lineWidth = 2;
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawCharts() {
+            drawChart(charts.distance);
+            drawChart(charts.curvature);
+        }
+
+        function setupChartInteraction(chart) {
+            const canvas = document.getElementById(chart.canvasId);
+            const tooltip = document.getElementById(chart.tooltipId);
+            function indexFromEvent(ev) {
+                const rect = canvas.getBoundingClientRect();
+                const L = chartLayout(canvas.clientWidth, canvas.clientHeight);
+                const f = (ev.clientX - rect.left - L.left) / (L.w - L.left - L.right);
+                return Math.round(Math.min(Math.max(f, 0), 1) * (orbitData.N - 1));
+            }
+            canvas.addEventListener('pointermove', ev => {
+                hoverIndex = indexFromEvent(ev);
+                drawCharts();
+                const rect = canvas.getBoundingClientRect();
+                let html = `<b>${jdToString(orbitData.jd[hoverIndex])}</b>`;
+                for (const s of chart.series()) {
+                    html += `<br>${s.name}: ${chart.format(s.values[hoverIndex])}`;
+                }
+                tooltip.innerHTML = html;
+                placeTooltip(tooltip, canvas, ev.clientX - rect.left, ev.clientY - rect.top);
+            });
+            canvas.addEventListener('pointerleave', () => {
+                hoverIndex = null;
+                tooltip.style.display = 'none';
+                drawCharts();
+            });
+            canvas.addEventListener('click', ev => setSelectedIndex(indexFromEvent(ev)));
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                   Ausgabe und Steuerung                     //
+    /////////////////////////////////////////////////////////////////
+
+        function argMinMax(arr) {
+            let iMin = 0, iMax = 0;
+            for (let i = 1; i < arr.length; i++) {
+                if (arr[i] < arr[iMin]) iMin = i;
+                if (arr[i] > arr[iMax]) iMax = i;
+            }
+            return [iMin, iMax];
+        }
+
+        function updateTable() {
+            const d = orbitData;
+            const newMoons = d.phases.filter(p => p.type === 'new');
+            const fullMoons = d.phases.filter(p => p.type === 'full');
+
+            // Blauer Mond: zweiter Vollmond in einem Kalendermonat
+            const perMonth = {};
+            for (const p of fullMoons) {
+                const m = calculateGregorianDateFromJulianDate(valueAt(d.jd, p.pos)).getUTCMonth();
+                (perMonth[m] = perMonth[m] || []).push(p);
+            }
+            const blueMoons = Object.values(perMonth).filter(list => list.length > 1).map(list => list[1]);
+
+            const [kMin, kMax] = argMinMax(d.kappaMoon);
+            const [rMin, rMax] = argMinMax(d.rMoon);
+            const [sMin] = argMinMax(kappaShown);
+
+            const rows = [
+                { type: 'category', text: `<b>Mondbahn ${d.year}</b>` },
+                { type: 'row', key: 'Zur Sonne hin gekrümmt (κ &gt; 0)', value: (d.kappaMoon[kMin] > 0) ? 'ja, im ganzen Jahr' : 'nein' },
+                { type: 'row', key: 'Kleinste Krümmung', value: `${formatNumber(d.kappaMoon[kMin], 3)} 1/AE (Radius ${formatNumber(1 / d.kappaMoon[kMin], 2)} AE) am ${jdToString(d.jd[kMin])}` },
+                { type: 'row', key: 'Größte Krümmung', value: `${formatNumber(d.kappaMoon[kMax], 3)} 1/AE (Radius ${formatNumber(1 / d.kappaMoon[kMax], 2)} AE) am ${jdToString(d.jd[kMax])}` },
+                { type: 'row', key: 'Kleinster Abstand zur Sonne', value: `${formatNumber(d.rMoon[rMin], 5)} AE am ${jdToString(d.jd[rMin])}` },
+                { type: 'row', key: 'Größter Abstand zur Sonne', value: `${formatNumber(d.rMoon[rMax], 5)} AE am ${jdToString(d.jd[rMax])}` },
+            ];
+            if (exaggeration > 1) {
+                rows.push({ type: 'row', key: `Darstellung ×${exaggeration}`,
+                            value: (kappaShown[sMin] > 0) ? 'überall zur Sonne gekrümmt' : 'Krümmung wechselt das Vorzeichen (Verfälschung durch Überhöhung)' });
+            }
+            rows.push({ type: 'category', text: `<b>Mondphasen</b> (${newMoons.length} Neumonde, ${fullMoons.length} Vollmonde${blueMoons.length ? ', Blue Moon' : ''})` });
+            for (const p of d.phases) {
+                const isBlue = blueMoons.includes(p);
+                rows.push({ type: 'row', key: (p.type === 'new') ? 'Neumond' : (isBlue ? 'Vollmond (Blue Moon)' : 'Vollmond'),
+                            value: jdToString(valueAt(d.jd, p.pos)) });
+            }
+            renderOutputTable('outputTable', rows);
+        }
+
+        function updateSelectedText() {
+            const d = orbitData;
+            const i = selectedIndex;
+            document.getElementById('dateText').textContent = jdToString(d.jd[i]);
+            document.getElementById('dateSlider').value = i;
+        }
+
+        function setSelectedIndex(i) {
+            selectedIndex = Math.min(Math.max(i, 0), orbitData.N - 1);
+            updateSelectedText();
+            drawOrbit();
+            drawCharts();
+        }
+
+        function setExaggeration(k) {
+            exaggeration = k;
+            kappaShown = computeCurvature(orbitData, exaggeration);
+            drawOrbit();
+            drawCharts();
+            updateTable();
+        }
+
+        function loadYear(year) {
+            const fraction = orbitData ? selectedIndex / (orbitData.N - 1) : null;
+            orbitData = computeYear(year);
+            kappaShown = computeCurvature(orbitData, exaggeration);
+            const slider = document.getElementById('dateSlider');
+            slider.max = orbitData.N - 1;
+            if (fraction === null) {
+                // Beim ersten Aufruf: aktueller Zeitpunkt, falls im Jahr
+                const now = calculateJulianDate(new Date());
+                const idx = Math.round((now - orbitData.jd[0]) / stepDays);
+                selectedIndex = (idx >= 0 && idx < orbitData.N) ? idx : 0;
+            } else {
+                selectedIndex = Math.round(fraction * (orbitData.N - 1));
+            }
+            updateSelectedText();
+            updateTable();
+            drawOrbit();
+            drawCharts();
+        }
+
+        function togglePlay() {
+            const button = document.getElementById('playButton');
+            if (playTimer) {
+                clearInterval(playTimer);
+                playTimer = null;
+                button.textContent = '▶ Abspielen';
+                return;
+            }
+            button.textContent = '⏸ Anhalten';
+            playTimer = setInterval(() => {
+                setSelectedIndex((selectedIndex + 3) % orbitData.N);
+            }, 30);
+        }
+
+        // Überhöhung: logarithmischer Schieberegler von ×1 bis ×300
+        function sliderToExaggeration(v) {
+            return Math.round(10 ** (v / 100 * Math.log10(300)));
+        }
+        function exaggerationToSlider(k) {
+            return Math.log10(k) / Math.log10(300) * 100;
+        }
+
+        window.onload = function () {
+            const yearInput = document.getElementById('year');
+            yearInput.value = new Date().getUTCFullYear();
+            yearInput.addEventListener('change', () => {
+                const year = parseInt(yearInput.value, 10);
+                if (Number.isFinite(year)) loadYear(year);
+            });
+
+            const exSlider = document.getElementById('exaggeration');
+            exSlider.value = exaggerationToSlider(exaggeration);
+            exSlider.addEventListener('input', () => setExaggeration(sliderToExaggeration(Number(exSlider.value))));
+
+            document.getElementById('dateSlider').addEventListener('input', ev => setSelectedIndex(Number(ev.target.value)));
+            document.getElementById('showPhases').addEventListener('change', ev => { showPhases = ev.target.checked; drawOrbit(); });
+            document.getElementById('followEarth').addEventListener('change', ev => {
+                followEarth = ev.target.checked;
+                drawOrbit();
+            });
+
+            setupOrbitInteraction();
+            setupChartInteraction(charts.distance);
+            setupChartInteraction(charts.curvature);
+
+            new ResizeObserver(() => { drawOrbit(); drawCharts(); }).observe(document.body);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawOrbit(); drawCharts(); });
+
+            loadYear(Number(yearInput.value));
+        };
+    </script>
+</head>
+<body>
+    <h1>Mondbahn um die Sonne</h1>
+    <p>Der Mond umkreist die Erde in rund 29,5 Tagen, während die Erde in einem Jahr um die Sonne läuft. Von der Sonne aus betrachtet beschreibt der Mond deshalb keine Schleifen, sondern eine leicht gewellte Bahn entlang der Erdbahn: Bei Vollmond ist er etwas weiter außen, bei Neumond etwas weiter innen. Da der Abstand Erde–Mond (≈ 384 400 km) nur etwa 1/400 des Abstands zur Sonne beträgt, ist diese Welle in einer maßstäblichen Gesamtansicht nicht zu erkennen. Mit der Überhöhung wird der Abstand Erde–Mond künstlich vergrößert, mit dem Mausrad lässt sich in die maßstäbliche Bahn hineinzoomen.</p>
+    <p>Alle Zeiten in Weltzeit (UTC). Die Bahn wird stundenweise mit <code>calculateMoon()</code> (Meeus, Kap. 47) und der Sonnenposition aus <code>astro.js</code> berechnet und in die Ebene der Ekliptik projiziert.</p>
+
+    <div class="controls">
+        <label>Jahr <input type="number" id="year" step="1"></label>
+        <label>Überhöhung Erde–Mond
+            <input type="range" id="exaggeration" min="0" max="100" step="0.5">
+            <span class="value" id="exaggerationText"></span>
+        </label>
+        <label><input type="checkbox" id="showPhases" checked> Neu-/Vollmond</label>
+    </div>
+    <div class="controls">
+        <label>Zeitpunkt <input type="range" id="dateSlider" min="0" step="1"></label>
+        <span class="value" id="dateText"></span>
+        <button id="playButton" onclick="togglePlay()">▶ Abspielen</button>
+    </div>
+    <div class="controls">
+        <button onclick="resetView()">Gesamtansicht</button>
+        <button onclick="zoomToEarth()">Ausschnitt um die Erde</button>
+        <label><input type="checkbox" id="followEarth"> Ansicht folgt der Erde</label>
+    </div>
+
+    <div class="legend">
+        <span style="--c: var(--earth)">Erdbahn</span>
+        <span style="--c: var(--moon)">Mondbahn</span>
+        <span class="dot" style="--c: var(--surface); --fill: var(--text)">Neumond</span>
+        <span class="dot" style="--c: var(--moon); --fill: var(--surface)">Vollmond</span>
+    </div>
+    <div class="figure">
+        <canvas id="orbit"></canvas>
+        <div class="tooltip" id="orbitTooltip"></div>
+    </div>
+    <p class="hint">Mausrad: zoomen · Ziehen: verschieben · Doppelklick: Gesamtansicht · Klick auf die Bahn: Zeitpunkt wählen. Blick von Norden auf die Ekliptik, Umlauf gegen den Uhrzeigersinn.
+        <span id="exaggerationWarning" class="warning"><br>Achtung: Die Überhöhung verfälscht die Form. Schon ab etwa ×2 erscheinen Dellen nach außen, ab etwa ×30 sogar Schleifen – die reale Mondbahn (×1) ist dagegen überall zur Sonne hin gekrümmt.</span>
+    </p>
+
+    <h2>Abstand zur Sonne</h2>
+    <div class="legend">
+        <span style="--c: var(--earth)">Erde</span>
+        <span style="--c: var(--moon)">Mond</span>
+    </div>
+    <div class="figure">
+        <canvas id="distanceChart" class="chart"></canvas>
+        <div class="tooltip" id="distanceTooltip"></div>
+    </div>
+    <p class="hint">Die Erde ist Anfang Januar im Perihel und Anfang Juli im Aphel. Der Mond pendelt monatlich um ±0,0026 AE um diese Kurve – bei Vollmond außen, bei Neumond innen.</p>
+
+    <h2>Krümmung der Bahn</h2>
+    <div class="legend">
+        <span style="--c: var(--earth)">Erde</span>
+        <span style="--c: var(--moon)">Mond (real)</span>
+        <span class="dashed" style="--c: var(--text-2)">Mond in der überhöhten Darstellung</span>
+    </div>
+    <div class="figure">
+        <canvas id="curvatureChart" class="chart"></canvas>
+        <div class="tooltip" id="curvatureTooltip"></div>
+    </div>
+    <p class="hint">Krümmung κ = 1/Krümmungsradius in 1/AE, positiv bedeutet zur Sonne hin gekrümmt. Die Anziehung der Sonne auf den Mond ist gut doppelt so stark wie die der Erde – deshalb bleibt κ des Mondes immer positiv: Bei Neumond ist die Bahn stärker gekrümmt als die Erdbahn (Radius ≈ 0,7 AE), bei Vollmond flacher (Radius ≈ 2 AE). Auch die Erde schwankt leicht, da sie um den gemeinsamen Schwerpunkt mit dem Mond kreist.</p>
+
+    <h2>Kennzahlen</h2>
+    <div id="outputTable"></div>
+</body>
+</html>
