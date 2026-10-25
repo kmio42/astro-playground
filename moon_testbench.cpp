@@ -21,11 +21,11 @@
  * damit der reine Interpolationsfehler sichtbar wird.
  *
  * Übersetzen und aufrufen:
- *   g++ -std=c++20 -O2 -Wall -Wextra moon_testbench.cpp astro.cpp -o moon_testbench
+ *   g++ -std=c++11 -O2 -Wall -Wextra moon_testbench.cpp astro.cpp -o moon_testbench
  *   ./moon_testbench [--lat 50] [--lon 10] [--deltat 0] [mooninfo_2025.txt mooninfo_2026.txt]
  *
- * --deltat: ΔT = TD − UT [s]. astro.cpp setzt TD = UT (ΔT = 0); mit --deltat 69 wird die Mondposition
- * zur Dynamischen Zeit berechnet, dann zeigt der Vergleich die Genauigkeit der Algorithmen selbst.
+ * --deltat: ΔT = TD − UT [s] fest vorgeben. Ohne Angabe gilt ΔT aus astro.cpp (JulianDay::deltaT);
+ * --deltat 0 entspricht dem früheren Stand von astro.cpp mit TD = UT.
  */
 
 #include "astro.h"
@@ -107,7 +107,7 @@ bool readReference(const std::vector<std::string>& paths, ReferenceTable& table)
             if (!table.rows.empty()) {
                 ra = table.rows.back().ra + Angle::fromRad(ra - table.rows.back().ra).normalizedSigned().rad();
             }
-            table.rows.push_back({ .ra = ra, .dec = Angle::fromDeg(decDeg).rad(), .distance = dist });
+            table.rows.push_back({ ra, Angle::fromDeg(decDeg).rad(), dist });
         }
     }
     if (table.rows.size() < 72) {
@@ -128,7 +128,7 @@ Equatorial precessFromJ2000(const double ra0, const double dec0, const JulianDay
     const double A = std::cos(dec0) * sin(a);
     const double B = cos(theta) * std::cos(dec0) * cos(a) - sin(theta) * std::sin(dec0);
     const double C = sin(theta) * std::cos(dec0) * cos(a) + cos(theta) * std::sin(dec0);
-    return { .ra = (Angle::atan2(A, B) + z).normalized(), .dec = Angle::asin(C) };
+    return { (Angle::atan2(A, B) + z).normalized(), Angle::asin(C) };
 }
 
 // ---------------------------------------------------------------
@@ -144,7 +144,7 @@ struct MoonState {
 // Referenz zum Zeitpunkt jd (UT): Polynom dritten Grades durch die vier umgebenden Stunden
 MoonState referenceAt(const ReferenceTable& table, const JulianDay jd) {
     const double x = (jd - table.start) * 24.0;
-    const long i = std::clamp(static_cast<long>(std::floor(x)) - 1, 0L, static_cast<long>(table.rows.size()) - 4);
+    const long i = std::min(std::max(static_cast<long>(std::floor(x)) - 1, 0L), static_cast<long>(table.rows.size()) - 4);
     const double u = x - i;     // Stützstellen bei u = 0, 1, 2, 3
 
     double w[4];
@@ -160,18 +160,20 @@ MoonState referenceAt(const ReferenceTable& table, const JulianDay jd) {
         r.dec += w[j] * table.rows[i + j].dec;
         r.distance += w[j] * table.rows[i + j].distance;
     }
-    return { .equ = precessFromJ2000(r.ra, r.dec, jd), .distance = r.distance };
+    return { precessFromJ2000(r.ra, r.dec, jd), r.distance };
 }
 
 using PositionFunction = Ecliptic (*)(JulianDay);
 
-double deltaT = 0.0;    // ΔT = TD − UT [d]
+bool fixedDeltaT = false;   // true: ΔT nach --deltat statt aus astro.cpp
+double deltaT = 0.0;        // fest vorgegebenes ΔT = TD − UT [d]
 
 // Position nach astro.cpp zum Zeitpunkt jd (UT)
 MoonState modelAt(const PositionFunction position, const JulianDay jd) {
-    const JulianDay jde = jd + deltaT;
-    const Ecliptic moon = position(jde);
-    return { .equ = calculateEquatorial(moon, calculateObliquity(jde)), .distance = moon.distance };
+    // Mit --deltat den Zeitpunkt so wählen, dass astro.cpp in TD bei jd + ΔT rechnet
+    const JulianDay t = fixedDeltaT ? JulianDay::fromDynamicalTime(jd.value() + deltaT) : jd;
+    const Ecliptic moon = position(t);
+    return { calculateEquatorial(moon, calculateObliquity(t)), moon.distance };
 }
 
 // Höhe über der Standardhöhe h0 wie in calculateMoonRiseSet [rad]
@@ -332,8 +334,8 @@ void evaluateHourlyTable(const ReferenceTable& table, const std::vector<int>& st
     std::vector<MoonState> reference(hours), meeus(hours);
     for (long i = 0; i < hours; i++) {
         const JulianDay jd = table.start + i / 24.0;
-        reference[i] = { .equ = precessFromJ2000(table.rows[i].ra, table.rows[i].dec, jd),
-                         .distance = table.rows[i].distance };
+        reference[i] = { precessFromJ2000(table.rows[i].ra, table.rows[i].dec, jd),
+                         table.rows[i].distance };
         meeus[i] = modelAt(calculateMoonPosition, jd);
     }
 
@@ -404,9 +406,9 @@ void evaluateHourlyTable(const ReferenceTable& table, const std::vector<int>& st
             for (long i = first; i <= last; i++) {
                 const double x = static_cast<double>(i) / step;
                 const MoonState state = {
-                    .equ = { .ra = Angle::fromRad(interpolateNodes(ra, scheme, x)).normalized(),
-                             .dec = Angle::fromRad(interpolateNodes(dec, scheme, x)) },
-                    .distance = interpolateNodes(distance, scheme, x),
+                    { Angle::fromRad(interpolateNodes(ra, scheme, x)).normalized(),
+                             Angle::fromRad(interpolateNodes(dec, scheme, x)) },
+                    interpolateNodes(distance, scheme, x),
                 };
                 stats.add(state, 0, reference[i], 0);
                 statsMeeus.add(state, 0, meeus[i], 0);
@@ -424,7 +426,7 @@ void evaluateHourlyTable(const ReferenceTable& table, const std::vector<int>& st
 } // namespace
 
 int main(int argc, char** argv) {
-    GeoLocation location = { .longitude = 10.0_deg, .latitude = 50.0_deg, .elevation = 0.0, .timezone = "UTC0" };
+    GeoLocation location = { 10.0_deg, 50.0_deg, 0.0, "UTC0" };
     std::vector<std::string> files;
     for (int i = 1; i < argc; i++) {
         const bool hasValue = i + 1 < argc;
@@ -434,6 +436,7 @@ int main(int argc, char** argv) {
             location.longitude = Angle::fromDeg(std::atof(argv[++i]));
         } else if (!std::strcmp(argv[i], "--deltat") && hasValue) {
             deltaT = std::atof(argv[++i]) / 86400.0;
+            fixedDeltaT = true;
         } else if (argv[i][0] == '-') {
             std::cerr << "Aufruf: " << argv[0] << " [--lat Grad] [--lon Grad Ost] [--deltat s] [mooninfo...]\n";
             return 1;
@@ -564,8 +567,12 @@ int main(int argc, char** argv) {
 
     std::printf("Mondberechnungen in astro.cpp: RMS (Wurzel aus dem mittleren quadratischen Fehler) und maximaler Fehler\n");
     std::printf("Zeitraum: %ld Tage ab JD %.1f, Prüfzeitpunkte alle %.0f min\n", days, firstDay.value(), EVALUATION_STEP * 60);
-    std::printf("Ort: Breite %.4f°, Länge %.4f° Ost; ΔT = %.1f s\n",
-                location.latitude.deg(), location.longitude.deg(), deltaT * 86400.0);
+    std::printf("Ort: Breite %.4f°, Länge %.4f° Ost; ", location.latitude.deg(), location.longitude.deg());
+    if (fixedDeltaT) {
+        std::printf("ΔT = %.1f s (fest)\n", deltaT * 86400.0);
+    } else {
+        std::printf("ΔT aus astro.cpp (%.3f s zu Beginn)\n", firstDay.deltaT());
+    }
     std::printf("Positionen geozentrisch, mittleres Äquinoktium des Datums; h−h0: geozentrische Höhe über der\n"
                 "Standardhöhe h0 = 0.7275·π − 0°34′ wie in calculateMoonRiseSet\n");
 

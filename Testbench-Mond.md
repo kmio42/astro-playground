@@ -7,13 +7,13 @@ Polynomnäherungen aus Stützstellen.
 ## Aufruf
 
 ```bash
-g++ -std=c++20 -O2 -Wall -Wextra moon_testbench.cpp astro.cpp -o moon_testbench
+g++ -std=c++11 -O2 -Wall -Wextra moon_testbench.cpp astro.cpp -o moon_testbench
 ./moon_testbench [--lat 50] [--lon 10] [--deltat 0] [mooninfo_2025.txt mooninfo_2026.txt]
 ```
 
 - `--lat`, `--lon`: Beobachtungsort für die Höhe (Länge Ost positiv), Standard 50° N, 10° O
-- `--deltat`: ΔT = TD − UT [s]. astro.cpp setzt TD = UT; mit `--deltat 69` wird die Mondposition zur
-  Dynamischen Zeit berechnet.
+- `--deltat`: ΔT = TD − UT [s] fest vorgeben. Ohne Angabe gilt ΔT aus astro.cpp (`JulianDay::deltaT`,
+  2025/2026: 69,184 s); `--deltat 0` entspricht dem früheren Stand von astro.cpp mit TD = UT.
 
 ## Verfahren
 
@@ -56,8 +56,9 @@ Alle folgenden Werte mit ΔT = 69 s, sofern nicht anders angegeben.
 | simple direkt | 0 s | 1,49′ / 5,0′ | 1,85′ / 7,0′ | – |
 | simple direkt | 69 s | 1,27′ / 4,3′ | 1,87′ / 6,4′ | – |
 
-- Mit ΔT = 69 s stimmt normal auf 3″ RMS mit NASA überein. Der Fehler von etwa 0,6′ ohne ΔT kommt fast ganz
-  daher, dass astro.cpp TD = UT setzt. Das bestätigt zugleich Referenz und Präzession.
+- Mit ΔT = 69 s stimmt normal auf 3″ RMS mit NASA überein. Der Fehler von etwa 0,6′ ohne ΔT kam fast ganz
+  daher, dass astro.cpp früher TD = UT setzte. Das bestätigt zugleich Referenz und Präzession.
+  Seit astro.cpp ΔT selbst berücksichtigt, liefert der Aufruf ohne `--deltat` die Werte der Zeilen mit 69 s.
 - Die Entfernung weicht unabhängig von ΔT um etwa 27 km ab. Die Ursache ist nicht untersucht; vermutlich ist
   die NASA-Entfernung anders definiert.
 - simple: bis 4,3′ in der Position. In h−h0 bis 6,4′, weil h0 mit der konstanten Entfernung berechnet wird
@@ -148,5 +149,6 @@ Verhältnis dürfte ähnlich bleiben, da beide vor allem Winkelfunktionen berech
   Aufrufe pro Tag und ist trotzdem ungenauer (bis 9′).
 - **simple** lohnt sich nur für eine einzelne Position ohne Tabelle, wenn Speicher oder Code-Größe knapp sind.
   Für Tabellen bietet simple keinen Vorteil; außerdem verfälscht die konstante Entfernung h0 um bis zu 6′.
-- **ΔT:** Der größte einzelne Fehler von normal ist TD = UT (≈ 0,6′). Ein fester Wert von ΔT ≈ 69 s würde den Fehler
-  für die nächsten Jahre im RMS etwa auf ein Zehntel senken (Maximum auf etwa ein Fünftel).
+- **ΔT:** Der größte einzelne Fehler von normal war TD = UT (≈ 0,6′). astro.cpp berücksichtigt ΔT inzwischen
+  (JulianDay, Tabelle der Schaltsekunden); das senkt den Fehler im RMS etwa auf ein Zehntel (Maximum auf etwa
+  ein Fünftel).

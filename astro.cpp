@@ -70,7 +70,8 @@ JulianDay JulianDay::fromTm(const struct tm& utc) {
  * @return Sternzeit θ0
  */
 SiderealTime calculateGreenwichSiderealTime(const JulianDay jd) {
-    const double T = jd.centuries();
+    // Formel 11.1, hier mit JD in UT (jd.centuries() rechnet in TD)
+    const double T = (jd.value() - 2451545.0) / 36525.0;
 
     // Formel 11.4 [°]
     const double theta0 = 280.46061837 + 360.98564736629 * (jd.value() - 2451545.0)
@@ -87,6 +88,185 @@ SiderealTime calculateGreenwichSiderealTime(const JulianDay jd) {
  */
 SiderealTime calculateLocalSiderealTime(const JulianDay jd, const GeoLocation& location) {
     return calculateGreenwichSiderealTime(jd) + location.longitude;
+}
+
+// ---------------------------------------------------------------
+//  Dynamische Zeit und Weltzeit (Kapitel 9)
+// ---------------------------------------------------------------
+
+constexpr double TT_MINUS_TAI = 32.184;         // TT = TAI + 32,184 s [s]
+constexpr double TAI_MINUS_UTC_2017 = 37.0;     // TAI − UTC seit 1.1.2017 [s]
+
+#if ASTRO_EXACT_DELTA_T
+
+// UTC von 1961 bis 1971: ab 0h UTC des Tages mjd gilt TAI − UTC = offset + (MJD − mjdRef)·rate.
+// Die UTC-Sekunde war etwas länger als die SI-Sekunde (rate > 0), dazu kamen Sprünge um Bruchteile
+// einer Sekunde. Quelle: USNO tai-utc.dat.
+struct TaiUtcDrift {
+    int32_t mjd;        // Beginn des Abschnitts, Modifiziertes Julianisches Datum (JD − 2400000.5)
+    double offset;      // [s]
+    int32_t mjdRef;     // Bezugstag der Drift (MJD)
+    double rate;        // Drift [s/d]
+};
+
+static const TaiUtcDrift TAI_UTC_1961[] = {
+    { 37300, 1.4228180, 37300, 0.001296 },    // 1.1.1961
+    { 37512, 1.3728180, 37300, 0.001296 },    // 1.8.1961
+    { 37665, 1.8458580, 37665, 0.0011232 },   // 1.1.1962
+    { 38334, 1.9458580, 37665, 0.0011232 },   // 1.11.1963
+    { 38395, 3.2401300, 38761, 0.001296 },    // 1.1.1964
+    { 38486, 3.3401300, 38761, 0.001296 },    // 1.4.1964
+    { 38639, 3.4401300, 38761, 0.001296 },    // 1.9.1964
+    { 38761, 3.5401300, 38761, 0.001296 },    // 1.1.1965
+    { 38820, 3.6401300, 38761, 0.001296 },    // 1.3.1965
+    { 38942, 3.7401300, 38761, 0.001296 },    // 1.7.1965
+    { 39004, 3.8401300, 38761, 0.001296 },    // 1.9.1965
+    { 39126, 4.3131700, 39126, 0.002592 },    // 1.1.1966
+    { 39887, 4.2131700, 39126, 0.002592 },    // 1.2.1968
+};
+
+// Seit 1972 ändert sich TAI − UTC nur noch um ganze Schaltsekunden: ab 0h UTC des Tages mjd gilt
+// TAI − UTC = seconds. Quelle: IERS Bulletin C (leap-seconds.list), gültig bis 28.6.2027.
+// Eine neue Schaltsekunde wird als weitere Zeile angehängt.
+struct LeapSecond {
+    int32_t mjd;        // Tag (MJD), ab dem der Wert gilt
+    int8_t seconds;     // TAI − UTC [s]
+};
+
+static const LeapSecond LEAP_SECONDS[] = {
+    { 41317, 10 },    // 1.1.1972
+    { 41499, 11 },    // 1.7.1972
+    { 41683, 12 },    // 1.1.1973
+    { 42048, 13 },    // 1.1.1974
+    { 42413, 14 },    // 1.1.1975
+    { 42778, 15 },    // 1.1.1976
+    { 43144, 16 },    // 1.1.1977
+    { 43509, 17 },    // 1.1.1978
+    { 43874, 18 },    // 1.1.1979
+    { 44239, 19 },    // 1.1.1980
+    { 44786, 20 },    // 1.7.1981
+    { 45151, 21 },    // 1.7.1982
+    { 45516, 22 },    // 1.7.1983
+    { 46247, 23 },    // 1.7.1985
+    { 47161, 24 },    // 1.1.1988
+    { 47892, 25 },    // 1.1.1990
+    { 48257, 26 },    // 1.1.1991
+    { 48804, 27 },    // 1.7.1992
+    { 49169, 28 },    // 1.7.1993
+    { 49534, 29 },    // 1.7.1994
+    { 50083, 30 },    // 1.1.1996
+    { 50630, 31 },    // 1.7.1997
+    { 51179, 32 },    // 1.1.1999
+    { 53736, 33 },    // 1.1.2006
+    { 54832, 34 },    // 1.1.2009
+    { 56109, 35 },    // 1.7.2012
+    { 57204, 36 },    // 1.7.2015
+    { 57754, 37 },    // 1.1.2017
+};
+
+/**
+ * TAI − UTC aus den Tabellen LEAP_SECONDS und TAI_UTC_1961.
+ * Nach dem letzten Tabelleneintrag bleibt der letzte Wert stehen.
+ * @param mjd Modifiziertes Julianisches Datum (UTC)
+ * @param result TAI − UTC [s]
+ * @return false vor dem 1.1.1961 (UTC noch nicht definiert)
+ */
+static bool lookupTaiMinusUtc(const double mjd, double& result) {
+    // Von hinten suchen: die meisten Zeitpunkte liegen in der Gegenwart
+    for (size_t i = sizeof(LEAP_SECONDS) / sizeof(LEAP_SECONDS[0]); i-- > 0;) {
+        if (mjd >= LEAP_SECONDS[i].mjd) {
+            result = LEAP_SECONDS[i].seconds;
+            return true;
+        }
+    }
+    for (size_t i = sizeof(TAI_UTC_1961) / sizeof(TAI_UTC_1961[0]); i-- > 0;) {
+        const TaiUtcDrift& s = TAI_UTC_1961[i];
+        if (mjd >= s.mjd) {
+            result = s.offset + (mjd - s.mjdRef) * s.rate;
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * ΔT vor 1961 nach den Polynomen von Espenak und Meeus ("Five Millennium Canon of Solar Eclipses",
+ * NASA/TP-2006-214141), die auf den Werten von Morrison und Stephenson beruhen.
+ * @param y Jahr mit Bruchteil
+ * @return ΔT [s]
+ */
+static double deltaTPolynomial(const double y) {
+    if (y < -500) {
+        const double u = (y - 1820.0) / 100.0;
+        return -20.0 + 32.0 * u * u;
+    }
+    if (y < 500)  return horner(y / 100.0, 10583.6, -1014.41, 33.78311, -5.952053, -0.1798452,
+                                0.022174192, 0.0090316521);
+    if (y < 1600) return horner((y - 1000.0) / 100.0, 1574.2, -556.01, 71.23472, 0.319781, -0.8503463,
+                                -0.005050998, 0.0083572073);
+    if (y < 1700) return horner(y - 1600.0, 120.0, -0.9808, -0.01532, 1.0 / 7129.0);
+    if (y < 1800) return horner(y - 1700.0, 8.83, 0.1603, -0.0059285, 0.00013336, -1.0 / 1174000.0);
+    if (y < 1860) return horner(y - 1800.0, 13.72, -0.332447, 0.0068612, 0.0041116, -0.00037436,
+                                0.0000121272, -0.0000001699, 0.000000000875);
+    if (y < 1900) return horner(y - 1860.0, 7.62, 0.5737, -0.251754, 0.01680668, -0.0004473624,
+                                1.0 / 233174.0);
+    if (y < 1920) return horner(y - 1900.0, -2.79, 1.494119, -0.0598939, 0.0061966, -0.000197);
+    if (y < 1941) return horner(y - 1920.0, 21.20, 0.84493, -0.076100, 0.0020936);
+    return horner(y - 1950.0, 29.07, 0.407, -1.0 / 233.0, 1.0 / 2547.0);
+}
+
+/**
+ * TAI − UTC, also die Summe der Schaltsekunden (ab 1972 einschließlich der Anfangsdifferenz von 10 s)
+ * bzw. der Wert nach der Formel von 1961–1971.
+ * @return TAI − UTC [s]; NAN vor dem 1.1.1961 (UTC noch nicht definiert)
+ */
+double JulianDay::taiMinusUtc() const {
+    double result;
+    return lookupTaiMinusUtc(days_ - 2400000.5, result) ? result : NAN;
+}
+
+/**
+ * ΔT = TD − UT.
+ * Ab 1961 aus der Tabelle der Schaltsekunden: TD = TT = UTC + (TAI − UTC) + 32,184 s. Damit ist die
+ * Umrechnung für jedes Datum ab 1961 bis auf UT1 − UTC (stets unter 0,9 s) exakt; nach dem letzten
+ * Tabelleneintrag wird angenommen, dass keine weitere Schaltsekunde eingefügt wird.
+ * Davor nach den Polynomen von Espenak und Meeus (siehe deltaTPolynomial); am Übergang 1961 springt
+ * ΔT dadurch um weniger als 0,1 s.
+ * @return ΔT [s]
+ */
+double JulianDay::deltaT() const {
+    double dAT;
+    if (lookupTaiMinusUtc(days_ - 2400000.5, dAT)) {
+        return TT_MINUS_TAI + dAT;
+    }
+    // Jahr mit Bruchteil; 2451544.5 = 1.1.2000, 0h
+    return deltaTPolynomial(2000.0 + (days_ - 2451544.5) / 365.2425);
+}
+
+#else // ASTRO_EXACT_DELTA_T
+
+// Ohne Tabellen: Werte seit der letzten Schaltsekunde am 1.1.2017, gültig bis mindestens 28.6.2027
+double JulianDay::taiMinusUtc() const {
+    return TAI_MINUS_UTC_2017;
+}
+
+double JulianDay::deltaT() const {
+    return TT_MINUS_TAI + TAI_MINUS_UTC_2017;
+}
+
+#endif // ASTRO_EXACT_DELTA_T
+
+/**
+ * Weltzeit zu einem Zeitpunkt in Dynamischer Zeit, z. B. für Ergebnisse in JDE (Äquinoktien,
+ * Apsiden, Knotendurchgänge): JD = JDE − ΔT, wobei ΔT zum Zeitpunkt in UT gehört.
+ * Der zweite Schritt korrigiert den Fehler von 1 s, wenn zwischen UT und TD eine Schaltsekunde liegt;
+ * mehrdeutig bleibt nur die Sekunde direkt nach einer Schaltsekunde (23:59:60 hat keinen eigenen JD).
+ * @param jde Julianischer Tag (TD)
+ * @return Julianischer Tag (UT, ab 1961 UTC)
+ */
+JulianDay JulianDay::fromDynamicalTime(const double jde) {
+    const JulianDay estimate(jde - JulianDay(jde).deltaT() / 86400.0);
+    return JulianDay(jde - estimate.deltaT() / 86400.0);
 }
 
 // ---------------------------------------------------------------
@@ -115,10 +295,10 @@ struct SunArguments {
 static inline SunArguments sunArguments(const double T) {
     const Angle M = Angle::fromDeg(horner(T, 357.52910, 35999.05030, -0.0001559, -0.00000048));
     return {
-        .L0 = Angle::fromDeg(horner(T, 280.46645, 36000.76983, 0.0003032)).normalized(),
-        .M  = M,
-        .e  = horner(T, 0.016708617, -0.000042037, -0.0000001236),
-        .C  = Angle::fromDeg(horner(T, 1.914600, -0.004817, -0.000014) * sin(M)
+        Angle::fromDeg(horner(T, 280.46645, 36000.76983, 0.0003032)).normalized(),
+        M,
+        horner(T, 0.016708617, -0.000042037, -0.0000001236),
+        Angle::fromDeg(horner(T, 1.914600, -0.004817, -0.000014) * sin(M)
                              + horner(T, 0.019993, -0.000101) * sin(2 * M)
                              + 0.000290 * sin(3 * M)),
     };
@@ -145,9 +325,9 @@ Ecliptic calculateSunPosition(const JulianDay jd) {
     const SunArguments sun = sunArguments(jd.centuries());
     const Angle nu = sun.M + sun.C;
     return {
-        .longitude = sun.L0 + sun.C,
-        .latitude  = Angle(),
-        .distance  = EARTH_SEMI_MAJOR_AXIS * (1 - sun.e * sun.e) / (1 + sun.e * cos(nu)) * AU_KM,
+        sun.L0 + sun.C,
+        Angle(),
+        EARTH_SEMI_MAJOR_AXIS * (1 - sun.e * sun.e) / (1 + sun.e * cos(nu)) * AU_KM,
     };
 }
 
@@ -217,8 +397,8 @@ Equatorial calculateEquatorial(const Ecliptic& ecliptic, const Angle eps) {
     const Angle lambda = ecliptic.longitude;
     const Angle beta = ecliptic.latitude;
     return {
-        .ra  = Angle::atan2(sin(lambda) * cos(eps) - tan(beta) * sin(eps), cos(lambda)),     // Formel 12.3
-        .dec = Angle::asin(sin(beta) * cos(eps) + cos(beta) * sin(eps) * sin(lambda)),       // Formel 12.4
+        Angle::atan2(sin(lambda) * cos(eps) - tan(beta) * sin(eps), cos(lambda)),    // Formel 12.3
+        Angle::asin(sin(beta) * cos(eps) + cos(beta) * sin(eps) * sin(lambda)),      // Formel 12.4
     };
 }
 
@@ -234,8 +414,8 @@ Horizontal calculateHorizontal(const Equatorial& equ, const SiderealTime localSi
     // Lokaler Stundenwinkel H = θ − α
     const Angle H = localSiderealTime - equ.ra;
     return {
-        .azimuth  = Angle::atan2(sin(H), cos(H) * sin(phi) - tan(equ.dec) * cos(phi)),         // Formel 12.5
-        .altitude = Angle::asin(sin(phi) * sin(equ.dec) + cos(phi) * cos(equ.dec) * cos(H)),  // Formel 12.6
+        Angle::atan2(sin(H), cos(H) * sin(phi) - tan(equ.dec) * cos(phi)),          // Formel 12.5
+        Angle::asin(sin(phi) * sin(equ.dec) + cos(phi) * cos(equ.dec) * cos(H)),    // Formel 12.6
     };
 }
 
@@ -283,7 +463,7 @@ Equatorial calculateTopocentric(const Equatorial& equ, const Angle parallax, con
     const Angle dec = Angle::atan2((sin(equ.dec) - rhoSinPhi * sin(parallax)) * cos(deltaAlpha),
                                    cos(equ.dec) - rhoCosPhi * sin(parallax) * cos(H));
 
-    return { .ra = equ.ra + deltaAlpha, .dec = dec };
+    return { equ.ra + deltaAlpha, dec };
 }
 
 // ---------------------------------------------------------------
@@ -335,9 +515,9 @@ RiseTransitSet calculateSunRiseSet(const JulianDay jd, const GeoLocation& locati
     const Angle transitAltitude = Angle::asin(sin(phi) * sin(sun.dec) + cos(phi) * cos(sun.dec));
 
     RiseTransitSet result = {
-        .hasRise = false, .hasSet = false, .hasTransit = true,
-        .rise = 0.0, .set = 0.0, .transit = m0 * 24.0,
-        .maxAltitude = transitAltitude - h0, .maxAltitudeTime = m0 * 24.0,
+        false, false, true,
+        0.0, 0.0, m0 * 24.0,
+        transitAltitude - h0, m0 * 24.0,
     };
 
     // Formel 14.1; außerhalb [−1, 1] Polartag oder Polarnacht
@@ -362,9 +542,9 @@ RiseTransitSet calculateSunRiseSet(const JulianDay jd, const GeoLocation& locati
  * Zeitpunkt eines Äquinoktiums oder Solstitiums, Tabellen 26.2 und 26.3 (Jahre +1000 bis +3000).
  * @param year Jahr
  * @param type Frühlings-, Sommer-, Herbst- oder Winteranfang
- * @return Zeitpunkt [JDE]
+ * @return Zeitpunkt (UT); die Tabellen liefern ihn in TD
  */
-double calculateEquinoxSolstice(const int year, const EquinoxType type) {
+JulianDay calculateEquinoxSolstice(const int year, const EquinoxType type) {
     // Tabelle 26.2: JDE0 = c0 + c1·Y + c2·Y² + c3·Y³ + c4·Y⁴, Y = (Jahr − 2000)/1000
     static const double meanPoint[4][5] = {
         {2451623.80984, 365242.37404,  0.05169, -0.00411, -0.00057}, // Märzäquinoktium
@@ -389,7 +569,7 @@ double calculateEquinoxSolstice(const int year, const EquinoxType type) {
     const double Y = (year - 2000) / 1000.0;
     const double JDE0 = horner(Y, c[0], c[1], c[2], c[3], c[4]);
 
-    const double T = JulianDay(JDE0).centuries();
+    const double T = (JDE0 - 2451545.0) / 36525.0;     // JDE0 ist bereits in TD
     const Angle W = Angle::fromDeg(35999.373 * T - 2.47);
     const double deltaLambda = 1 + 0.0334 * cos(W) + 0.0007 * cos(2 * W);
 
@@ -398,7 +578,7 @@ double calculateEquinoxSolstice(const int year, const EquinoxType type) {
         S += term[0] * cos(Angle::fromDeg(term[1] + term[2] * T));
     }
 
-    return JDE0 + 0.00001 * S / deltaLambda;
+    return JulianDay::fromDynamicalTime(JDE0 + 0.00001 * S / deltaLambda);
 }
 
 // ---------------------------------------------------------------
@@ -432,19 +612,21 @@ static double earthApsisForK(const double k, const ApsisType type) {
  * Erstes Perihel bzw. Aphel der Erde nach jd (Kapitel 37). Der mittlere Fehler beträgt drei Stunden.
  * @param jd Julianischer Tag
  * @param type Perihel (Periapsis) oder Aphel (Apoapsis)
- * @return Zeitpunkt [JDE] und Entfernung Erde–Sonne nach Formel 24.5 [km]
+ * @return Zeitpunkt (UT) und Entfernung Erde–Sonne nach Formel 24.5 [km]
  */
 Apsis calculateNextEarthApsis(const JulianDay jd, const ApsisType type) {
     // k ≈ 0.99997·(Jahr − 2000.01), ganzzahlig für das Perihel, + 0.5 für das Aphel
     const double year = 2000.0 + (jd.value() - 2451545.0) / 365.25;
     double k = floor(0.99997 * (year - 2000.01)) - 1;
     if (type == ApsisType::Apoapsis) k += 0.5;
+    const double jdeStart = jd.dynamicalTime();
     double jde = earthApsisForK(k, type);
-    while (jde <= jd.value()) {
+    while (jde <= jdeStart) {
         k += 1;
         jde = earthApsisForK(k, type);
     }
-    return { .jde = jde, .distance = calculateSunPosition(JulianDay(jde)).distance };
+    const JulianDay time = JulianDay::fromDynamicalTime(jde);
+    return { time, calculateSunPosition(time).distance };
 }
 
 // ---------------------------------------------------------------
@@ -463,12 +645,12 @@ struct MoonArguments {
 
 static inline MoonArguments moonArguments(const double T) {
     return {
-        .Lp = Angle::fromDeg(horner(T, 218.3164591, 481267.88134236, -0.0013268, 1.0 / 538841.0, -1.0 / 65194000.0)).normalized(),
-        .D  = Angle::fromDeg(horner(T, 297.8502042, 445267.1115168, -0.0016300, 1.0 / 545868.0, -1.0 / 113065000.0)).normalized(),
-        .M  = Angle::fromDeg(horner(T, 357.5291092, 35999.0502909, -0.0001536, 1.0 / 24490000.0)).normalized(),
-        .Mp = Angle::fromDeg(horner(T, 134.9634114, 477198.8676313, 0.0089970, 1.0 / 69699.0, -1.0 / 14712000.0)).normalized(),
-        .F  = Angle::fromDeg(horner(T, 93.2720993, 483202.0175273, -0.0034029, -1.0 / 3526000.0, 1.0 / 863310000.0)).normalized(),
-        .E  = horner(T, 1.0, -0.002516, -0.0000074),
+        Angle::fromDeg(horner(T, 218.3164591, 481267.88134236, -0.0013268, 1.0 / 538841.0, -1.0 / 65194000.0)).normalized(),
+        Angle::fromDeg(horner(T, 297.8502042, 445267.1115168, -0.0016300, 1.0 / 545868.0, -1.0 / 113065000.0)).normalized(),
+        Angle::fromDeg(horner(T, 357.5291092, 35999.0502909, -0.0001536, 1.0 / 24490000.0)).normalized(),
+        Angle::fromDeg(horner(T, 134.9634114, 477198.8676313, 0.0089970, 1.0 / 69699.0, -1.0 / 14712000.0)).normalized(),
+        Angle::fromDeg(horner(T, 93.2720993, 483202.0175273, -0.0034029, -1.0 / 3526000.0, 1.0 / 863310000.0)).normalized(),
+        horner(T, 1.0, -0.002516, -0.0000074),
     };
 }
 
@@ -663,9 +845,9 @@ Ecliptic calculateMoonPosition(const JulianDay jd) {
           -   115 * sin(a.Lp + a.Mp);
 
     return {
-        .longitude = a.Lp + Angle::fromDeg(suml / 1000000.0),
-        .latitude  = Angle::fromDeg(sumb / 1000000.0),
-        .distance  = 385000.56 + sumr / 1000.0,
+        a.Lp + Angle::fromDeg(suml / 1000000.0),
+        Angle::fromDeg(sumb / 1000000.0),
+        385000.56 + sumr / 1000.0,
     };
 }
 
@@ -703,9 +885,9 @@ Ecliptic calculateMoonPositionSimple(const JulianDay jd) {
                    + 11 * sin(-ls + H) - 25 * sin(-2 * l + F) + 21 * sin(-l + F);
 
     return {
-        .longitude = (L0 + Angle::fromArcsec(dL)).normalized(),
-        .latitude  = Angle::fromArcsec(18520.0 * sin(S) + N),
-        .distance  = MOON_ORBIT_RADIUS,
+        (L0 + Angle::fromArcsec(dL)).normalized(),
+        Angle::fromArcsec(18520.0 * sin(S) + N),
+        MOON_ORBIT_RADIUS,
     };
 }
 
@@ -835,7 +1017,7 @@ MoonOrientation calculateMoonOrientation(const JulianDay jd, const Ecliptic& moo
     const Angle b = b1 + b2;
     const Angle P = Angle::asin(sqrt(X * X + Y * Y) * cos(moonEqu.ra - omega) / cos(b));
 
-    return { .libration = { .longitude = (l1 + l2).normalizedSigned(), .latitude = b }, .positionAngle = P };
+    return { { (l1 + l2).normalizedSigned(), b }, P };
 }
 
 // ---------------------------------------------------------------
@@ -915,7 +1097,7 @@ static double sumApsisTerms(const ApsisTerm (&terms)[N], const double T,
     return sum;
 }
 
-// Perigäum (k ganzzahlig) oder Apogäum (k + 0.5) nach Kapitel 48.
+// Perigäum (k ganzzahlig) oder Apogäum (k + 0.5) nach Kapitel 48; Zeitpunkt nach UT umgerechnet.
 static Apsis moonApsisForK(const double k, const ApsisType type) {
     // Formel 48.3 [Julianische Jahrhunderte]
     const double T = k / 1325.55;
@@ -934,7 +1116,7 @@ static Apsis moonApsisForK(const double k, const ApsisType type) {
     // Äquatoriale Horizontalparallaxe (Tabelle in Bogensekunden)
     const Angle parallax = Angle::fromArcsec(perigee ? sumApsisTerms(PERIGEE_PARALLAX, T, D, M, F, true)
                                                      : sumApsisTerms(APOGEE_PARALLAX, T, D, M, F, true));
-    return { .jde = jde, .distance = EARTH_RADIUS / sin(parallax) };
+    return { JulianDay::fromDynamicalTime(jde), EARTH_RADIUS / sin(parallax) };
 }
 
 /**
@@ -942,14 +1124,14 @@ static Apsis moonApsisForK(const double k, const ApsisType type) {
  * Meeus gibt die Genauigkeit des Zeitpunkts mit bis zu 31 min (Perigäum) bzw. 3 min (Apogäum) an.
  * @param jd Julianischer Tag
  * @param type Perigäum (Periapsis) oder Apogäum (Apoapsis)
- * @return Zeitpunkt [JDE] und Entfernung [km]
+ * @return Zeitpunkt (UT) und Entfernung [km]
  */
 Apsis calculateNextMoonApsis(const JulianDay jd, const ApsisType type) {
     // k zählt die anomalistischen Monate ab dem Perigäum 1999 Dezember 22 (Formel 48.1 nach k umgestellt)
     double k = floor((jd.value() - 2451534.6698) / 27.55454988) - 1;
     if (type == ApsisType::Apoapsis) k += 0.5;
     Apsis apsis = moonApsisForK(k, type);
-    while (apsis.jde <= jd.value()) {
+    while (apsis.time <= jd) {
         k += 1;
         apsis = moonApsisForK(k, type);
     }
@@ -999,17 +1181,18 @@ static double moonNodeForK(const double k) {
 /**
  * Erster Durchgang des Mondes durch einen Knoten seiner Bahn nach jd (Kapitel 49).
  * @param jd Julianischer Tag
- * @return Zeitpunkt [JDE] und Art des Knotens
+ * @return Zeitpunkt (UT) und Art des Knotens
  */
 NodePassage calculateNextMoonNode(const JulianDay jd) {
     // k zählt die drakonitischen Monate ab dem aufsteigenden Knoten 2000 Januar 21
     double k = floor((jd.value() - 2451565.1619) / 27.212220817) - 1;
+    const double jdeStart = jd.dynamicalTime();
     double jde = moonNodeForK(k);
-    while (jde <= jd.value()) {
+    while (jde <= jdeStart) {
         k += 0.5;
         jde = moonNodeForK(k);
     }
-    return { .jde = jde, .ascending = k == floor(k) };
+    return { JulianDay::fromDynamicalTime(jde), k == floor(k) };
 }
 
 // ---------------------------------------------------------------
@@ -1029,9 +1212,9 @@ struct Parabola {
 // und Ausmultiplizieren nach Potenzen von u.
 Parabola parabolaThrough(const double y0, const double y1, const double y2) {
     return {
-        .A = 0.5 * (y0 - 2.0 * y1 + y2),
-        .B = 0.5 * (-3.0 * y0 + 4.0 * y1 - y2),
-        .C = y0,
+        0.5 * (y0 - 2.0 * y1 + y2),
+        0.5 * (-3.0 * y0 + 4.0 * y1 - y2),
+        y0,
     };
 }
 
@@ -1048,14 +1231,14 @@ struct ParabolaRoots {
 ParabolaRoots parabolaRoots(const Parabola& p) {
     const double discriminant = p.B * p.B - 4.0 * p.A * p.C;
     if (discriminant < 0.0) {
-        return { .real = false, .r1 = 0, .r2 = 0 };
+        return { false, 0, 0 };
     }
     // Auslöschungsfreie Form der Lösungsformel
     const double q = -0.5 * (p.B + copysign(sqrt(discriminant), p.B));
     double r1 = q / p.A;
     double r2 = (q != 0.0) ? p.C / q : r1;
     if (r1 > r2) std::swap(r1, r2);
-    return { .real = true, .r1 = r1, .r2 = r2 };
+    return { true, r1, r2 };
 }
 
 // Nullstelle der Parabel im Intervall [0, 1].
@@ -1100,7 +1283,7 @@ MoonSample sampleMoon(const JulianDay jd, const GeoLocation& location) {
     const Angle parallax = Angle::asin(EARTH_RADIUS / moon.distance);
     const Angle h0 = 0.7275 * parallax - 0.5667_deg;
 
-    return { .altitude = (hor.altitude - h0).rad(), .hourAngle = (theta - equ.ra).normalizedSigned().rad() };
+    return { (hor.altitude - h0).rad(), (theta - equ.ra).normalizedSigned().rad() };
 }
 
 // Stetige Fortsetzung eines Stundenwinkels relativ zu einem Bezugswert [rad]
@@ -1250,9 +1433,9 @@ Mat3 operator*(const Mat3& m1, const Mat3& m2) {
  */
 Vec3 operator*(const Mat3& matrix, const Vec3& point) {
     return {
-        .x = point.x * matrix.m[0][0] + point.y * matrix.m[0][1] + point.z * matrix.m[0][2],
-        .y = point.x * matrix.m[1][0] + point.y * matrix.m[1][1] + point.z * matrix.m[1][2],
-        .z = point.x * matrix.m[2][0] + point.y * matrix.m[2][1] + point.z * matrix.m[2][2],
+        point.x * matrix.m[0][0] + point.y * matrix.m[0][1] + point.z * matrix.m[0][2],
+        point.x * matrix.m[1][0] + point.y * matrix.m[1][1] + point.z * matrix.m[1][2],
+        point.x * matrix.m[2][0] + point.y * matrix.m[2][1] + point.z * matrix.m[2][2],
     };
 }
 

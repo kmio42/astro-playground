@@ -5,6 +5,7 @@ Umstellung auf die Typen `Angle`, `JulianDay`, `SiderealTime` und `GeoLocation`,
 
 Die neue Fassung kompiliert mit `g++ -std=c++20 -Wall -Wextra` ohne Warnungen. C++20 ist nötig, weil die Strukturen
 mit benannten Feldern (`.x = …`) initialisiert werden. Gegen Referenzwerte getestet wurde nichts.
+(Nachtrag: Die benannten Initialisierer sind inzwischen entfernt; astro.cpp übersetzt ab C++11.)
 
 ## Geänderte Ergebnisse
 

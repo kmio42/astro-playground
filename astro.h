@@ -9,11 +9,15 @@
  *  - Winkel als Angle (intern Radiant), Sternzeit als SiderealTime, Zeitpunkte als JulianDay.
  *  - Geographische Länge Ost positiv (abweichend vom Buch, dort West positiv).
  *  - Azimut von Süden über Westen gezählt (wie im Buch, Kapitel 12).
- *  - Zeiten in UT; die Dynamische Zeit TD wird mit UT gleichgesetzt (ΔT aus Kapitel 9 fehlt).
+ *  - Zeitpunkte als JulianDay in UT (ab 1961 UTC, wie time_t). Wo die Formeln die Dynamische Zeit TD
+ *    verlangen, rechnet JulianDay sie selbst mit ΔT = TD − UT um (Kapitel 9); Zeitpunkte, die die
+ *    Formeln in TD liefern (Apsiden, Knoten, Äquinoktien), werden nach UT zurückgerechnet.
+ *  - Übersetzbar ab C++11 (z. B. Arduino-Cores mit -std=gnu++11).
  *
  * Umgesetzt                                        Formeln/Tabellen          Funktion
  *  3  Interpolation                                3.3                       interpolate
  *  7  Julianischer Tag                             7.1                       JulianDay::fromCalendar
+ *  9  Dynamische Zeit und Weltzeit (ΔT)                                     JulianDay::deltaT, JulianDay::taiMinusUtc
  * 10  Der Erdglobus (ρ sin φ′, ρ cos φ′)                                     calculateTopocentric
  * 11  Sternzeit in Greenwich                       11.1, 11.4                calculateGreenwichSiderealTime
  * 12  Umwandeln von Koordinaten                    12.3–12.6                 calculateEquatorial, calculateHorizontal
@@ -35,13 +39,15 @@
  *
  * Nicht aus dem Buch: Mondauf-/-untergang, Meridiandurchgang und höchster Stand
  * (eigene stündliche Abtastung mit Parabel), calculateMoonRiseSet.
+ * ΔT ab 1961 aus der Tabelle TAI − UTC (Schaltsekunden, IERS), davor nach den Polynomen von
+ * Espenak und Meeus (NASA/TP-2006-214141) statt Tabelle 9.a.
  * Mondposition niedriger Genauigkeit nach MINI_MOON aus Montenbruck/Pfleger,
  * "Astronomie mit dem Personal Computer", calculateMoonPositionSimple.
  *
  * Nicht umgesetzt:
  *  1 Hinweise und Tips, 2 Über Genauigkeit (ohne Algorithmen),
  *  4 Kurvenanpassung, 5 Iteration, 6 Sortieren von Zahlen, 8 Osterdatum,
- *  9 Dynamische Zeit und Weltzeit, 15 Atmosphärische Refraktion, 16 Winkelabstand,
+ * 15 Atmosphärische Refraktion, 16 Winkelabstand,
  * 17 Planetenkonjunktionen, 18 Objekte auf gerader Linie, 19 Drei Himmelsobjekte im kleinsten Kreis,
  * 20 Präzession, 22 Scheinbarer Ort eines Sternes,
  * 23 Reduktion ekliptikaler Elemente auf ein anderes Äquinoktium,
@@ -82,6 +88,15 @@ constexpr double MOON_RADIUS = 1738.1;                 // Mondradius [km]
 constexpr double MOON_ORBIT_RADIUS = 384400.0;         // Mittlere Entfernung Erde–Mond [km]
 
 constexpr size_t TIMEZONE_CAPACITY = 64;               // Länge eines POSIX-TZ-Strings einschließlich Nullbyte
+
+// Berechnung von ΔT = TD − UT (Kapitel 9):
+//  1: ab 1961 aus der Tabelle TAI − UTC (Schaltsekunden), davor nach den Polynomen von Espenak und Meeus.
+//  0: fester Wert TT − UTC = 69,184 s, gültig vom 1.1.2017 bis mindestens 28.6.2027; spart Tabellen
+//     und Polynome. Für frühere Daten wird ΔT zunehmend falsch (genau wären 2000: 64,2 s, 1961: 33,6 s).
+// Ändern hier oder beim Übersetzen mit -DASTRO_EXACT_DELTA_T=0.
+#ifndef ASTRO_EXACT_DELTA_T
+#define ASTRO_EXACT_DELTA_T 1
+#endif
 
 // ---------------------------------------------------------------
 //  Winkel, Sternzeit und Julianischer Tag
@@ -125,8 +140,8 @@ public:
     static Angle atan2(const double y, const double x) { return Angle(std::atan2(y, x)); }
 
     constexpr Angle operator-() const { return Angle(-rad_); }
-    constexpr Angle& operator+=(const Angle b) { rad_ += b.rad_; return *this; }
-    constexpr Angle& operator-=(const Angle b) { rad_ -= b.rad_; return *this; }
+    Angle& operator+=(const Angle b) { rad_ += b.rad_; return *this; }
+    Angle& operator-=(const Angle b) { rad_ -= b.rad_; return *this; }
     friend constexpr Angle operator+(const Angle a, const Angle b) { return Angle(a.rad_ + b.rad_); }
     friend constexpr Angle operator-(const Angle a, const Angle b) { return Angle(a.rad_ - b.rad_); }
     friend constexpr Angle operator*(const Angle a, const double f) { return Angle(a.rad_ * f); }
@@ -175,21 +190,28 @@ private:
     Angle angle_;
 };
 
-// Julianischer Tag (Kapitel 7); TD wird mit UT gleichgesetzt
+// Julianischer Tag (Kapitel 7). Gespeichert wird die Weltzeit UT (ab 1961 UTC, wie bei time_t);
+// die Dynamische Zeit TD = UT + ΔT (Kapitel 9) wird bei Bedarf daraus berechnet.
 class JulianDay {
 public:
     constexpr JulianDay() = default;
-    constexpr explicit JulianDay(const double days) : days_(days) {}
+    constexpr explicit JulianDay(const double days) : days_(days) {}             // JD (UT) [d]
 
     static JulianDay fromCalendar(int year, int month, int day, double hours);   // Formel 7.1
     static JulianDay fromTm(const struct tm& utc);
     static constexpr JulianDay fromUnixTime(const time_t t) { return JulianDay(t / 86400.0 + 2440587.5); }
+    static JulianDay fromDynamicalTime(double jde);                              // Zeitpunkt in TD → UT
 
-    constexpr double value() const { return days_; }                            // [d]
+    constexpr double value() const { return days_; }                            // JD (UT) [d]
     time_t toUnixTime() const { return (time_t) std::llround((days_ - 2440587.5) * 86400.0); }
 
-    constexpr double centuries() const { return (days_ - 2451545.0) / 36525.0; }  // T seit J2000.0, Formel 11.1
-    constexpr double millennia() const { return (days_ - 2451545.0) / 365250.0; } // τ seit J2000.0, Formel 27.2
+    double deltaT() const;                                                       // ΔT = TD − UT [s]
+    double taiMinusUtc() const;                                                  // TAI − UTC [s], NAN vor 1961
+    double dynamicalTime() const { return days_ + deltaT() / 86400.0; }         // JDE (TD) [d]
+
+    // Zeit seit J2000.0 in TD, wie sie die Formeln für Sonne und Mond verlangen
+    double centuries() const { return (dynamicalTime() - 2451545.0) / 36525.0; }  // T [Jahrhunderte]
+    double millennia() const { return (dynamicalTime() - 2451545.0) / 365250.0; } // τ [Jahrtausende], Formel 27.2
     JulianDay midnight() const { return JulianDay(std::round(days_) - 0.5); }     // 0h UT desselben UT-Tags
 
     friend constexpr JulianDay operator+(const JulianDay jd, const double days) { return JulianDay(jd.days_ + days); }
@@ -264,13 +286,13 @@ struct RiseTransitSet {
 // Apsiden einer Bahn: Perigäum/Apogäum (Mond, Kapitel 48), Perihel/Aphel (Planeten, Kapitel 37)
 enum class ApsisType { Periapsis, Apoapsis };
 struct Apsis {
-    double jde;             // Zeitpunkt [JDE]; TD wird mit UT gleichgesetzt
+    JulianDay time;         // Zeitpunkt (UT)
     double distance;        // Entfernung vom Zentralkörper [km]
 };
 
 // Durchgang durch einen Knoten der Bahn (Mond: Kapitel 49, Planeten: Kapitel 38)
 struct NodePassage {
-    double jde;             // Zeitpunkt [JDE]; TD wird mit UT gleichgesetzt
+    JulianDay time;         // Zeitpunkt (UT)
     bool ascending;         // true: aufsteigender Knoten (Breite wird positiv)
 };
 
@@ -316,8 +338,8 @@ double interpolate(double y1, double y2, double y3, double n);
 RiseTransitSet calculateSunRiseSet(JulianDay jd, const GeoLocation& location);
 RiseTransitSet calculateMoonRiseSet(JulianDay jd, const GeoLocation& location);
 
-// Solstitien und Äquinoktien [JDE], Perihel/Aphel der Erde
-double calculateEquinoxSolstice(int year, EquinoxType type);
+// Solstitien und Äquinoktien (UT), Perihel/Aphel der Erde
+JulianDay calculateEquinoxSolstice(int year, EquinoxType type);
 Apsis calculateNextEarthApsis(JulianDay jd, ApsisType type);
 
 // Mond
