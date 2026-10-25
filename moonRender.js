@@ -4,7 +4,7 @@
 // Abhängigkeiten – in Browser global aus astro.js/render.js; in Node.js vor require() setzen:
 //   Object.assign(global, require('./astro.js'), require('./render.js'))
 //
-//   astro.js:   epsilon, deg2rad, moonOrbitRadius
+//   astro.js:   DEG2RAD, MOON_ORBIT_RADIUS
 //   render.js:  createRotationMatrix, multiplyMatrix, transposeMatrix, applyMatrix,
 //               drawPolygonLine, calculateLatitudePoints, calculateLongitudePoints
 
@@ -51,7 +51,7 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     const q = considerParallacticAngle
         ? Math.atan2(
             Math.sin(siderealtime - moonRaDec.ra),
-            Math.tan(latitude * deg2rad) * Math.cos(moonRaDec.dec) -
+            Math.tan(latitude * DEG2RAD) * Math.cos(moonRaDec.dec) -
             Math.sin(moonRaDec.dec) * Math.cos(siderealtime - moonRaDec.ra))
         : 0;
 
@@ -66,7 +66,7 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     rot1Matrix     = multiplyMatrix(rot1Matrix, coordinateTransform);
 
     const r = considerDistance?Math.floor(Math.min(ctx.canvas.width / 2,
-        moonOrbitRadius / moonRaDec.distance * ctx.canvas.width / 2 * 0.93)):ctx.canvas.width / 2;
+        MOON_ORBIT_RADIUS / moonRaDec.distance * ctx.canvas.width / 2 * 0.93)):ctx.canvas.width / 2;
 
     const cx = Math.floor(ctx.canvas.width / 2);
     const cy = Math.floor(ctx.canvas.height / 2);
@@ -205,7 +205,7 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     const q = considerParallacticAngle
         ? Math.atan2(
             Math.sin(siderealtime - moonRaDec.ra),
-            Math.tan(latitude * deg2rad) * Math.cos(moonRaDec.dec) -
+            Math.tan(latitude * DEG2RAD) * Math.cos(moonRaDec.dec) -
             Math.sin(moonRaDec.dec) * Math.cos(siderealtime - moonRaDec.ra))
         : 0;
 
@@ -213,9 +213,9 @@ function drawMoonPhasePicture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
     const rotY1_1 = createRotationMatrix({x:0, y:-1, z:0}, considerLibration ? -libration.longitude : 0);
     const rotX1_1 = createRotationMatrix({x:1, y:0, z:0},  considerLibration ? -libration.latitude  : 0);
     const rotZ1_1 = createRotationMatrix({x:0, y:0, z:1},  -moonAxisAngle + q);
-    const rotX1_2 = createRotationMatrix({x:1, y:0, z:0},   offsetX * deg2rad);
-    const rotY1_2 = createRotationMatrix({x:0, y:-1, z:0},  offsetY * deg2rad);
-    const rotZ1_2 = createRotationMatrix({x:0, y:0, z:1},   offsetZ * deg2rad);
+    const rotX1_2 = createRotationMatrix({x:1, y:0, z:0},   offsetX * DEG2RAD);
+    const rotY1_2 = createRotationMatrix({x:0, y:-1, z:0},  offsetY * DEG2RAD);
+    const rotZ1_2 = createRotationMatrix({x:0, y:0, z:1},   offsetZ * DEG2RAD);
 
     let rotMatrix = multiplyMatrix(rotZ1_2, rotX1_2);
     rotMatrix = multiplyMatrix(rotMatrix, rotY1_2);

@@ -9,13 +9,13 @@ A personal sandbox for experimenting with astronomical calculations and visualiz
 ## Core Files
 
 ### `astro.js`
-The main calculation library (~780 lines, no external dependencies). Implements:
-- Julian Date conversion and Gregorian calendar
-- Solar position: equation of time, ecliptical length, true anomaly, orbit radius, sidereal time
+The main calculation library (no external dependencies), a JavaScript port of the C++ library in `cpp/` with the same function names and results (see [`cpp/README.md`](cpp/README.md)). Implements:
+- Julian Day conversion, ΔT (leap-second table), Easter date
+- Solar position: equation of time, obliquity, true anomaly, distance, sidereal time
 - Rise/set times for sun and moon
-- Solstices and equinoxes (via Meeus tables)
-- Coordinate transforms: ecliptic → equatorial → horizontal
-- Lunar position with 60+ periodic correction terms, moon phase, ascending node
+- Solstices and equinoxes, perihelion and aphelion
+- Coordinate transforms: ecliptic → equatorial → horizontal, topocentric (parallax)
+- Lunar position with 60+ periodic correction terms, illuminated fraction, libration and position angle, ascending node, perigee/apogee, node passages
 - Helper utilities: angle normalization, interpolation
 
 ### `cpp/` – `astro.cpp` / `astro.h`

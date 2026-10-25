@@ -93,4 +93,5 @@ Unabhängig davon: TD = UT kostet etwa 0,6′ in der Position (siehe `Testbench-
   Untergang und Durchgang).
 - Testbench um einen direkten Vergleich der Auf-/Untergangszeiten erweitern: heutige Variante, neue Variante
   und eine Referenz, die die Nullstelle mit direkter Rechnung sehr genau bestimmt.
-- Prüfen, ob `astro.js` (`calculateMoonSimple` mit 2-Stunden-Schritten) entsprechend angepasst werden soll.
+- `astro.js` ist seit dem 26.10.2026 eine Portierung von `astro.cpp` und enthält dasselbe `calculateMoonRiseSet`;
+  ein Umbau muss in beiden Dateien erfolgen.

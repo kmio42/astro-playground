@@ -207,23 +207,22 @@ function getSharpnessScore(imageData) {
         }
 
         function update() {
-            const julianDate       = calculateJulianDate(datetime);
-            const siderealTime     = calculateSiderealTime(julianDate);
-            const eclipticalLength = calculateEclipticalLength(julianDate);
-            const trueAnomaly      = calculateTrueAnomaly(julianDate);
-            const orbitRadius      = calculateOrbitRadiusEarth(trueAnomaly);
-            const sunRaDec         = calculateRaDec(eclipticalLength, 0);
-            sunRaDec.distance      = orbitRadius * aeTokm;
+            const julianDate       = julianDayFromDate(datetime);
+            const location         = getLocation();
+            const obliquity        = calculateObliquity(julianDate);
+            const sunPosition      = calculateSunPosition(julianDate);
+            const sunRaDec         = calculateEquatorial(sunPosition, obliquity);
+            sunRaDec.distance      = sunPosition.distance;
 
-            const moonCoords    = calculateMoon(julianDate);
-            const moonAxis      = calculateMoonAxis(julianDate, moonCoords);
-            const moonParallax  = Math.asin(6378.14 / moonCoords.distance);
-            const siderealRad   = siderealTime / 12 * Math.PI + longitude * deg2rad;
-            const moonRaDecRaw  = calculateRaDec(moonCoords.longitude, moonCoords.latitude);
-            const moonRaDec     = calculateParallax(moonRaDecRaw, moonParallax, siderealRad);
+            const moonCoords    = calculateMoonPosition(julianDate);
+            const moonAxis      = calculateMoonOrientation(julianDate, moonCoords);
+            const moonParallax  = Math.asin(EARTH_RADIUS / moonCoords.distance);
+            const siderealRad   = calculateLocalSiderealTime(julianDate, location);
+            const moonRaDecRaw  = calculateEquatorial(moonCoords, obliquity);
+            const moonRaDec     = calculateTopocentric(moonRaDecRaw, moonParallax, siderealRad, location);
             moonRaDec.distance  = moonCoords.distance;
 
-            drawBlend(sunRaDec, moonRaDec, moonAxis.axle, moonAxis.libration, siderealRad);
+            drawBlend(sunRaDec, moonRaDec, moonAxis.positionAngle, moonAxis.libration, siderealRad);
         }
 
         window.onload = function () {

@@ -2,9 +2,31 @@
         var datetime = new Date();
         var intervalId;
         var addTimeOffset;
-        var latitude = 0;  // Breitengrad Ort
-        var longitude = 0; // Längengrad Ort
+        var latitude = 0;  // Breitengrad Ort [°]
+        var longitude = 0; // Längengrad Ort [°], Ost positiv
         var useLocalTime = false;
+
+        /**
+         * Beobachtungsort aus den Eingabefeldern als Objekt für astro.js (Winkel in Radiant, Höhe 0 m)
+         */
+        function getLocation() {
+            return { longitude: longitude * DEG2RAD, latitude: latitude * DEG2RAD, elevation: 0 };
+        }
+
+        /**
+         * Winkel in Grad auf [0, 360) bringen (für Anzeigen in Grad)
+         */
+        function normalizeDegrees(deg) {
+            // direkt in Grad rechnen, damit ganze Gradzahlen ganz bleiben (Beschriftungen)
+            return ((deg % 360) + 360) % 360;
+        }
+
+        /**
+         * Sternzeit in Greenwich in Stunden [0, 24)
+         */
+        function siderealTimeHours(jd) {
+            return calculateGreenwichSiderealTime(jd) * 12 / Math.PI;
+        }
 
     /////////////////////////////////////////////////////////////////
     //              Formatierungsfunktionen                        //
@@ -14,7 +36,7 @@
          * String-Ausgabe im Gradmaß von einem Winkel im Bogenmaß
          */
         function radToDegString(rad) {
-            const normalizedDegree = normalizeAngleDegree(rad*rad2deg);
+            const normalizedDegree = normalizeAngle(rad)*RAD2DEG;
             const degInteger = Math.floor(normalizedDegree);
             const minutes = Math.floor((normalizedDegree-degInteger)*60);
             const seconds = Math.floor(((normalizedDegree-degInteger)*60-minutes)*60);
@@ -174,8 +196,8 @@
 
             if (type === 'longitude' && !isNaN(value)) {
                 longitude = value;
-                const julianDate = calculateJulianDate(datetime);
-                fillSiderealTime(calculateSiderealTime(julianDate));
+                const julianDate = julianDayFromDate(datetime);
+                fillSiderealTime(siderealTimeHours(julianDate));
                 update();
             } else if (type === 'latitude' && !isNaN(value)) {
                 latitude = value;
@@ -190,9 +212,9 @@
         function changeJD() {
             const jdInput = parseFloat(document.getElementById('julianDate').value);
             if (isNaN(jdInput)) return;
-            datetime = calculateGregorianDateFromJulianDate(jdInput);
+            datetime = julianDayToDate(jdInput);
             fillGregorianDate(datetime);
-            fillSiderealTime(calculateSiderealTime(jdInput));
+            fillSiderealTime(siderealTimeHours(jdInput));
             update();
         }
 
@@ -209,9 +231,9 @@
             datetime_new.setUTCSeconds(Math.floor(seconds));
             datetime_new.setUTCMilliseconds((seconds-Math.floor(seconds))*1000);
             datetime = datetime_new;
-            const julianDate = calculateJulianDate(datetime);
+            const julianDate = julianDayFromDate(datetime);
             fillJulianDate(julianDate);
-            fillSiderealTime(calculateSiderealTime(julianDate));
+            fillSiderealTime(siderealTimeHours(julianDate));
             update();
         }
 
@@ -224,25 +246,25 @@
              *
              * 1 Sterntag hat 86164100 Millisekunden und ist in 24 Sternzeitstunden geteilt
              */
-            const julianDate = Math.round(calculateJulianDate(datetime))-0.5;
-            const siderealTimeBase = calculateSiderealTime(julianDate);
+            const julianDate = julianDayMidnight(julianDayFromDate(datetime));
+            const siderealTimeBase = siderealTimeHours(julianDate);
             const timeInput = document.getElementById('siderealTime').value;
             const siderealTimeNew = timeInput.split(':');
             const timeInputSeconds = document.getElementById('siderealSeconds').value;
             const timediffInMs = ((parseInt(siderealTimeNew[0])+24+parseInt(siderealTimeNew[1])/60+parseFloat(timeInputSeconds)/3600-siderealTimeBase)%24)*86164100/24;
-            datetime = calculateGregorianDateFromJulianDate(julianDate);
+            datetime = julianDayToDate(julianDate);
             datetime.setTime(datetime.getTime()+timediffInMs);
             fillGregorianDate(datetime);
-            fillJulianDate(calculateJulianDate(datetime));
+            fillJulianDate(julianDayFromDate(datetime));
             update();
         }
 
         function changeTime(offset) {
             datetime.setTime(datetime.getTime()+offset);
             fillGregorianDate(datetime);
-            const julianDate = calculateJulianDate(datetime);
+            const julianDate = julianDayFromDate(datetime);
             fillJulianDate(julianDate);
-            fillSiderealTime(calculateSiderealTime(julianDate));
+            fillSiderealTime(siderealTimeHours(julianDate));
             update();
         }
 

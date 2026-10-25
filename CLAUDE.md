@@ -19,18 +19,20 @@ The C++ files live in `cpp/` (`astro.cpp`, `astro.h`, examples in `cpp/beispiele
 
 ## Architecture
 
-**`astro.js`** is the core mathematical library (~1080 lines, ~40 functions). It is self-contained with no external dependencies. It exports:
+**`astro.js`** is the core mathematical library (~1385 lines), a port of `cpp/astro.cpp` with the same function names, parameters and result objects (see `cpp/README.md`). Self-contained, wrapped in an IIFE; in the browser all public names are global, in Node.js they come from `require('./astro.js')`. Angles are numbers in radians, time is a Julian Day number in UT (ΔT is applied internally), locations are `{ longitude, latitude, elevation }` objects (radians, east positive). It exports:
 
-- **Constants**: `aeTokm`, `e` (eccentricity), `epsilon` (axial tilt), `deg2rad`, `rad2deg`, radii
-- **Time**: `calculateJulianDate()`, `calculateGregorianDateFromJulianDate()`, `calculateJulianEpoch()`
-- **Solar**: `calculateEquationOfTime()`, `calculateEclipticalLength()`, `calculateTrueAnomaly()`, `calculateOrbitRadiusEarth()`, `calculateSiderealTime()`, `calculateSunriseSunset()`, `calculateJDOfPoint()` (solstices/equinoxes via Meeus tables), `calculatePerihelAphel()`
-- **Coordinate transforms**: `calculateRaDek()` (ecliptic→equatorial), `calculateHAzFromRaDek()` (equatorial→horizontal)
-- **Lunar**: `calculateMoon()` (position with 60+ periodic correction terms, including libration), `calculateRisingKnotMoon()`, `getMoonPhase()`
-- **Utilities**: `interpolate()`, `normalizeAngleDegree()`, `normalizeAngleDifferenceRad()`
+- **Constants**: `DEG2RAD`, `RAD2DEG`, `AU_KM`, `EARTH_RADIUS`, `MOON_RADIUS`, `MOON_ORBIT_RADIUS`, `EARTH_SEMI_MAJOR_AXIS`, `OBLIQUITY_J2000`, `EquinoxType`, `ApsisType`
+- **Time**: `julianDayFromCalendar()`, `julianDayFromDate()`, `julianDayToDate()`, `julianDayMidnight()`, `deltaT()`, `taiMinusUtc()`, `dynamicalTime()`, `julianDayFromDynamicalTime()`, `calculateEaster()`
+- **Solar**: `calculateSunPosition()`, `calculateObliquity()`, `calculateEquationOfTime()`, `calculateEarthTrueAnomaly()`, `calculateEarthEccentricity()`, `calculateGreenwichSiderealTime()`, `calculateLocalSiderealTime()`, `calculateSunRiseSet()`, `calculateEquinoxSolstice()`, `calculateNextEarthApsis()`
+- **Coordinate transforms**: `calculateEquatorial()`, `calculateHorizontal()`, `calculateTopocentric()`, `calculateParallacticAngle()`
+- **Lunar**: `calculateMoonPosition()`, `calculateMoonPositionSimple()`, `calculateMoonIlluminatedFraction()`, `calculateMoonOrientation()` (libration, position angle), `calculateMoonAscendingNode()`, `calculateMoonRiseSet()`, `calculateNextMoonApsis()`, `calculateNextMoonNode()`
+- **Utilities**: `interpolate()`, `normalizeAngle()`, `normalizeAngleSigned()`, `angleFromDms()`
+
+When changing an algorithm, change `astro.js` and `cpp/astro.cpp` together; their results agree to about 1e-11.
 
 **`render.js`** — small shared 3D rendering helpers: `createRotationMatrix(axle, angle)` and `multiplyMatrix(m1, m2)`. Used by the moon surface renderer in `Mond.html`.
 
-**`ui.js`** — shared UI state and formatting helpers (`radToDegString`, time formatting, common variables like `datetime`, `latitude`, `longitude`, `useLocalTime`). Loaded alongside `astro.js` by the pages that opt into the shared modules.
+**`ui.js`** — shared UI state and formatting helpers (`radToDegString`, time formatting, common variables like `datetime`, `latitude`, `longitude` in degrees, `useLocalTime`). `getLocation()` turns the inputs into the location object for `astro.js`, `siderealTimeHours(jd)` gives Greenwich sidereal time in hours, `normalizeDegrees()` normalizes display values in degrees. Loaded after `astro.js` by the pages that opt into the shared modules.
 
 **`cpp/astro.cpp` / `cpp/astro.h`** — C++ reimplementation of the same algorithms in the `astro::` namespace. Standalone, no build integration. `JulianDay` holds UT and applies ΔT (leap-second table) itself; `ASTRO_EXACT_DELTA_T=0` switches to a fixed 69.184 s. Also in `cpp/`: `moon_testbench.cpp` (accuracy vs. NASA, results in `Testbench-Mond.md`), `Plan-Mondaufgang.md`.
 
@@ -51,6 +53,6 @@ Pages that do not load `astro.js` embed (an older copy of) the calculation logic
 ## Key Conventions
 
 - Identifiers (variables, function names) are in English; comments are in German
-- Angles internally in degrees unless a function explicitly works in radians
+- Angles in `astro.js` are radians (`DEG2RAD`/`RAD2DEG` to convert); degrees only in UI inputs and display
 - Julian Date (JD) is the primary time representation for calculations
-- Location inputs are latitude/longitude in decimal degrees
+- Location inputs are latitude/longitude in decimal degrees (`ui.js` globals); `getLocation()` converts them for `astro.js`

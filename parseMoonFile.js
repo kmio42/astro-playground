@@ -16,7 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { calculateMoon, calculateJulianDate, calculateRaDec, normalizeAngleDifferenceRad, calculateHAzFromRaDec, calculateSiderealTime, calculateMoonSimple } = require('./astro.js');
+const { calculateMoonPosition, calculateMoonPositionSimple, calculateEquatorial, calculateObliquity, julianDayFromDate, normalizeAngleSigned } = require('./astro.js');
 
 // --- Argumente einlesen ---
 const inputPath = process.argv[2] || 'input.txt';
@@ -34,25 +34,25 @@ const deg2rad = Math.PI / 180;
 const rad2deg = 180 / Math.PI;
 
 function berechne(input) {
-  const jd = calculateJulianDate(input.timestampUTC);
-  const siderealtime = calculateSiderealTime(jd);
+  const jd = julianDayFromDate(input.timestampUTC);
+  const obliquity = calculateObliquity(jd);
 
   // input.ra ist in Stunden, input.dec in Grad — auf Bogenmaß bringen
   const input_ra_rad = input.ra * hours2rad;
   const input_dec_rad = input.dec * deg2rad;
 
-  const moon_meuss_ecliptical = calculateMoon(jd);
-  const moon_meuss_radec = calculateRaDec(moon_meuss_ecliptical.longitude, moon_meuss_ecliptical.latitude);
-  const diff_meuss_ra = normalizeAngleDifferenceRad(input_ra_rad - moon_meuss_radec.ra);
-  const diff_meuss_dec = normalizeAngleDifferenceRad(input_dec_rad - moon_meuss_radec.dec);
+  const moon_meuss_ecliptical = calculateMoonPosition(jd);
+  const moon_meuss_radec = calculateEquatorial(moon_meuss_ecliptical, obliquity);
+  const diff_meuss_ra = normalizeAngleSigned(input_ra_rad - moon_meuss_radec.ra);
+  const diff_meuss_dec = normalizeAngleSigned(input_dec_rad - moon_meuss_radec.dec);
 
-  const moon_simple_radec = calculateMoonSimple(jd);
-  const diff_simple_ra = normalizeAngleDifferenceRad(input_ra_rad - moon_simple_radec.ra);
-  const diff_simple_dec = normalizeAngleDifferenceRad(input_dec_rad - moon_simple_radec.dec);
+  const moon_simple_radec = calculateEquatorial(calculateMoonPositionSimple(jd), obliquity);
+  const diff_simple_ra = normalizeAngleSigned(input_ra_rad - moon_simple_radec.ra);
+  const diff_simple_dec = normalizeAngleSigned(input_dec_rad - moon_simple_radec.dec);
   const diff_distance = input.dist - moon_meuss_ecliptical.distance;
 
-  const diff_meuss_simple_ra = normalizeAngleDifferenceRad(moon_meuss_radec.ra - moon_simple_radec.ra);
-  const diff_meuss_simple_dec = normalizeAngleDifferenceRad(moon_meuss_radec.dec - moon_simple_radec.dec);
+  const diff_meuss_simple_ra = normalizeAngleSigned(moon_meuss_radec.ra - moon_simple_radec.ra);
+  const diff_meuss_simple_dec = normalizeAngleSigned(moon_meuss_radec.dec - moon_simple_radec.dec);
 
 
   return {

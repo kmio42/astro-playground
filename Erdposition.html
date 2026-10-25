@@ -26,6 +26,17 @@
     <script>
         // Grafik-Ausgabe
 
+        // Exzentrizität der Erdbahn zum eingestellten Datum (Formel 24.4)
+        function earthEccentricity() {
+            return calculateEarthEccentricity(julianDayFromDate(datetime));
+        }
+
+        // Abstand Erde–Sonne [AE] zur wahren Anomalie ν, Formel 24.5 (zum Zeichnen der Bahn)
+        function orbitRadiusAU(nu) {
+            const e = earthEccentricity();
+            return EARTH_SEMI_MAJOR_AXIS * (1 - e * e) / (1 + e * Math.cos(nu));
+        }
+
 
 
     /////////////////////////////////////////////////////////////////
@@ -100,6 +111,7 @@
 
             function drawOrbit(ctx) {
                 //sun is in one focal point, so calculating center:
+                const e = earthEccentricity();
                 const centerX = sun.x - e * earth.orbit.radius;
                 const centerY = sun.y;
 
@@ -124,7 +136,7 @@
 
             function siderealDirectionCorrection(sideRealTime) {
                 const alpha = sideRealTime+Math.PI/2;
-                const lambda = Math.atan2(Math.sin(alpha)*Math.cos(epsilon*deg2rad),Math.cos(alpha));
+                const lambda = Math.atan2(Math.sin(alpha)*Math.cos(OBLIQUITY_J2000),Math.cos(alpha));
                 return lambda-Math.PI/2;
             }
 
@@ -137,7 +149,7 @@
                 ctx.translate(earthX, earthY);
                 ctx.rotate(-vernalPoint);
                 ctx.beginPath();
-                ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(epsilon*deg2rad), Math.PI/2, 0, Math.PI * 2);
+                ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(OBLIQUITY_J2000), Math.PI/2, 0, Math.PI * 2);
                 ctx.fillStyle = earth.color;
                 ctx.fill();
                 ctx.closePath();
@@ -157,7 +169,7 @@
                 ctx.closePath();
 
 
-                if(Math.abs(normalizeAngleDifferenceRad(vernalPoint+indicatorDirection-eclipticalLength)) < 10*deg2rad) {
+                if(Math.abs(normalizeAngleSigned(vernalPoint+indicatorDirection-eclipticalLength)) < 10*DEG2RAD) {
                     ctx.beginPath();
                     const endSunIndicatorX = -(radius*earth.orbit.radius+30)*Math.cos(indicatorDirection);
                     const endSunIndicatorY = (radius*earth.orbit.radius+30)*Math.sin(indicatorDirection);
@@ -172,7 +184,7 @@
             }
 
             function drawFullLineWithText(ctx, eclipticalLength, text) {
-                const radius = calculateOrbitRadiusEarth(eclipticalLength);
+                const radius = orbitRadiusAU(eclipticalLength);
 
                 // Position der Erde basierend auf dem Orbit um die Sonne
                 const startx = sun.x;
@@ -199,7 +211,7 @@
 
             function drawMarker(ctx, phi) {
                 const size = 10;
-                const radius = calculateOrbitRadiusEarth(phi);
+                const radius = orbitRadiusAU(phi);
 
                 // Position der Erde basierend auf dem Orbit um die Sonne
                 const startx = sun.x + (radius * earth.orbit.radius - size/2) * Math.cos(phi);
@@ -223,10 +235,10 @@
                 ctx.font= "15px arial";
                 ctx.fillStyle="black";
                 ctx.textAlign = "left";
-                let radius = calculateOrbitRadiusEarth(Math.PI);
+                let radius = orbitRadiusAU(Math.PI);
                 ctx.fillText("Aphel", sun.x - radius * earth.orbit.radius+8,5);
 
-                radius = calculateOrbitRadiusEarth(0);
+                radius = orbitRadiusAU(0);
                 ctx.textAlign = "right";
                 ctx.fillText("Perihel", sun.x + radius * earth.orbit.radius-8,5);
             }
@@ -247,7 +259,7 @@
             drawOrbit(ctx);
 
             drawEarthWithIndicatorAndMoon(ctx, orbitRadiusEarth, orbitLengthEarth, springEquinoxLength,
-                siderealTime/12*Math.PI+longitude*deg2rad, moonLongitude, ascendingNodeMoon);
+                siderealTime/12*Math.PI+longitude*DEG2RAD, moonLongitude, ascendingNodeMoon);
             drawOrbit(ctx);
             drawPerihelAphel(ctx);
         }
@@ -264,12 +276,12 @@
 
             const phase = eclipticalLength - vernalPoint;
 
-            const rotationMatrixEpsilon = createRotationMatrix({x:0,y:1,z:0},-epsilon*deg2rad);
+            const rotationMatrixEpsilon = createRotationMatrix({x:0,y:1,z:0},-OBLIQUITY_J2000);
             const rotationMatrxEcliptic = createRotationMatrix({x:0,y:0,z:1},phase-Math.PI/2);
 
             let rotationMatrix = multiplyMatrix(rotationMatrxEcliptic,rotationMatrixEpsilon);
             const axleDirectionRaw = applyMatrix({x:0,y:0,z:1},rotationMatrix);
-            const axleAngleY = Math.asin(Math.sin(phase-Math.PI/2)*Math.sin(-epsilon*deg2rad));//Math.asin(axleDirectionRaw.y);
+            const axleAngleY = Math.asin(Math.sin(phase-Math.PI/2)*Math.sin(-OBLIQUITY_J2000));//Math.asin(axleDirectionRaw.y);
             const rotationMatrixPlain = createRotationMatrix({x:1,y:0,z:0},axleAngleY);
             rotationMatrix = multiplyMatrix(rotationMatrixPlain,rotationMatrix);
             //console.log("rotation",applyMatrix({x:0,y:0,z:1},rotationMatrix));
@@ -278,7 +290,7 @@
             /*const rotationMatrixMoonWidth = createRotationMatrix({x:0,y:1,z:0}, moonWidth);
             const rotationMatrixMoonLength = createRotationMatrix({x:0,y:0,z:1}, );
 
-            const moonY = earthRadiusGraphic/earthRadius * moonDistance * Math.sin(-moonWidth);
+            const moonY = earthRadiusGraphic/EARTH_RADIUS * moonDistance * Math.sin(-moonWidth);
             const moonX = 260 * Math.cos(phase - moonLength + Math.PI);
             const moonZ = Math.sin(phase - moonLength + Math.PI);
 
@@ -289,7 +301,7 @@
 
             //Halbkugel Nacht
             ctx.beginPath();
-            ctx.arc(0,0,earthRadiusGraphic,-90*deg2rad,90*deg2rad,false);
+            ctx.arc(0,0,earthRadiusGraphic,-90*DEG2RAD,90*DEG2RAD,false);
             ctx.fillStyle = "#dddddd";
             ctx.fill();
             ctx.closePath();
@@ -359,13 +371,13 @@
             // for(let i = 0; i < 5; i++) {
             // ctx.beginPath();
             // ctx.setLineDash([]);
-            // ctx.arc(0, 0, earthRadius/5*i, 0, Math.PI*2,false);
+            // ctx.arc(0, 0, EARTH_RADIUS/5*i, 0, Math.PI*2,false);
             // ctx.strokeStyle = "blue";
             // ctx.stroke();
             // ctx.closePath();
             // }
 
-            const polygonLineLatitude = calculateLatitudePoints(earthRadiusGraphic,latitude*deg2rad, rotationMatrix);
+            const polygonLineLatitude = calculateLatitudePoints(earthRadiusGraphic,latitude*DEG2RAD, rotationMatrix);
             drawPolygonLine(ctx,polygonLineLatitude,'#000000');
 
             ctx.lineWidth = 2;
@@ -384,57 +396,59 @@
 
         function update() {
 
-            //Julianisches Datum
-            const julianDate = calculateJulianDate(datetime);
-
-            //Julianische Epoche
-            const julianEpoch = calculateJulianEpoch(julianDate);
+            //Julianisches Datum und Beobachtungsort
+            const julianDate = julianDayFromDate(datetime);
+            const location = getLocation();
 
             //Zeitgleichung
             const equationOfTimeFull = calculateEquationOfTime(julianDate,true);
             const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDate,false);
             const equationOfTimeWithoutExcentric = equationOfTimeFull - equatonOfTimeWithoutTilt;
 
-            //Sternzeit
-            const siderealTime = calculateSiderealTime(julianDate);
+            //Sternzeit: Greenwich in Stunden, lokal in Radiant
+            const siderealTime = siderealTimeHours(julianDate);
+            const localSiderealTime = calculateLocalSiderealTime(julianDate, location);
 
-            //Position der Erde: Ekliptische Laenge und Radius
-            const orbitLengthEarth = calculateTrueAnomaly(julianDate);
-            const orbitRadiusEarth = calculateOrbitRadiusEarth(orbitLengthEarth);
+            //Position der Erde: wahre Anomalie und Abstand zur Sonne
+            const orbitLengthEarth = calculateEarthTrueAnomaly(julianDate);
+            const sunPosition = calculateSunPosition(julianDate);
+            const orbitRadiusEarth = sunPosition.distance / AU_KM;
 
             //Tag- und Nachtgleichen und Sonnenwenden des Jahres bestimmen
-            const springEquinoxDate = calculateJDOfPoint(datetime.getUTCFullYear(),"spring");
-            const summerSolsticeDate = calculateJDOfPoint(datetime.getUTCFullYear(),"summer");
-            const autumnEquinoxDate = calculateJDOfPoint(datetime.getUTCFullYear(),"autumn");
-            const winterSolsticeDate = calculateJDOfPoint(datetime.getUTCFullYear(),"winter");
+            const year = datetime.getUTCFullYear();
+            const springEquinoxDate = calculateEquinoxSolstice(year, EquinoxType.Spring);
+            const summerSolsticeDate = calculateEquinoxSolstice(year, EquinoxType.Summer);
+            const autumnEquinoxDate = calculateEquinoxSolstice(year, EquinoxType.Autumn);
+            const winterSolsticeDate = calculateEquinoxSolstice(year, EquinoxType.Winter);
 
-            const aphelDate = calculatePerihelAphel(datetime,"aphel");
-            const perihelDate = calculatePerihelAphel(datetime,"perihel");
+            //Perihel (Anfang Januar) und Aphel (Anfang Juli) des Jahres
+            const yearStart = julianDayFromCalendar(year, 1, 1);
+            const perihelDate = calculateNextEarthApsis(yearStart - 15, ApsisType.Periapsis).time;
+            const aphelDate = calculateNextEarthApsis(yearStart, ApsisType.Apoapsis).time;
 
             //Fruehlingspunkt des Datums ist Ekliptische Laenge der Fruehlings Tag-und Nachtgleichen
-            const springEquinoxLength = calculateTrueAnomaly(springEquinoxDate);
-            //const eclipticalLength = orbitLengthEarth-springEquinoxLength;
-            const eclipticalLength = calculateEclipticalLength(julianDate);
+            const springEquinoxLength = calculateEarthTrueAnomaly(springEquinoxDate);
+            const eclipticalLength = sunPosition.longitude;
 
-            const sunRaDec = calculateRaDec(eclipticalLength,0);
+            const obliquity = calculateObliquity(julianDate);
+            const sunRaDec = calculateEquatorial(sunPosition, obliquity);
 
-            const sunAzimuthAltitude = calculateHAzFromRaDec(sunRaDec,siderealTime/12*Math.PI+longitude*deg2rad);
+            const sunAzimuthAltitude = calculateHorizontal(sunRaDec, localSiderealTime, location);
 
-            const moon = calculateMoon(julianDate);
-            const ascendingNodeMoon = calculateAscendingNodeMoon(julianDate);
+            const moon = calculateMoonPosition(julianDate);
+            const ascendingNodeMoon = calculateMoonAscendingNode(julianDate);
             const moonDistanceEcliptic = moon.distance * Math.sin(moon.latitude);
 
-            const moonRaDec = calculateRaDec(moon.longitude, moon.latitude);
-            const moonAzimuthAltitude = calculateHAzFromRaDec(moonRaDec,siderealTime/12*Math.PI+longitude*deg2rad);
-            //sunRaDec, sunDistance, moonRaDec, moonDistance
-            const moonPhase = calculateMoonPhase(sunRaDec, 1*aeTokm, moonRaDec, moon.distance);
+            const moonRaDec = calculateEquatorial(moon, obliquity);
+            const moonAzimuthAltitude = calculateHorizontal(moonRaDec, localSiderealTime, location);
+            const moonPhase = calculateMoonIlluminatedFraction(sunRaDec, sunPosition.distance, moonRaDec, moon.distance);
 
-            //console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
+            //console.log("Mond Länge, Breite, Radius", moon.length*RAD2DEG, moon.width*RAD2DEG, moon.r);
 
-            //console.log(springEquinoxLength*rad2deg,orbitLengthEarth*rad2deg,(springEquinoxLength-orbitLengthEarth)*rad2deg);
+            //console.log(springEquinoxLength*RAD2DEG,orbitLengthEarth*RAD2DEG,(springEquinoxLength-orbitLengthEarth)*RAD2DEG);
 
             //Sonnenauf- und Untergang
-            const sunriseSet = calculateSunriseSunset(julianDate);
+            const sunriseSet = calculateSunRiseSet(julianDate, location);
 
             //Tabellen-Ausgabe
 
@@ -445,33 +459,33 @@
                 { type: 'row', key: 'Anteil durch Exzentrität', value: hoursToString(equatonOfTimeWithoutTilt)+' Minuten ('+equatonOfTimeWithoutTilt.toFixed(2)+' Minuten)' },
                 { type: 'row', key: 'Anteil durch Neigung der Erdachse', value: hoursToString(equationOfTimeWithoutExcentric)+' Minuten ('+equationOfTimeWithoutExcentric.toFixed(2)+' Minuten)' },
                 { type: 'category', text: 'Position der Erde' },
-                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(eclipticalLength)+' ('+normalizeAngleDegree(eclipticalLength*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'Wahre Anomalie<br>(Winkel zum Perihel)', value: radToDegString(orbitLengthEarth)+' ('+normalizeAngleDegree(orbitLengthEarth*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: '&Delta; (UTC-Sternzeit)', value: hoursToString(siderealTimeRelative)+' (entspricht \u2248'+normalizeAngleDegree(siderealTimeRelative*15-180).toFixed(4)+'° ekliptikaler Länge)' },
-                { type: 'row', key: 'Abstand Erde-Sonne', value: orbitRadiusEarth.toFixed(5)+' AE ('+(orbitRadiusEarth*aeTokm).toFixed(2)+' km)' },
+                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(eclipticalLength)+' ('+normalizeDegrees(eclipticalLength*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Wahre Anomalie<br>(Winkel zum Perihel)', value: radToDegString(orbitLengthEarth)+' ('+normalizeDegrees(orbitLengthEarth*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: '&Delta; (UTC-Sternzeit)', value: hoursToString(siderealTimeRelative)+' (entspricht \u2248'+normalizeDegrees(siderealTimeRelative*15-180).toFixed(4)+'° ekliptikaler Länge)' },
+                { type: 'row', key: 'Abstand Erde-Sonne', value: orbitRadiusEarth.toFixed(5)+' AE ('+(orbitRadiusEarth*AU_KM).toFixed(2)+' km)' },
                 { type: 'category', text: 'Zeitpunkte besonderer Erdposition im Jahr' },
-                { type: 'row', key: 'Perihel (grober Näherungswert)', value: gregorianDateToString(calculateGregorianDateFromJulianDate(perihelDate))+' ('+radToDegString(calculateTrueAnomaly(perihelDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Aphel (grober Näherungswert)', value: gregorianDateToString(calculateGregorianDateFromJulianDate(aphelDate))+' ('+radToDegString(calculateTrueAnomaly(aphelDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Frühlingsäquinoktium (Tag- und Nachtgleiche)', value: gregorianDateToString(calculateGregorianDateFromJulianDate(springEquinoxDate))+' ('+radToDegString(springEquinoxLength)+' wahre Anomalie)' },
-                { type: 'row', key: 'Sommersolstitium (Sonnenwende)', value: gregorianDateToString(calculateGregorianDateFromJulianDate(summerSolsticeDate))+' ('+radToDegString(calculateTrueAnomaly(summerSolsticeDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Herbstäquinoktium (Tag- und Nachtgleiche)', value: gregorianDateToString(calculateGregorianDateFromJulianDate(autumnEquinoxDate))+' ('+radToDegString(calculateTrueAnomaly(autumnEquinoxDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Wintersolstitium (Sonnenwende)', value: gregorianDateToString(calculateGregorianDateFromJulianDate(winterSolsticeDate))+' ('+radToDegString(calculateTrueAnomaly(winterSolsticeDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Perihel (grober Näherungswert)', value: gregorianDateToString(julianDayToDate(perihelDate))+' ('+radToDegString(calculateEarthTrueAnomaly(perihelDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Aphel (grober Näherungswert)', value: gregorianDateToString(julianDayToDate(aphelDate))+' ('+radToDegString(calculateEarthTrueAnomaly(aphelDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Frühlingsäquinoktium (Tag- und Nachtgleiche)', value: gregorianDateToString(julianDayToDate(springEquinoxDate))+' ('+radToDegString(springEquinoxLength)+' wahre Anomalie)' },
+                { type: 'row', key: 'Sommersolstitium (Sonnenwende)', value: gregorianDateToString(julianDayToDate(summerSolsticeDate))+' ('+radToDegString(calculateEarthTrueAnomaly(summerSolsticeDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Herbstäquinoktium (Tag- und Nachtgleiche)', value: gregorianDateToString(julianDayToDate(autumnEquinoxDate))+' ('+radToDegString(calculateEarthTrueAnomaly(autumnEquinoxDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Wintersolstitium (Sonnenwende)', value: gregorianDateToString(julianDayToDate(winterSolsticeDate))+' ('+radToDegString(calculateEarthTrueAnomaly(winterSolsticeDate))+' wahre Anomalie)' },
                 { type: 'category', text: 'Position des Mondes' },
-                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(moon.longitude)+' ('+normalizeAngleDegree(moon.longitude*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'Ekliptikale Breite', value: (moon.latitude*rad2deg).toFixed(2)+'°' },
+                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(moon.longitude)+' ('+normalizeDegrees(moon.longitude*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Ekliptikale Breite', value: (moon.latitude*RAD2DEG).toFixed(2)+'°' },
                 { type: 'row', key: 'Abstand zur Erde', value: Math.round(moon.distance)+' km' },
                 { type: 'row', key: 'Abstand zur Ekliptik', value: Math.round(moonDistanceEcliptic)+' km' },
-                { type: 'row', key: 'Aufsteigender Knoten', value: radToDegString(ascendingNodeMoon)+' ('+normalizeAngleDegree(ascendingNodeMoon*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'RA / DEK', value: normalizeAngleDegree(moonRaDec.ra*rad2deg).toFixed(4)+'° / '+(moonRaDec.dec*rad2deg).toFixed(4)+'°' },
+                { type: 'row', key: 'Aufsteigender Knoten', value: radToDegString(ascendingNodeMoon)+' ('+normalizeDegrees(ascendingNodeMoon*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'RA / DEK', value: normalizeDegrees(moonRaDec.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDec.dec*RAD2DEG).toFixed(4)+'°' },
                 { type: 'row', key: 'Mondphase', value: (moonPhase*100).toFixed(2)+'%' },
                 { type: 'category', text: 'Ortsbezogene Daten' },
-                { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'Höhe Sonne', value: (sunAzimuthAltitude.altitude*rad2deg).toFixed(2)+'°' },
-                { type: 'row', key: 'Sonnenaufgang', value: (sunriseSet !== false) ? hoursToString(sunriseSet.rising) : '-' },
-                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: (sunriseSet !== false) ? hoursToString(sunriseSet.zenit) : '-' },
-                { type: 'row', key: 'Sonnenuntergang', value: (sunriseSet !== false) ? hoursToString(sunriseSet.setting) : '-' },
-                { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*rad2deg).toFixed(4)+'°)' },
-                { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*rad2deg).toFixed(2)+'°' },
+                { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Höhe Sonne', value: (sunAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
+                { type: 'row', key: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise) : '-' },
+                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: hoursToString(sunriseSet.transit) },
+                { type: 'row', key: 'Sonnenuntergang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set) : '-' },
+                { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
             ];
             renderOutputTable('outputTable', tableData);
 
@@ -479,9 +493,9 @@
             //Grafik-Ausgabe
             drawSolarSystem({
                 springEquinoxLength,
-                summerSolsticeAnomaly: calculateTrueAnomaly(summerSolsticeDate),
-                autumnEquinoxAnomaly: calculateTrueAnomaly(autumnEquinoxDate),
-                winterSolsticeAnomaly: calculateTrueAnomaly(winterSolsticeDate),
+                summerSolsticeAnomaly: calculateEarthTrueAnomaly(summerSolsticeDate),
+                autumnEquinoxAnomaly: calculateEarthTrueAnomaly(autumnEquinoxDate),
+                winterSolsticeAnomaly: calculateEarthTrueAnomaly(winterSolsticeDate),
                 orbitRadiusEarth,
                 orbitLengthEarth,
                 siderealTime,
@@ -489,15 +503,15 @@
                 ascendingNodeMoon
             });
 
-            drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,siderealTime/12*Math.PI+longitude*deg2rad,moon.latitude,moon.longitude,moon.distance);
+            drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,localSiderealTime,moon.latitude,moon.longitude,moon.distance);
             //fillTable();
 
            /* let str = "";
             for(let stunde = 0; stunde < 365*24; stunde++) {
-                const moon = calculateMoon(julianDate+stunde/24);
+                const moon = calculateMoonPosition(julianDate+stunde/24);
 
                 str += moon.length + " " + moon.width + " " + moon.r + "\n";
-                //console.log("Mond Länge, Breite, Radius", moon.length*rad2deg, moon.width*rad2deg, moon.r);
+                //console.log("Mond Länge, Breite, Radius", moon.length*RAD2DEG, moon.width*RAD2DEG, moon.r);
             }
             document.getElementById("table").value = str;*/
 
@@ -508,14 +522,14 @@
             let str ="";
             for(let day = 0; day < 365; day++) {
                 datetime.setTime(datetime.getTime()+86400000);
-                const julianDate = calculateJulianDate(datetime);
+                const julianDate = julianDayFromDate(datetime);
                 const equationOfTimeFull = calculateEquationOfTime(julianDate,true);
                 const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDate,false);
                 const equationOfTimeWithoutExcentric = equationOfTimeFull - equatonOfTimeWithoutTilt;
-                const siderealTime = calculateSiderealTime(julianDate);//-equationOfTimeWithoutExcentric/60/24
+                const siderealTime = siderealTimeHours(julianDate);//-equationOfTimeWithoutExcentric/60/24
                 const siderealTimeRelative = (((siderealTime - equatonOfTimeWithoutTilt/60 - datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
-                const eclipticalLength = calculateEclipticalLength(julianDate)*rad2deg;
-                const delta = normalizeAngleDegree(siderealTimeRelative*15-180);
+                const eclipticalLength = calculateSunPosition(julianDate).longitude*RAD2DEG;
+                const delta = normalizeDegrees(siderealTimeRelative*15-180);
                 str +=(julianDate).toString() + " " + String(eclipticalLength) + " " + String(delta) + " " +String(equatonOfTimeWithoutTilt)+"\n";
             }
             document.getElementById("table").value = str;

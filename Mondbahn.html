@@ -141,7 +141,7 @@
 
         const earthMoonMassRatio = 81.3005678; // Masse Erde / Masse Mond
         const stepDays = 1 / 24;               // Schrittweite der Bahnpunkte (1 Stunde)
-        const realSunRadius = 696000 / aeTokm; // Sonnenradius in AE
+        const realSunRadius = 696000 / AU_KM; // Sonnenradius in AE
 
         let orbitData = null;
 
@@ -152,7 +152,7 @@
             const date = new Date(0);
             date.setUTCFullYear(year, month, 1);
             date.setUTCHours(0, 0, 0, 0);
-            return calculateJulianDate(date);
+            return julianDayFromDate(date);
         }
 
         /**
@@ -172,11 +172,12 @@
 
             for (let i = 0; i < N; i++) {
                 const t = jdStart + i * stepDays;
-                const sunLongitude = calculateEclipticalLength(t);
-                const sunDistance = calculateOrbitRadiusEarth(calculateTrueAnomaly(t));
-                const moon = calculateMoon(t);
+                const sun = calculateSunPosition(t);
+                const sunLongitude = sun.longitude;
+                const sunDistance = sun.distance / AU_KM;
+                const moon = calculateMoonPosition(t);
 
-                const moonDistance = moon.distance * Math.cos(moon.latitude) / aeTokm;
+                const moonDistance = moon.distance * Math.cos(moon.latitude) / AU_KM;
                 dx[i] = moonDistance * Math.cos(moon.longitude);
                 dy[i] = moonDistance * Math.sin(moon.longitude);
 
@@ -186,7 +187,7 @@
                 ey[i] = -sunDistance * Math.sin(sunLongitude) - dy[i] / (1 + earthMoonMassRatio);
 
                 jd[i] = t;
-                elongation[i] = normalizeAngleDegree((moon.longitude - sunLongitude) * rad2deg);
+                elongation[i] = normalizeDegrees((moon.longitude - sunLongitude) * RAD2DEG);
             }
 
             // Geschwindigkeit und Beschleunigung über zentrale Differenzen (AE/Tag, AE/Tag²)
@@ -222,11 +223,11 @@
             }
 
             const seasons = [
-                { type: 'spring', label: 'Frühlingsanfang' },
-                { type: 'summer', label: 'Sommeranfang' },
-                { type: 'autumn', label: 'Herbstanfang' },
-                { type: 'winter', label: 'Winteranfang' },
-            ].map(s => ({ ...s, pos: (calculateJDOfPoint(year, s.type) - jdStart) / stepDays }));
+                { type: 'spring', equinox: EquinoxType.Spring, label: 'Frühlingsanfang' },
+                { type: 'summer', equinox: EquinoxType.Summer, label: 'Sommeranfang' },
+                { type: 'autumn', equinox: EquinoxType.Autumn, label: 'Herbstanfang' },
+                { type: 'winter', equinox: EquinoxType.Winter, label: 'Winteranfang' },
+            ].map(s => ({ ...s, pos: (calculateEquinoxSolstice(year, s.equinox) - jdStart) / stepDays }));
 
             const months = [];
             for (let m = 0; m < 12; m++) {
@@ -272,7 +273,7 @@
         }
 
         function jdToString(jd) {
-            return gregorianDateToString(calculateGregorianDateFromJulianDate(jd)).slice(0, 16) + ' UTC';
+            return gregorianDateToString(julianDayToDate(jd)).slice(0, 16) + ' UTC';
         }
 
         function formatNumber(value, digits) {
@@ -475,7 +476,7 @@
          * Maßstabsbalken mit "runder" Länge (1, 2, 5 × 10^n km)
          */
         function drawScaleBar(ctx, w, h, scale, c) {
-            const kmPerPx = aeTokm / scale;
+            const kmPerPx = AU_KM / scale;
             const target = 120 * kmPerPx;
             const magnitude = 10 ** Math.floor(Math.log10(target));
             const nice = [1, 2, 5, 10].map(f => f * magnitude).filter(x => x <= target).pop();
@@ -572,7 +573,7 @@
                 tooltip.innerHTML = `<b>${jdToString(d.jd[idx])}</b><br>`
                     + `Abstand Sonne–Erde: ${formatNumber(d.rEarth[idx], 5)} AE<br>`
                     + `Abstand Sonne–Mond: ${formatNumber(d.rMoon[idx], 5)} AE<br>`
-                    + `Abstand Erde–Mond: ${formatKm(Math.hypot(d.dx[idx], d.dy[idx]) * aeTokm)}<br>`
+                    + `Abstand Erde–Mond: ${formatKm(Math.hypot(d.dx[idx], d.dy[idx]) * AU_KM)}<br>`
                     + `Elongation: ${formatNumber(d.elongation[idx], 1)}°<br>`
                     + `<span class="value">Klick wählt diesen Zeitpunkt</span>`;
                 placeTooltip(tooltip, canvas, mx, my);
@@ -836,7 +837,7 @@
             // Blauer Mond: zweiter Vollmond in einem Kalendermonat
             const perMonth = {};
             for (const p of fullMoons) {
-                const m = calculateGregorianDateFromJulianDate(valueAt(d.jd, p.pos)).getUTCMonth();
+                const m = julianDayToDate(valueAt(d.jd, p.pos)).getUTCMonth();
                 (perMonth[m] = perMonth[m] || []).push(p);
             }
             const blueMoons = Object.values(perMonth).filter(list => list.length > 1).map(list => list[1]);
@@ -896,7 +897,7 @@
             slider.max = orbitData.N - 1;
             if (fraction === null) {
                 // Beim ersten Aufruf: aktueller Zeitpunkt, falls im Jahr
-                const now = calculateJulianDate(new Date());
+                const now = julianDayFromDate(new Date());
                 const idx = Math.round((now - orbitData.jd[0]) / stepDays);
                 selectedIndex = (idx >= 0 && idx < orbitData.N) ? idx : 0;
             } else {
@@ -963,7 +964,7 @@
 <body>
     <h1>Mondbahn um die Sonne</h1>
     <p>Der Mond umkreist die Erde in rund 29,5 Tagen, während die Erde in einem Jahr um die Sonne läuft. Von der Sonne aus betrachtet beschreibt der Mond deshalb keine Schleifen, sondern eine leicht gewellte Bahn entlang der Erdbahn: Bei Vollmond ist er etwas weiter außen, bei Neumond etwas weiter innen. Da der Abstand Erde–Mond (≈ 384 400 km) nur etwa 1/400 des Abstands zur Sonne beträgt, ist diese Welle in einer maßstäblichen Gesamtansicht nicht zu erkennen. Mit der Überhöhung wird der Abstand Erde–Mond künstlich vergrößert, mit dem Mausrad lässt sich in die maßstäbliche Bahn hineinzoomen.</p>
-    <p>Alle Zeiten in Weltzeit (UTC). Die Bahn wird stundenweise mit <code>calculateMoon()</code> (Meeus, Kap. 47) und der Sonnenposition aus <code>astro.js</code> berechnet und in die Ebene der Ekliptik projiziert.</p>
+    <p>Alle Zeiten in Weltzeit (UTC). Die Bahn wird stundenweise mit <code>calculateMoonPosition()</code> (Meeus, Kap. 45) und der Sonnenposition aus <code>astro.js</code> berechnet und in die Ebene der Ekliptik projiziert.</p>
 
     <div class="controls">
         <label>Jahr <input type="number" id="year" step="1"></label>

@@ -176,7 +176,7 @@ function baseJdFromOpts(opts) {
         console.error(`Invalid date: "${opts.date}" — expected ISO-8601, e.g. 2026-01-15T20:00Z`);
         process.exit(1);
     }
-    return astro.calculateJulianDate(dt);
+    return astro.julianDayFromDate(dt);
 }
 
 // ── Build frame sequence ───────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ function buildFrames(opts) {
             process.exit(1);
         }
         for (let t = start.getTime(); t <= stop.getTime() + 1; t += stepMs)
-            frames.push({ jd: astro.calculateJulianDate(new Date(t)), lat: opts.lat, lon: opts.lon });
+            frames.push({ jd: astro.julianDayFromDate(new Date(t)), lat: opts.lat, lon: opts.lon });
 
     } else if (opts.sweep === 'jd') {
         const start = parseFloat(opts.start);
@@ -242,7 +242,7 @@ function buildFrames(opts) {
 // ── JD → human-readable timestamp ─────────────────────────────────────────────
 
 function jdToLabel(jd) {
-    const d  = astro.calculateGregorianDateFromJulianDate(jd);
+    const d  = astro.julianDayToDate(jd);
     const y  = String(d.getUTCFullYear()).padStart(4, '0');
     const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(d.getUTCDate()).padStart(2, '0');
@@ -254,24 +254,22 @@ function jdToLabel(jd) {
 // ── Astronomical calculations for one frame ────────────────────────────────────
 
 function computeAstro(jd, lat, lon) {
-    global.latitude = lat;
+    const location  = { longitude: lon * astro.DEG2RAD, latitude: lat * astro.DEG2RAD, elevation: 0 };
+    const obliquity = astro.calculateObliquity(jd);
+    const siderealRad = astro.calculateLocalSiderealTime(jd, location);
 
-    const siderealTime  = astro.calculateSiderealTime(jd);
-    const eclipticalLen = astro.calculateEclipticalLength(jd);
-    const orbitRadius   = astro.calculateOrbitRadiusEarth(astro.calculateTrueAnomaly(jd));
-    const siderealRad   = siderealTime / 12 * Math.PI + lon * astro.deg2rad;
+    const sunPosition = astro.calculateSunPosition(jd);
+    const sunRaDec    = astro.calculateEquatorial(sunPosition, obliquity);
+    sunRaDec.distance = sunPosition.distance;
 
-    const sunRaDec    = astro.calculateRaDec(eclipticalLen, 0);
-    sunRaDec.distance = orbitRadius * astro.aeTokm;
-
-    const moonCoords   = astro.calculateMoon(jd);
-    const moonParallax = Math.asin(6378.14 / moonCoords.distance);
-    const moonRaDecRaw = astro.calculateRaDec(moonCoords.longitude, moonCoords.latitude);
-    const moonRaDec    = astro.calculateParallax(moonRaDecRaw, moonParallax, siderealRad);
+    const moonCoords   = astro.calculateMoonPosition(jd);
+    const moonParallax = Math.asin(astro.EARTH_RADIUS / moonCoords.distance);
+    const moonRaDecRaw = astro.calculateEquatorial(moonCoords, obliquity);
+    const moonRaDec    = astro.calculateTopocentric(moonRaDecRaw, moonParallax, siderealRad, location);
     moonRaDec.distance = moonCoords.distance;
 
-    const moonAxis = astro.calculateMoonAxis(jd, moonCoords);
-    const phase    = astro.calculateMoonPhase(sunRaDec, orbitRadius * astro.aeTokm, moonRaDec, moonCoords.distance);
+    const moonAxis = astro.calculateMoonOrientation(jd, moonCoords);
+    const phase    = astro.calculateMoonIlluminatedFraction(sunRaDec, sunPosition.distance, moonRaDec, moonCoords.distance);
 
     return { sunRaDec, moonRaDec, moonAxis, siderealRad, moonCoords, phase };
 }
@@ -307,7 +305,7 @@ async function renderFrame(frame, textures, opts, outBase) {
         const canvas = createCanvas(opts.size, opts.size);
         drawMoonPhaseTexture(
             canvas.getContext('2d'),
-            sunRaDec, moonRaDec, moonAxis.axle, moonAxis.libration,
+            sunRaDec, moonRaDec, moonAxis.positionAngle, moonAxis.libration,
             siderealRad, lat,
             { moonImage1, texData: moonTexData, ...renderOpts }
         );
@@ -320,7 +318,7 @@ async function renderFrame(frame, textures, opts, outBase) {
         const canvas = createCanvas(opts.size, opts.size);
         drawMoonPhasePicture(
             canvas.getContext('2d'),
-            sunRaDec, moonRaDec, moonAxis.axle, moonAxis.libration,
+            sunRaDec, moonRaDec, moonAxis.positionAngle, moonAxis.libration,
             siderealRad, lat,
             { moonImageOffscreen, ...renderOpts }
         );

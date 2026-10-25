@@ -9,6 +9,25 @@ Die Bibliothek besteht aus genau zwei Dateien, `astro.h` und `astro.cpp`, ohne w
 nRF52). Für AVR (Arduino Uno usw.) ist sie nicht geeignet: Dort ist `double` nur 32 Bit breit, das reicht für einen
 Julianischen Tag nicht.
 
+## JavaScript-Fassung
+
+`astro.js` im Hauptordner ist eine Portierung dieser Bibliothek mit denselben Funktionsnamen, Parametern und
+Ergebnissen (Abweichung unter 1e-11). Unterschiede ergeben sich nur aus der Sprache:
+
+- Winkel sind Zahlen in Radiant statt `Angle` (`DEG2RAD`/`RAD2DEG` zum Umrechnen).
+- Zeitpunkte sind Zahlen (JD in UT); statt der Methoden von `JulianDay` gibt es Funktionen wie
+  `julianDayFromDate(date)`, `julianDayToDate(jd)`, `deltaT(jd)` und `julianDayFromDynamicalTime(jde)`.
+- Ergebnisse sind Objekte mit denselben Feldnamen, z. B. `{ ra, dec }` oder `{ hasRise, rise, … }`.
+- `EquinoxType` und `ApsisType` sind Objekte mit Zahlenwerten, `calculateEaster` liefert `{ year, month, day }`.
+
+```js
+const loc = { longitude: 13.405 * DEG2RAD, latitude: 52.52 * DEG2RAD, elevation: 34 };
+const jd  = julianDayFromDate(new Date());
+const sun = calculateSunPosition(jd);
+const hor = calculateHorizontal(calculateEquatorial(sun, calculateObliquity(jd)),
+                                calculateLocalSiderealTime(jd, loc), loc);
+```
+
 ## Inhalt des Ordners
 
 | Datei | Inhalt |
