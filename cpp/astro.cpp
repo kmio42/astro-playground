@@ -435,7 +435,9 @@ double calculateEquationOfTime(const JulianDay jd, const bool withEarthTilt) {
 /**
  * Ekliptikale in äquatoriale Koordinaten, Formeln 12.3 und 12.4.
  * @param ecliptic Ekliptikale Länge λ und Breite β; die Entfernung wird nicht benötigt
- * @param eps Schiefe der Ekliptik ε, z. B. aus calculateObliquity
+ * @param eps Schiefe der Ekliptik ε. Für Positionen aus calculateSunPosition und calculateMoonPosition
+ *            (mittleres Äquinoktium des Datums) calculateObliquity(jd); ohne Angabe OBLIQUITY_J2000,
+ *            das weicht 2026 um 12″ ab, im Jahr 1000 um 0,13°.
  * @return Rektaszension α und Deklination δ
  */
 Equatorial calculateEquatorial(const Ecliptic& ecliptic, const Angle eps) {

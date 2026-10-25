@@ -172,6 +172,10 @@ constexpr Angle operator""_rad(const long double rad) { return Angle::fromRad(st
 constexpr Angle operator""_rad(const unsigned long long rad) { return Angle::fromRad(static_cast<double>(rad)); }
 }
 
+// Mittlere Schiefe der Ekliptik zur Epoche J2000.0, konstantes Glied von Formel 21.2. Passt zu Koordinaten,
+// die auf J2000.0 bezogen sind; für das mittlere Äquinoktium des Datums calculateObliquity(jd) verwenden.
+constexpr Angle OBLIQUITY_J2000 = Angle::fromDms(23, 26, 21.448);
+
 // Sternzeit: Stundenwinkel des Frühlingspunkts, auf [0, 2π) gebracht (Kapitel 11 und 12)
 class SiderealTime {
 public:
@@ -337,7 +341,7 @@ double calculateEquationOfTime(JulianDay jd, bool withEarthTilt);  // Zeitgleich
 
 // Koordinatentransformation; vom Beobachtungsort wird nur die Breite (Topozentrisch: und die Höhe)
 // benötigt, die Länge steckt in der lokalen Sternzeit
-Equatorial calculateEquatorial(const Ecliptic& ecliptic, Angle eps);
+Equatorial calculateEquatorial(const Ecliptic& ecliptic, Angle eps = OBLIQUITY_J2000);  // ε ohne Angabe für J2000.0
 Horizontal calculateHorizontal(const Equatorial& equ, SiderealTime localSiderealTime, const GeoLocation& location);
 Angle calculateParallacticAngle(const Equatorial& equ, SiderealTime localSiderealTime, const GeoLocation& location);
 Equatorial calculateTopocentric(const Equatorial& equ, Angle parallax, SiderealTime localSiderealTime,

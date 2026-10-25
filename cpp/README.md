@@ -95,6 +95,10 @@ Die Zeitzone dient nur der Ausgabe in Ortszeit, gerechnet wird in UT.
 - Azimut **von Süden über Westen** gezählt wie im Buch. Für die übliche Zählung ab Norden:
   `(hor.azimuth + 180_deg).normalized()`.
 - Entfernungen in km.
+- `calculateEquatorial(ecliptic)` ohne Schiefe der Ekliptik verwendet die feste Schiefe `OBLIQUITY_J2000`. Das
+  passt zu Koordinaten, die auf J2000.0 bezogen sind. Sonne und Mond liefern aber Koordinaten zum mittleren
+  Äquinoktium des Datums, dafür `calculateObliquity(jd)` übergeben. Ohne diese Angabe ist die Position 2026 um
+  12″ falsch, 1900 und 2100 um 47″, im Jahr 1000 um 8′.
 - Auf- und Untergänge gelten für einen **UT-Tag** und werden in Stunden UT ab dessen Mitternacht angegeben. In
   Mitteleuropa beginnt der UT-Tag um 1:00 MEZ bzw. 2:00 MESZ; ein Mondaufgang um 0:30 Ortszeit gehört also zum
   vorigen UT-Tag.
