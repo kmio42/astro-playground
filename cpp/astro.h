@@ -169,6 +169,7 @@ inline namespace literals {
 constexpr Angle operator""_deg(const long double deg) { return Angle::fromDeg(static_cast<double>(deg)); }
 constexpr Angle operator""_deg(const unsigned long long deg) { return Angle::fromDeg(static_cast<double>(deg)); }
 constexpr Angle operator""_rad(const long double rad) { return Angle::fromRad(static_cast<double>(rad)); }
+constexpr Angle operator""_rad(const unsigned long long rad) { return Angle::fromRad(static_cast<double>(rad)); }
 }
 
 // Sternzeit: Stundenwinkel des Frühlingspunkts, auf [0, 2π) gebracht (Kapitel 11 und 12)

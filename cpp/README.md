@@ -44,7 +44,7 @@ Alle Winkel sind vom Typ `Angle`. Die Einheit wird nur beim Erzeugen und beim Au
 ```cpp
 using namespace astro;
 
-Angle a = 52.52_deg;                      // Literal (auch 1.2_rad)
+Angle a = 52.52_deg;                      // Literal, auch 45_deg, 1.2_rad, 2_rad
 Angle b = Angle::fromDms(13, 24, 18);     // 13° 24′ 18″
 Angle c = Angle::fromHours(14.5);         // Rektaszension 14h30m
 
