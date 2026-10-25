@@ -17,6 +17,7 @@
  * Umgesetzt                                        Formeln/Tabellen          Funktion
  *  3  Interpolation                                3.3                       interpolate
  *  7  Julianischer Tag                             7.1                       JulianDay::fromCalendar
+ *  8  Osterdatum                                                         calculateEaster
  *  9  Dynamische Zeit und Weltzeit (ΔT)                                     JulianDay::deltaT, JulianDay::taiMinusUtc
  * 10  Der Erdglobus (ρ sin φ′, ρ cos φ′)                                     calculateTopocentric
  * 11  Sternzeit in Greenwich                       11.1, 11.4                calculateGreenwichSiderealTime
@@ -46,7 +47,7 @@
  *
  * Nicht umgesetzt:
  *  1 Hinweise und Tips, 2 Über Genauigkeit (ohne Algorithmen),
- *  4 Kurvenanpassung, 5 Iteration, 6 Sortieren von Zahlen, 8 Osterdatum,
+ *  4 Kurvenanpassung, 5 Iteration, 6 Sortieren von Zahlen,
  * 15 Atmosphärische Refraktion, 16 Winkelabstand,
  * 17 Planetenkonjunktionen, 18 Objekte auf gerader Linie, 19 Drei Himmelsobjekte im kleinsten Kreis,
  * 20 Präzession, 22 Scheinbarer Ort eines Sternes,
@@ -230,6 +231,13 @@ private:
 //  Datenstrukturen
 // ---------------------------------------------------------------
 
+// Kalenderdatum
+struct CalendarDate {
+    int year;               // Jahr, astronomisch gezählt
+    int month;              // Monat [1..12]
+    int day;                // Tag [1..31]
+};
+
 // Beobachtungsort auf der Erde
 struct GeoLocation {
     Angle longitude;                    // Geographische Länge, Ost positiv
@@ -311,6 +319,9 @@ struct Mat3 {
 // ---------------------------------------------------------------
 //  Funktionen (Formeln siehe Kommentare in astro.cpp)
 // ---------------------------------------------------------------
+
+// Kalender
+CalendarDate calculateEaster(int year);                 // Ostersonntag, ab 1583 Gregorianisch, davor Julianisch
 
 // Sternzeit
 SiderealTime calculateGreenwichSiderealTime(JulianDay jd);                      // Mittlere Sternzeit θ0

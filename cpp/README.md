@@ -1,6 +1,6 @@
 # astro – Astronomische Berechnungen in C++
 
-Stand von Sonne und Mond, Auf- und Untergänge, Mondphase und Libration, Jahreszeiten, Apsiden und
+Stand von Sonne und Mond, Auf- und Untergänge, Mondphase und Libration, Jahreszeiten, Osterdatum, Apsiden und
 Knotendurchgänge. Die Algorithmen stammen aus Jean Meeus, *Astronomische Algorithmen* (2. Auflage, Barth 1994);
 Kapitel- und Formelnummern in den Kommentaren beziehen sich auf dieses Buch.
 
@@ -204,6 +204,10 @@ std::printf("ΔT = TD − UT: %.3f s\n", jd.deltaT());
 // Jahreszeiten (in UT)
 printLocal("Frühlingsanfang 2027", calculateEquinoxSolstice(2027, EquinoxType::Spring));
 
+// Ostersonntag, ab 1583 Gregorianisch, davor Julianisch
+const CalendarDate easter = calculateEaster(2027);
+std::printf("Ostersonntag 2027: %02d.%02d.%d\n", easter.day, easter.month, easter.year);
+
 // Nächstes Ereignis nach jd
 const Apsis perihelion = calculateNextEarthApsis(jd, ApsisType::Periapsis);
 const Apsis perigee = calculateNextMoonApsis(jd, ApsisType::Periapsis);
@@ -219,6 +223,7 @@ std::printf("  Entfernung: %.0f km\n", perigee.distance);
 TAI − UTC: 37 s
 Frühlingsanfang 2027: 20.03.2027 21:24 CET
 Sommeranfang 2027: 21.06.2027 16:10 CEST
+Ostersonntag 2027: 28.03.2027
 Perigäum des Mondes: 28.10.2026 19:00 CET
   Entfernung: 364410 km
 Absteigender Knoten: 03.11.2026 04:02 CET
@@ -285,6 +290,7 @@ Datums. Die atmosphärische Refraktion steckt nur pauschal in der Standardhöhe 
 
 | Bereich | Funktionen |
 |---|---|
+| Kalender | `calculateEaster` (Ostersonntag) |
 | Zeit | `JulianDay::fromCalendar`, `fromTm`, `fromUnixTime`, `fromDynamicalTime`, `toUnixTime`, `midnight`, `deltaT`, `taiMinusUtc`, `dynamicalTime` |
 | Sternzeit | `calculateGreenwichSiderealTime`, `calculateLocalSiderealTime` |
 | Sonne, Erdbahn | `calculateSunPosition`, `calculateObliquity`, `calculateEquationOfTime`, `calculateEarthTrueAnomaly`, `calculateEarthEccentricity`, `calculateNextEarthApsis`, `calculateEquinoxSolstice` |

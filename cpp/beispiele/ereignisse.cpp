@@ -1,6 +1,6 @@
 /*
  * Beispiel: Zeitskalen (UT, TD, ΔT) und Zeitpunkte von Ereignissen:
- * Jahreszeiten, Perihel der Erde, Perigäum und Apogäum des Mondes, Knotendurchgang.
+ * Jahreszeiten, Ostersonntag, Perihel der Erde, Perigäum und Apogäum des Mondes, Knotendurchgang.
  *
  * Übersetzen und aufrufen (im Ordner cpp/beispiele):
  *   g++ -std=c++11 -I.. ereignisse.cpp ../astro.cpp -o ereignisse && ./ereignisse
@@ -41,6 +41,10 @@ int main() {
     printLocal("Sommeranfang 2027", calculateEquinoxSolstice(2027, EquinoxType::Summer));
     printLocal("Herbstanfang 2027", calculateEquinoxSolstice(2027, EquinoxType::Autumn));
     printLocal("Winteranfang 2027", calculateEquinoxSolstice(2027, EquinoxType::Winter));
+
+    // Ostersonntag: ein Kalenderdatum ohne Uhrzeit
+    const CalendarDate easter = calculateEaster(2027);
+    std::printf("Ostersonntag 2027: %02d.%02d.%d\n", easter.day, easter.month, easter.year);
 
     // Nächste Ereignisse nach jd
     const Apsis perihelion = calculateNextEarthApsis(jd, ApsisType::Periapsis);

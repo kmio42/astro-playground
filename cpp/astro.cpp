@@ -91,6 +91,51 @@ SiderealTime calculateLocalSiderealTime(const JulianDay jd, const GeoLocation& l
 }
 
 // ---------------------------------------------------------------
+//  Osterdatum (Kapitel 8)
+// ---------------------------------------------------------------
+
+/**
+ * Datum des Ostersonntags.
+ * Ab 1583 im Gregorianischen Kalender nach dem Verfahren, das Meeus Spencer Jones und Butcher zuschreibt
+ * (gültig für alle Jahre ab 1583). Davor im Julianischen Kalender, wo Ostern sich alle 532 Jahre
+ * wiederholt; dasselbe Datum also in den Jahren 179, 711 und 1243 (jeweils 12. April).
+ * Die Grenze entspricht JulianDay::fromCalendar (Gregorianisch ab 15.10.1582).
+ * @param year Jahr, astronomisch gezählt
+ * @return Datum des Ostersonntags (März oder April)
+ */
+CalendarDate calculateEaster(const int year) {
+    int month, day;
+    if (year >= 1583) {
+        const int a = year % 19;
+        const int b = year / 100;
+        const int c = year % 100;
+        const int d = b / 4;
+        const int e = b % 4;
+        const int f = (b + 8) / 25;
+        const int g = (b - f + 1) / 3;
+        const int h = (19 * a + b - d - g + 15) % 30;
+        const int i = c / 4;
+        const int k = c % 4;
+        const int l = (32 + 2 * e + 2 * i - h - k) % 7;
+        const int m = (a + 11 * h + 22 * l) / 451;
+        const int n = h + l - 7 * m + 114;
+        month = n / 31;
+        day = n % 31 + 1;
+    } else {
+        // Reste nicht negativ, damit das Verfahren auch für Jahre vor 1 gilt
+        const int a = (year % 4 + 4) % 4;
+        const int b = (year % 7 + 7) % 7;
+        const int c = (year % 19 + 19) % 19;
+        const int d = (19 * c + 15) % 30;
+        const int e = (2 * a + 4 * b - d + 34) % 7;
+        const int n = d + e + 114;
+        month = n / 31;
+        day = n % 31 + 1;
+    }
+    return { year, month, day };
+}
+
+// ---------------------------------------------------------------
 //  Dynamische Zeit und Weltzeit (Kapitel 9)
 // ---------------------------------------------------------------
 
