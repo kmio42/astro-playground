@@ -18,8 +18,9 @@ The main calculation library (~780 lines, no external dependencies). Implements:
 - Lunar position with 60+ periodic correction terms, moon phase, ascending node
 - Helper utilities: angle normalization, interpolation
 
-### `astro.cpp` / `astro.h`
-Partial C/C++ reimplementations of the same algorithms (not integrated into any build, standalone files).
+### `cpp/` – `astro.cpp` / `astro.h`
+C++ reimplementation of the same algorithms (namespace `astro`, C++11, runs on ESP32/ESP8266 as well), with example
+programs, a test bench against NASA ephemerides and documentation in German: see [`cpp/README.md`](cpp/README.md).
 
 ### `render.js`
 Shared 3D rendering utilities: rotation matrix construction and matrix multiplication, used for moon surface rendering in `Mond.html`.

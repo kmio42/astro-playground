@@ -15,7 +15,7 @@ firefox Mond.html
 firefox Erdposition.html
 ```
 
-The C++ files (`astro.cpp`, `astro.h`) have no Makefile and are not integrated into any HTML page — they are a standalone partial reimplementation in the `astro::` namespace.
+The C++ files live in `cpp/` (`astro.cpp`, `astro.h`, examples in `cpp/beispiele/`, documented in `cpp/README.md`). They have no Makefile and are not integrated into any HTML page — they are a standalone reimplementation in the `astro::` namespace, kept compatible with C++11 (Arduino cores). Build an example: `cd cpp/beispiele && g++ -std=c++11 -I.. sonne.cpp ../astro.cpp -o sonne`.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ The C++ files (`astro.cpp`, `astro.h`) have no Makefile and are not integrated i
 
 **`ui.js`** — shared UI state and formatting helpers (`radToDegString`, time formatting, common variables like `datetime`, `latitude`, `longitude`, `useLocalTime`). Loaded alongside `astro.js` by the pages that opt into the shared modules.
 
-**`astro.cpp` / `astro.h`** — C++ partial reimplementation of the same algorithms in the `astro::` namespace. Standalone, no build integration.
+**`cpp/astro.cpp` / `cpp/astro.h`** — C++ reimplementation of the same algorithms in the `astro::` namespace. Standalone, no build integration. `JulianDay` holds UT and applies ΔT (leap-second table) itself; `ASTRO_EXACT_DELTA_T=0` switches to a fixed 69.184 s. Also in `cpp/`: `moon_testbench.cpp` (accuracy vs. NASA, results in `Testbench-Mond.md`), `Plan-Mondaufgang.md`.
 
 **`easter.py`** — Python script computing Easter dates (Meeus/Jones/Butcher algorithm) with a matplotlib visualization.
 
