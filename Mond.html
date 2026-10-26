@@ -612,7 +612,7 @@
                 { label: '1 Minute',           step: 60000 },
                 { label: '1 Stunde',           step: 3600000 },
                 { label: '1 Tag',              step: 86400000 },
-                { label: '1 Lunarer Tag',      step: 89428000000 },
+                { label: '1 Lunarer Tag',      step: 86400000*29.530589/28.530589 }, // ca. 24 h 50 min 28 s
                 { label: '1 siderischer Monat',step: 27.321661*86400000 },
                 { label: '1 synodischer Monat',step: 29.530589*86400000 },
             ]);
