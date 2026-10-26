@@ -167,10 +167,10 @@
             const seconds = remainingMinutes * 60;
             document.getElementById('siderealSeconds').value = seconds.toFixed(3);
 
-            const timeLocal = (time+longitude/15)%24;
-            const remainingHoursLocal = timeLocal - Math.floor(timeLocal);
-            const remainingMinutesLocal = remainingHoursLocal - Math.floor(remainingHoursLocal);
-            const secondsLocal = remainingMinutesLocal * 60;
+            // Lokale Sternzeit auf [0, 24) bringen (westliche Länge sonst negativ)
+            const timeLocal = (((time + longitude/15) % 24) + 24) % 24;
+            const minutesLocal = timeLocal * 60;
+            const secondsLocal = (minutesLocal - Math.floor(minutesLocal)) * 60;
 
             document.getElementById('siderealTimeLocal').innerHTML = hoursToString(timeLocal);
             document.getElementById('siderealSecondsLocal').innerHTML = secondsLocal.toFixed(3);
