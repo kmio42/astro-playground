@@ -492,6 +492,14 @@
 
             const moonRiseSet = calculateMoonRiseSet(julianDate, location);
 
+            //Nächstes Perigäum und Apogäum (Kapitel 48)
+            const nextPerigee = calculateNextMoonApsis(julianDate, ApsisType.Periapsis);
+            const nextApogee = calculateNextMoonApsis(julianDate, ApsisType.Apoapsis);
+
+            //Geozentrische Elongation aus ekliptikalen Koordinaten (Breite der Sonne ≈ 0), positiv: östlich der Sonne
+            const elongationSigned = normalizeAngleSigned(moonCoordinates.longitude - sunPosition.longitude);
+            const elongation = Math.acos(Math.cos(moonCoordinates.latitude) * Math.cos(elongationSigned));
+
             const moonRaDecRaw = calculateEquatorial(moonCoordinates, obliquity);
             const moonRaDec = calculateTopocentric(moonRaDecRaw, moonParallax, localSiderealTime, location);
 
@@ -518,10 +526,13 @@
                 { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(moonCoordinates.longitude)+' ('+normalizeDegrees(moonCoordinates.longitude*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Ekliptikale Breite', value: (moonCoordinates.latitude*RAD2DEG).toFixed(2)+'°' },
                 { type: 'row', key: 'Abstand zur Erde', value: Math.round(moonCoordinates.distance)+' km' },
+                { type: 'row', key: 'Nächstes Perigäum (erdnächster Punkt)', value: gregorianDateToString(julianDayToDate(nextPerigee.time)).slice(0, 16)+' UTC ('+Math.round(nextPerigee.distance)+' km)' },
+                { type: 'row', key: 'Nächstes Apogäum (erdfernster Punkt)', value: gregorianDateToString(julianDayToDate(nextApogee.time)).slice(0, 16)+' UTC ('+Math.round(nextApogee.distance)+' km)' },
                 { type: 'row', key: 'Abstand zur Ekliptik', value: Math.round(moonDistanceEcliptic)+' km' },
                 { type: 'row', key: 'Aufsteigender Knoten<br>(ekliptikale Länge)', value: radToDegString(ascendingNodeMoon)+' ('+normalizeDegrees(ascendingNodeMoon*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK)', value: normalizeDegrees(moonRaDecRaw.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDecRaw.dec*RAD2DEG).toFixed(4)+'°' },
                 { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK, scheinbar)', value: normalizeDegrees(moonRaDec.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDec.dec*RAD2DEG).toFixed(4)+'°' },
+                { type: 'row', key: 'Elongation (geozentrisch)', value: (elongation*RAD2DEG).toFixed(2)+'° '+(elongationSigned >= 0 ? 'östlich' : 'westlich')+' der Sonne' },
                 { type: 'row', key: 'Beleuchteter Anteil', value: (moonPhase*100).toFixed(2)+'%' },
                 { type: 'row', key: 'Positionswinkel Achse', value: radToDegString(moonAxis.positionAngle)+' ('+(moonAxis.positionAngle*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Positionswinkel heller Rand', value: radToDegString(moonRand)+' ('+(moonRand*RAD2DEG).toFixed(4)+'°)' },
@@ -655,7 +666,7 @@
             <li>Die dargestellte Mondbahn umfasst die Positionen des Mondes der letzten 13,5 Tage und der nächsten 13,5 Tage.</li>
             <li>Der Teil der Mondbahn, der unterhalb der Ekliptik liegt, ist gestrichelt dargestellt. Der Teil oberhalb der Ekliptik ist durchgezogen dargestellt.</li>
             <li>Der aufsteigende Knoten - der Punkt an dem der Mond die Ekliptik von "unten" nach "oben" schneidet - ist grün markiert.</li>
-            <li>Das Apogäum - der Punkt mit dem größten Abstand des Mondes von der Erde - ist auf der Mondbahn violett markiert (das zeitlich nächstgelegene Apogäum nach Meeus, Kapitel 48). Das Perigäum mit dem geringsten Abstand liegt in etwa gegenüber.</li>
+            <li>Das Apogäum - der Punkt mit dem größten Abstand des Mondes von der Erde - ist auf der Mondbahn violett markiert (das zeitlich nächstgelegene <a href="#Apsiden">Apogäum</a>). Das Perigäum mit dem geringsten Abstand liegt in etwa gegenüber.</li>
         </ul>
     <canvas id="moon" width="500" height="500"></canvas>
     <canvas id="moon1" width="500" height="500"></canvas>
@@ -699,6 +710,26 @@
             <td id="Parallaxe"><b>Parallaxe und scheinbare Äquatoriale Koordinaten (RA/DEK)</b></td>
             <td>Die scheinbaren äquatorialen Koordinaten berücksichtigen die Position des Beobachters auf der Erde.
                 Der Fehler, der durch die Annahme entsteht, dass der Beobachter sich im Erdmittelpunkt befindet, wird als Parallaxe bezeichnet.
+            </td>
+        </tr>
+        <tr>
+            <td id="Apsiden"><b>Perigäum und Apogäum</b></td>
+            <td>Da die Mondbahn eine Ellipse ist, schwankt der Abstand des Mondes zur Erde.
+                Der erdnächste Punkt der Bahn heißt <i>Perigäum</i> (ca. 356&nbsp;000 bis 370&nbsp;000 km), der erdfernste <i>Apogäum</i> (ca. 404&nbsp;000 bis 406&nbsp;700 km).
+                Von einem Perigäum zum nächsten vergeht im Mittel ein anomalistischer Monat (27,55 Tage). Weil die Sonne die Mondbahn stört, schwanken die tatsächlichen Abstände und Zeitpunkte deutlich, beim Perigäum stärker als beim Apogäum.
+                Fällt ein Vollmond in die Nähe des Perigäums, erscheint der Mond besonders groß („Supermond“).
+                Die Zeitpunkte und Entfernungen werden nach Meeus, Kapitel 48, berechnet: Ausgehend von einem mittleren Perigäum bzw. Apogäum werden periodische Korrekturen addiert.
+                Meeus gibt die Genauigkeit des Zeitpunkts mit bis zu 31 Minuten (Perigäum) bzw. 3 Minuten (Apogäum) an.
+                Die Bahnellipse selbst dreht sich: Die Linie Perigäum–Apogäum (Apsidenlinie) läuft in ca. 8,85 Jahren einmal herum.
+            </td>
+        </tr>
+        <tr>
+            <td id="Elongation"><b>Elongation</b></td>
+            <td>Die Elongation ist der Winkelabstand des Mondes von der Sonne, von der Erde aus gesehen (0° bis 180°).
+                Bei Neumond ist sie nahezu 0°, bei Halbmond etwa 90°, bei Vollmond nahezu 180°. Der beleuchtete Anteil der Mondscheibe hängt direkt von ihr ab.
+                Steht der Mond östlich der Sonne, ist er zunehmend und am Abendhimmel zu sehen; steht er westlich, ist er abnehmend und am Morgenhimmel zu sehen.
+                Weil die Mondbahn gegen die Ekliptik geneigt ist, wird die Elongation auch bei Neu- und Vollmond meist nicht genau 0° bzw. 180° - nur bei einer Finsternis.
+                Berechnet wird sie aus den geozentrischen ekliptikalen Koordinaten: cos ψ = cos β · cos(λ − λ<sub>Sonne</sub>).
             </td>
         </tr>
         <tr>
