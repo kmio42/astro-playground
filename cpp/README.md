@@ -141,7 +141,8 @@ std::printf("Höhe: %.2f°\n", hor.altitude.deg());
 std::printf("Azimut: %.2f° (von Nord)\n", (hor.azimuth + 180_deg).normalized().deg());
 std::printf("Zeitgleichung: %.2f min\n", calculateEquationOfTime(jd, true));
 
-// Auf-, Untergang und Meridiandurchgang, Zeiten in Stunden UT
+// Auf-, Untergang und Meridiandurchgang am UT-Tag, Zeiten in Stunden UT.
+// Mit drittem Argument utcOffset [h] gilt der Kalendertag dieser Zeitzone, Zeiten in Stunden seit dessen Beginn.
 const RiseTransitSet rts = calculateSunRiseSet(jd, berlin);
 if (rts.hasRise) printLocalTime("Sonnenaufgang", jd, rts.rise);
 printLocalTime("Höchster Stand", jd, rts.transit);

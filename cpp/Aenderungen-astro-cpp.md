@@ -43,6 +43,11 @@ mit benannten Feldern (`.x = …`) initialisiert werden. Gegen Referenzwerte get
 ### Sonnenauf-/-untergang (Kapitel 14)
 - Ergebnis enthält zusätzlich die Höhe beim Meridiandurchgang (`maxAltitude`).
 - Bei Polartag/Polarnacht wird der Meridiandurchgang trotzdem geliefert; bisher nur `valid = false` mit Nullen.
+- Vollständiges Verfahren aus Kapitel 14: α und δ aus drei Stützstellen interpoliert, Zeiten mit Δm verfeinert
+  (Abweichung von direkter Rechnung < 0,1 s, vorher bis zu 25 min in hohen Breiten). Auf-, Untergang und
+  Durchgang gelten nur, wenn sie in den Tag fallen (`hasRise`, `hasSet`, `hasTransit`), statt in den Tag
+  gefaltet zu werden.
+- Optionaler Parameter `utcOffset` [h] (auch bei `calculateMoonRiseSet`): Tag = Kalendertag dieser Zeitzone.
 
 ### Parallaxe / topozentrische Position (Kapitel 10, 39)
 - Höhe über dem Meeresspiegel aus `GeoLocation.elevation` (bisher fest 0).

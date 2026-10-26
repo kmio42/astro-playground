@@ -32,7 +32,7 @@ When changing an algorithm, change `astro.js` and `cpp/astro.cpp` together; thei
 
 **`render.js`** — small shared 3D rendering helpers: `createRotationMatrix(axle, angle)` and `multiplyMatrix(m1, m2)`. Used by the moon surface renderer in `Mond.html`.
 
-**`ui.js`** — shared UI state and formatting helpers (`radToDegString`, time formatting, common variables like `datetime`, `latitude`, `longitude` in degrees, `useLocalTime`). `getLocation()` turns the inputs into the location object for `astro.js`, `siderealTimeHours(jd)` gives Greenwich sidereal time in hours, `normalizeDegrees()` normalizes display values in degrees. Loaded after `astro.js` by the pages that opt into the shared modules.
+**`ui.js`** — shared UI state and formatting helpers (`radToDegString`, time formatting, common variables like `datetime`, `latitude`, `longitude` in degrees, `useLocalTime`). `getLocation()` turns the inputs into the location object for `astro.js`, `siderealTimeHours(jd)` gives Greenwich sidereal time in hours, `normalizeDegrees()` normalizes display values in degrees. `dayUtcOffset()` and `timeZoneLabel()` give the time zone for day-based values (rise/set) depending on the "Lokalzeit" checkbox; `calculateSunRiseSet()`/`calculateMoonRiseSet()` take it as optional third argument `utcOffset`. Loaded after `astro.js` by the pages that opt into the shared modules.
 
 **`cpp/astro.cpp` / `cpp/astro.h`** — C++ reimplementation of the same algorithms in the `astro::` namespace. Standalone, no build integration. `JulianDay` holds UT and applies ΔT (leap-second table) itself; `ASTRO_EXACT_DELTA_T=0` switches to a fixed 69.184 s. Also in `cpp/`: `moon_testbench.cpp` (accuracy vs. NASA, results in `Testbench-Mond.md`), `Plan-Mondaufgang.md`.
 

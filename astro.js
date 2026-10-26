@@ -521,46 +521,129 @@
     // ---------------------------------------------------------------
 
     /**
-     * Genäherte Zeiten von Sonnenaufgang, Meridiandurchgang und Sonnenuntergang, Formeln 14.1 und 14.2
-     * (ohne die Korrekturen Δm). Rektaszension und Deklination gelten für 0h UT.
-     * @param jd Julianischer Tag eines Zeitpunkts des gewünschten UT-Tags
-     * @param location Beobachtungsort
-     * @return { hasRise, hasSet, hasTransit, rise, set, transit [h UT], maxAltitude [rad] über h0,
-     *           maxAltitudeTime [h UT] }; bei Polartag oder Polarnacht weder Auf- noch Untergang
+     * 0h des Kalendertags, der jd enthält, in der Zeitzone utcOffset.
+     * @param jd Julianischer Tag (UT)
+     * @param utcOffset Abstand der Zeitzone zu UT [h], z. B. +1 für MEZ
+     * @return Julianischer Tag (UT) des Tagesbeginns
      */
-    function calculateSunRiseSet(jd, location) {
+    function localMidnight(jd, utcOffset) {
+        return julianDayMidnight(jd + utcOffset / 24) - utcOffset / 24;
+    }
+
+    // Stundenwinkel H (−π, π], Deklination und Höhe der Sonne zum Zeitpunkt m [Tagesbruchteile ab Tagesbeginn];
+    // α und δ aus den Stützstellen interpoliert (Formel 3.3), θ = θ0 + 360.985647°·m (Kapitel 14)
+    function sunStateAt(nodes, m, location) {
+        const ra = interpolate(nodes.ra[0], nodes.ra[1], nodes.ra[2], m);
+        const dec = interpolate(nodes.dec[0], nodes.dec[1], nodes.dec[2], m);
+        const theta = nodes.theta0 + 360.985647 * DEG2RAD * m + location.longitude;
+        const H = normalizeAngleSigned(theta - ra);
+        const phi = location.latitude;
+        const altitude = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H));
+        return { H, dec, altitude };
+    }
+
+    // Zeitpunkt m eines Ereignisses mit der Korrektur Δm verfeinern (Kapitel 14); null ohne Konvergenz.
+    // type: 0 Durchgang, −1 Aufgang, +1 Untergang
+    function refineSunEvent(nodes, m, location, h0, type) {
+        for (let i = 0; i < 10; i++) {
+            const s = sunStateAt(nodes, m, location);
+            const dm = (type === 0)
+                ? -s.H / (2 * Math.PI)
+                : (s.altitude - h0) / (2 * Math.PI * Math.cos(s.dec) * Math.cos(location.latitude) * Math.sin(s.H));
+            if (!isFinite(dm) || Math.abs(dm) > 0.5) return null;
+            m += dm;
+            if (Math.abs(dm) < 1e-7) {
+                // Aufgang östlich (H < 0), Untergang westlich (H > 0) des Meridians
+                const sideOk = type === 0 || (type < 0 ? s.H < 0 : s.H > 0);
+                return sideOk ? m : null;
+            }
+        }
+        return null;
+    }
+
+    // Ereignis innerhalb des Tages (0 ≤ m < 1) suchen; der Startwert gilt modulo 1, daher auch m ± 1 versuchen
+    function sunEventInDay(nodes, mStart, location, h0, type) {
+        for (const shift of [0, -1, 1]) {
+            const m = refineSunEvent(nodes, mStart + shift, location, h0, type);
+            if (m !== null && m >= 0 && m < 1) return m;
+        }
+        return null;
+    }
+
+    /**
+     * Sonnenaufgang, Meridiandurchgang und Sonnenuntergang nach Kapitel 14: Startwerte nach Formeln 14.1
+     * und 14.2, α und δ aus drei Stützstellen (Tagesbeginn −1, 0, +1 Tag) interpoliert und die Zeiten
+     * mit der Korrektur Δm verfeinert. Ein Ereignis gilt nur, wenn es innerhalb des Tages liegt; liegt es
+     * knapp davor oder danach, gehört es zum Vor- oder Folgetag.
+     * @param jd Julianischer Tag eines Zeitpunkts des gewünschten Tages
+     * @param location Beobachtungsort
+     * @param utcOffset Zeitzone des Tages [h], ohne Angabe 0 (UT-Tag)
+     * @return { hasRise, hasSet, hasTransit, rise, set, transit [h seit Tagesbeginn], maxAltitude [rad] über h0,
+     *           maxAltitudeTime [h seit Tagesbeginn] }; bei Polartag oder Polarnacht weder Auf- noch Untergang
+     */
+    function calculateSunRiseSet(jd, location, utcOffset = 0) {
         const phi = location.latitude;
 
         // Standardhöhe der Sonne h0 = −0°50′
         const h0 = -0.8333 * DEG2RAD;
 
-        const midnight = julianDayMidnight(jd);
-        const sun = calculateEquatorial(calculateSunPosition(midnight), calculateObliquity(midnight));
-        const theta0 = calculateGreenwichSiderealTime(midnight);
-
-        // Formel 14.2, Durchgang m0 = (α + L − θ0)/360° in Tagesbruchteilen; die Länge L zählt im Buch West positiv
-        const m0 = normalizeAngle(sun.ra - location.longitude - theta0) / (2 * Math.PI);
-
-        // Höhe beim Durchgang, Formel 12.6 mit H = 0
-        const transitAltitude = Math.asin(Math.sin(phi) * Math.sin(sun.dec) + Math.cos(phi) * Math.cos(sun.dec));
-
-        const result = {
-            hasRise: false, hasSet: false, hasTransit: true,
-            rise: 0, set: 0, transit: m0 * 24,
-            maxAltitude: transitAltitude - h0, maxAltitudeTime: m0 * 24,
+        // Stützstellen am Tagesbeginn sowie einen Tag davor und danach; α stetig fortgesetzt
+        const start = localMidnight(jd, utcOffset);
+        const equ = [-1, 0, 1].map(d => calculateEquatorial(calculateSunPosition(start + d), calculateObliquity(start + d)));
+        const nodes = {
+            ra: equ.map(e => equ[1].ra + normalizeAngleSigned(e.ra - equ[1].ra)),
+            dec: equ.map(e => e.dec),
+            theta0: calculateGreenwichSiderealTime(start),
         };
 
-        // Formel 14.1; außerhalb [−1, 1] Polartag oder Polarnacht
-        const cosH0 = (Math.sin(h0) - Math.sin(phi) * Math.sin(sun.dec)) / (Math.cos(phi) * Math.cos(sun.dec));
-        if (cosH0 < -1 || cosH0 > 1) {
+        // Formel 14.2, Durchgang m0 = (α + L − θ0)/360° in Tagesbruchteilen; die Länge L zählt im Buch West positiv
+        const m0 = normalizeAngle(nodes.ra[1] - location.longitude - nodes.theta0) / (2 * Math.PI);
+
+        const result = {
+            hasRise: false, hasSet: false, hasTransit: false,
+            rise: 0, set: 0, transit: 0, maxAltitude: 0, maxAltitudeTime: 0,
+        };
+
+        // Durchgang und höchster Stand; ohne Durchgang im Tag liegt der höchste Stand am Tagesrand
+        const transit = sunEventInDay(nodes, m0, location, h0, 0);
+        if (transit !== null) {
+            result.hasTransit = true;
+            result.transit = transit * 24;
+            result.maxAltitude = sunStateAt(nodes, transit, location).altitude - h0;
+            result.maxAltitudeTime = transit * 24;
+        } else {
+            const atStart = sunStateAt(nodes, 0, location).altitude;
+            const atEnd = sunStateAt(nodes, 1, location).altitude;
+            result.maxAltitude = Math.max(atStart, atEnd) - h0;
+            result.maxAltitudeTime = atStart >= atEnd ? 0 : 24;
+        }
+
+        // Formel 14.1 mit δ beim Durchgang, zu Beginn und am Ende des Tages. δ ändert sich innerhalb eines
+        // Tages monoton: Liegt cos H0 an allen drei Stellen außerhalb [−1, 1], ist Polartag oder Polarnacht.
+        // Sonst liefert die erste Stelle innerhalb [−1, 1] den Startwert (am Übergang zum Polartag bzw.
+        // zur Polarnacht nur der Tagesbeginn oder das Tagesende).
+        const cosH0At = (m) => {
+            const dec = interpolate(nodes.dec[0], nodes.dec[1], nodes.dec[2], m);
+            return (Math.sin(h0) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec));
+        };
+        const cosH0 = [cosH0At(m0), cosH0At(0), cosH0At(1)].find(c => c >= -1 && c <= 1);
+        if (cosH0 === undefined) {
             return result;
         }
         const H0 = Math.acos(cosH0) / (2 * Math.PI);
 
-        // Formel 14.2, Aufgang m1 und Untergang m2 in Tagesbruchteilen
-        result.hasRise = result.hasSet = true;
-        result.rise = ((m0 - H0 + 1) % 1) * 24;
-        result.set = ((m0 + H0 + 1) % 1) * 24;
+        // Formel 14.2, Aufgang m1 und Untergang m2 in Tagesbruchteilen, dann verfeinert
+        const m1 = m0 - H0, m2 = m0 + H0;
+        const rise = sunEventInDay(nodes, m1 - Math.floor(m1), location, h0, -1);
+        const set = sunEventInDay(nodes, m2 - Math.floor(m2), location, h0, 1);
+        if (rise !== null) {
+            result.hasRise = true;
+            result.rise = rise * 24;
+        }
+        if (set !== null) {
+            result.hasSet = true;
+            result.set = set * 24;
+        }
         return result;
     }
 
@@ -1257,16 +1340,19 @@
     }
 
     /**
-     * Mondauf- und -untergang, Meridiandurchgang und höchster Stand für den UT-Tag, der jd enthält.
+     * Mondauf- und -untergang, Meridiandurchgang und höchster Stand für den Tag (UT oder Zeitzone utcOffset),
+     * der jd enthält.
      * Die Mondhöhe wird stündlich berechnet. Für jedes Stundenintervall [k, k+1] wird eine Parabel durch
      * die Stützstellen k, k+1, k+2 gelegt, mit der Horizont- und Meridiandurchgänge sowie der Scheitel
      * innerhalb des Intervalls bestimmt werden.
      * @param jd Julianischer Tag
      * @param location Beobachtungsort
-     * @return { hasRise, hasSet, hasTransit, rise, set, transit [h UT], maxAltitude [rad] über h0, maxAltitudeTime [h UT] }
+     * @param utcOffset Zeitzone des Tages [h], ohne Angabe 0 (UT-Tag)
+     * @return { hasRise, hasSet, hasTransit, rise, set, transit [h seit Tagesbeginn], maxAltitude [rad] über h0,
+     *           maxAltitudeTime [h seit Tagesbeginn] }
      */
-    function calculateMoonRiseSet(jd, location) {
-        const midnight = julianDayMidnight(jd);
+    function calculateMoonRiseSet(jd, location, utcOffset = 0) {
+        const midnight = localMidnight(jd, utcOffset);
         const sampleAt = (hour) => sampleMoon(midnight + hour / 24, location);
 
         // Gleitendes Fenster aus drei aufeinanderfolgenden Stunden k, k+1, k+2

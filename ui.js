@@ -28,6 +28,25 @@
             return calculateGreenwichSiderealTime(jd) * 12 / Math.PI;
         }
 
+        /**
+         * Zeitzone der Tageswerte (Auf-/Untergang usw.): Abstand zu UT [h], 0 ohne Lokalzeit.
+         * Gilt für den eingestellten Zeitpunkt; an Tagen mit Zeitumstellung ist der Tag deshalb nicht
+         * exakt der Kalendertag der Lokalzeit.
+         */
+        function dayUtcOffset() {
+            return useLocalTime ? -datetime.getTimezoneOffset() / 60 : 0;
+        }
+
+        /**
+         * Bezeichnung der Zeitzone für die Ausgabe, z. B. "UTC" oder "MESZ"
+         */
+        function timeZoneLabel() {
+            if (!useLocalTime) return 'UTC';
+            const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short' })
+                .formatToParts(datetime).find(p => p.type === 'timeZoneName');
+            return part ? part.value : 'Lokalzeit';
+        }
+
     /////////////////////////////////////////////////////////////////
     //              Formatierungsfunktionen                        //
     /////////////////////////////////////////////////////////////////
@@ -430,6 +449,7 @@
             document.getElementById('localTime').addEventListener('change', function () {
                 useLocalTime = this.checked;
                 fillGregorianDate(datetime);
+                update();   // Tageswerte gelten jetzt für den Kalendertag der Lokalzeit
             });
             loadData();
             datetime = new Date();

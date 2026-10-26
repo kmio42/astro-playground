@@ -23,7 +23,7 @@
  * 11  Sternzeit in Greenwich                       11.1, 11.4                calculateGreenwichSiderealTime
  * 12  Umwandeln von Koordinaten                    12.3–12.6                 calculateEquatorial, calculateHorizontal
  * 13  Der parallaktische Winkel                    13.1                      calculateParallacticAngle
- * 14  Aufgang, Durchgang, Untergang (Sonne; h0)    14.1, 14.2                calculateSunRiseSet
+ * 14  Aufgang, Durchgang, Untergang (Sonne; h0)    14.1, 14.2, Δm            calculateSunRiseSet
  * 21  Schiefe der Ekliptik (ohne Nutation)         21.2                      calculateObliquity
  * 24  Koordinaten der Sonne (niedrige Genauigk.)   24.1–24.5                 calculateSunPosition, calculateEarthEccentricity
  * 26  Äquinoktien und Solstitien                   Tab. 26.2, 26.3           calculateEquinoxSolstice
@@ -283,17 +283,18 @@ struct MoonOrientation {
     Angle positionAngle;        // Positionswinkel der Mondachse P
 };
 
-// Aufgang, Meridiandurchgang, Untergang und höchster Stand eines Himmelskörpers an einem UT-Tag.
+// Aufgang, Meridiandurchgang, Untergang und höchster Stand eines Himmelskörpers an einem Tag
+// (UT-Tag oder Kalendertag einer Zeitzone, Zeiten in Stunden seit dessen Beginn).
 // Ohne Auf- und Untergang steht der Körper den ganzen Tag über (maxAltitude > 0) oder unter dem Horizont.
 struct RiseTransitSet {
-    bool   hasRise;         // Aufgang an diesem UT-Tag
-    bool   hasSet;          // Untergang an diesem UT-Tag
-    bool   hasTransit;      // Meridiandurchgang (Stundenwinkel 0) an diesem UT-Tag
-    double rise;            // Aufgang [h UT]
-    double set;             // Untergang [h UT]
-    double transit;         // Meridiandurchgang [h UT]
+    bool   hasRise;         // Aufgang an diesem Tag
+    bool   hasSet;          // Untergang an diesem Tag
+    bool   hasTransit;      // Meridiandurchgang (Stundenwinkel 0) an diesem Tag
+    double rise;            // Aufgang [h]
+    double set;             // Untergang [h]
+    double transit;         // Meridiandurchgang [h]
     Angle  maxAltitude;     // Höchste Höhe über der Standardhöhe h0
-    double maxAltitudeTime; // Zeitpunkt der höchsten Höhe [h UT]
+    double maxAltitudeTime; // Zeitpunkt der höchsten Höhe [h]
 };
 
 // Apsiden einer Bahn: Perigäum/Apogäum (Mond, Kapitel 48), Perihel/Aphel (Planeten, Kapitel 37)
@@ -350,9 +351,9 @@ Equatorial calculateTopocentric(const Equatorial& equ, Angle parallax, SiderealT
 // Interpolation
 double interpolate(double y1, double y2, double y3, double n);
 
-// Auf-/Untergang
-RiseTransitSet calculateSunRiseSet(JulianDay jd, const GeoLocation& location);
-RiseTransitSet calculateMoonRiseSet(JulianDay jd, const GeoLocation& location);
+// Auf-/Untergang am Tag, der jd enthält; utcOffset [h] wählt den Kalendertag einer Zeitzone (0: UT-Tag)
+RiseTransitSet calculateSunRiseSet(JulianDay jd, const GeoLocation& location, double utcOffset = 0.0);
+RiseTransitSet calculateMoonRiseSet(JulianDay jd, const GeoLocation& location, double utcOffset = 0.0);
 
 // Solstitien und Äquinoktien (UT), Perihel/Aphel der Erde
 JulianDay calculateEquinoxSolstice(int year, EquinoxType type);

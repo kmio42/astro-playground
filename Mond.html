@@ -490,7 +490,7 @@
             const moonAxis = calculateMoonOrientation(julianDate, moonCoordinates);
             const moonParallax = Math.asin(EARTH_RADIUS/moonCoordinates.distance);
 
-            const moonRiseSet = calculateMoonRiseSet(julianDate, location);
+            const moonRiseSet = calculateMoonRiseSet(julianDate, location, dayUtcOffset());
 
             //Nächstes Perigäum und Apogäum (Kapitel 48)
             const nextPerigee = calculateNextMoonApsis(julianDate, ApsisType.Periapsis);
@@ -511,11 +511,12 @@
             const moonParallacticAngle = calculateParallacticAngle(moonRaDec, localSiderealTime, location);
 
             //Sonnenauf- und Untergang
-            const sunriseSet = calculateSunRiseSet(julianDate, location);
+            const sunriseSet = calculateSunRiseSet(julianDate, location, dayUtcOffset());
 
             //Tabellen-Ausgabe
 
             const raDec = sunRaDec;
+            const tz = ' ' + timeZoneLabel();
 
             const tableData = [
                 { type: 'category', text: 'Sonne' },
@@ -540,16 +541,16 @@
                 { type: 'category', text: 'Ortsbezogene Daten' },
                 { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Höhe Sonne', value: (sunAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
-                { type: 'row', key: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise)+' UTC' : '-' },
-                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: hoursToString(sunriseSet.transit)+' UTC' },
-                { type: 'row', key: 'Sonnenuntergang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set)+' UTC' : '-' },
+                { type: 'row', key: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise)+tz : '-' },
+                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: sunriseSet.hasTransit ? hoursToString(sunriseSet.transit)+tz : '-' },
+                { type: 'row', key: 'Sonnenuntergang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set)+tz : '-' },
                 { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
                 { type: 'row', key: 'Mond \u2013 parallaktischer Winkel', value: (moonParallacticAngle*RAD2DEG).toFixed(2)+'°' },
-                { type: 'row', key: 'Mondaufgang', value: moonRiseSet.hasRise ? hoursToString(moonRiseSet.rise)+' UTC' : '-' },
-                { type: 'row', key: 'Monddurchgang', value: moonRiseSet.hasTransit ? hoursToString(moonRiseSet.transit)+' UTC' : '-' },
-                { type: 'row', key: 'Kulmination', value: hoursToString(moonRiseSet.maxAltitudeTime)+' UTC' },
-                { type: 'row', key: 'Monduntergang', value: moonRiseSet.hasSet ? hoursToString(moonRiseSet.set)+' UTC' : '-' },
+                { type: 'row', key: 'Mondaufgang', value: moonRiseSet.hasRise ? hoursToString(moonRiseSet.rise)+tz : '-' },
+                { type: 'row', key: 'Monddurchgang', value: moonRiseSet.hasTransit ? hoursToString(moonRiseSet.transit)+tz : '-' },
+                { type: 'row', key: 'Kulmination', value: hoursToString(moonRiseSet.maxAltitudeTime)+tz },
+                { type: 'row', key: 'Monduntergang', value: moonRiseSet.hasSet ? hoursToString(moonRiseSet.set)+tz : '-' },
             ];
             renderOutputTable('outputTable', tableData);
 
@@ -730,6 +731,61 @@
                 Steht der Mond östlich der Sonne, ist er zunehmend und am Abendhimmel zu sehen; steht er westlich, ist er abnehmend und am Morgenhimmel zu sehen.
                 Weil die Mondbahn gegen die Ekliptik geneigt ist, wird die Elongation auch bei Neu- und Vollmond meist nicht genau 0° bzw. 180° - nur bei einer Finsternis.
                 Berechnet wird sie aus den geozentrischen ekliptikalen Koordinaten: cos ψ = cos β · cos(λ − λ<sub>Sonne</sub>).
+            </td>
+        </tr>
+        <tr>
+            <td id="Durchgang"><b>Monddurchgang und Kulmination</b></td>
+            <td>Der <i>Monddurchgang</i> (Meridiandurchgang) ist der Zeitpunkt, zu dem der Mond den Meridian des Beobachtungsortes überquert:
+                Er steht dann genau im Süden (auf der Südhalbkugel im Norden), sein Stundenwinkel ist 0. Der Durchgang ist also über die Richtung definiert.
+                Die <i>Kulmination</i> ist hier der Zeitpunkt, zu dem der Mond seine größte Höhe über dem Horizont erreicht - sie ist über die Höhe definiert.
+                <br>
+                Bei einem Fixstern fallen beide Zeitpunkte zusammen, weil sich seine Deklination nicht ändert.
+                Der Mond dagegen ändert seine Deklination innerhalb eines Monats um bis zu ca. ±28°, also um bis zu ca. 0,3° pro Stunde.
+                Bewegt er sich dabei auf den Zenit des Beobachters zu, steigt er nach dem Durchgang noch kurz weiter, die Kulmination folgt dem Durchgang;
+                bewegt er sich vom Zenit weg, liegt die Kulmination kurz davor.
+                Der Unterschied beträgt in mittleren Breiten nur wenige Minuten (in Berlin bis ca. 6 Minuten), in der Nähe des Äquators etwas mehr, weil die Höhe dort um den Meridian herum nur sehr langsam zu- und abnimmt.
+                <br>
+                Da ein <a href="#LunarerTag">lunarer Tag</a> ca. 24 Stunden 50 Minuten dauert, kommt der Mond jeden Tag später in den Meridian. Etwa einmal im Monat fällt der Durchgang deshalb in keinen Kalendertag - in der Tabelle steht dann „-“.
+                <br>
+                Die Kulmination wird immer angegeben, als höchster Stand <i>innerhalb des angezeigten Tages</i>. Das ist nicht in jedem Fall eine Kulmination im eigentlichen Sinn:
+                <ul>
+                    <li>Gibt es an dem Tag keinen Durchgang, liegt der höchste Stand am Anfang oder Ende des Tages (0:00 oder 24:00 Uhr, siehe <a href="#Tageszeiten">Zeitangaben</a>).
+                        Das kann auch an Tagen mit Durchgang passieren: Steigt die Deklination schnell, steht der Mond kurz vor dem nächsten Durchgang um 24 Uhr höher als beim Durchgang am frühen Morgen
+                        (z. B. in Berlin am 2.7.2026, UTC: Durchgang um 0:48 Uhr, höchster Stand um 24:00 Uhr).
+                        In Berlin liegt der höchste Stand an rund 25 Tagen im Jahr am Tagesrand.</li>
+                    <li>Auch wenn der Mond den ganzen Tag unter dem Horizont bleibt, wird eine Kulmination angegeben - dann der Zeitpunkt, an dem er dem Horizont am nächsten kommt.
+                        Das kommt nur in hohen Breiten vor, z. B. in Tromsø an rund 90 Tagen im Jahr; Auf- und Untergang stehen dann auf „-“.</li>
+                </ul>
+                Beide Zeitpunkte werden für den Erdmittelpunkt (geozentrisch) berechnet.
+            </td>
+        </tr>
+        <tr>
+            <td id="Tageszeiten"><b>Zeitangaben: 0 Uhr und 24 Uhr</b></td>
+            <td>Auf- und Untergänge, Durchgänge und Kulmination werden für den Kalendertag berechnet, der den eingestellten Zeitpunkt enthält:
+                ohne „Lokalzeit“ für den Tag in Weltzeit (UTC), mit „Lokalzeit“ für den Kalendertag in der Zeitzone des Browsers; die Zeiten werden dann auch in Lokalzeit angegeben (z. B. MEZ oder MESZ).
+                Der Tag reicht von <i>0:00 Uhr</i> (Anfang des Tages) bis <i>24:00 Uhr</i> (Ende des Tages).
+                24:00 Uhr ist derselbe Zeitpunkt wie 0:00 Uhr des Folgetags, wird aber bewusst so angezeigt: So ist erkennbar, dass ein Wert am Ende und nicht am Anfang des angezeigten Tages liegt.
+                <br>
+                Genau 0:00 oder 24:00 Uhr erscheint praktisch nur bei der Kulmination des Mondes, wenn der höchste Stand des Tages am Tagesrand liegt: Um 0:00 Uhr sinkt der Mond bereits, oder um 24:00 Uhr steigt er noch.
+                Das ist dann keine Kulmination im eigentlichen Sinn, sondern nur die größte Höhe innerhalb des Tages; die eigentliche Kulmination liegt am Vor- oder Folgetag.
+                Minuten werden abgerundet, ein Ereignis um 23:59:40 Uhr wird also als 23:59 angezeigt.
+                <br>
+                Ein Ereignis wird nur angezeigt, wenn es in den Tag fällt; sonst steht „-“ in der Tabelle.
+                Die Reihenfolge ist dabei nicht festgelegt: Ein Untergang kann vor dem Aufgang liegen, wenn der Körper beim Tagesbeginn schon über dem Horizont steht.
+                Beim Mond ist das etwa jeden zweiten Tag so, bei der Sonne nur in Weltzeit fern von Greenwich
+                (z. B. Sydney: Untergang gegen 7:00 UTC, Aufgang gegen 21:00 UTC; in Lokalzeit liegt der Aufgang wieder vor dem Untergang).
+                <br>
+                Ohne „Lokalzeit“ ist der Tag gegenüber der Ortszeit verschoben: In Mitteleuropa beginnt der UTC-Tag um 1:00 Uhr (MEZ) bzw. 2:00 Uhr (MESZ).
+                Ein Mondaufgang um 23:30 UTC findet nach Ortszeit also schon am nächsten Kalendertag statt.
+                Mit „Lokalzeit“ gilt der Abstand zur Weltzeit des eingestellten Zeitpunkts für den ganzen Tag.
+                An den Tagen der Zeitumstellung können Ereignisse vor der Umstellung (zwischen 0 und 3 Uhr) deshalb um eine Stunde verschoben angezeigt werden.
+            </td>
+        </tr>
+        <tr>
+            <td id="LunarerTag"><b>Lunarer Tag</b></td>
+            <td>Der lunare Tag ist die Zeit zwischen zwei aufeinanderfolgenden Monddurchgängen, im Mittel ca. 24 Stunden 50 Minuten.
+                Er ist länger als ein Sonnentag, weil der Mond auf seiner Bahn täglich um ca. 12° nach Osten weiterwandert und die Erde sich entsprechend weiter drehen muss, bis er wieder im Meridian steht.
+                Die Dauer ergibt sich aus dem synodischen Monat: 24 h · 29,53 / 28,53.
             </td>
         </tr>
         <tr>

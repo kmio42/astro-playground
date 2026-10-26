@@ -448,7 +448,8 @@
             //console.log(springEquinoxLength*RAD2DEG,orbitLengthEarth*RAD2DEG,(springEquinoxLength-orbitLengthEarth)*RAD2DEG);
 
             //Sonnenauf- und Untergang
-            const sunriseSet = calculateSunRiseSet(julianDate, location);
+            const sunriseSet = calculateSunRiseSet(julianDate, location, dayUtcOffset());
+            const tz = ' ' + timeZoneLabel();
 
             //Tabellen-Ausgabe
 
@@ -481,9 +482,9 @@
                 { type: 'category', text: 'Ortsbezogene Daten' },
                 { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Höhe Sonne', value: (sunAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
-                { type: 'row', key: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise) : '-' },
-                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: hoursToString(sunriseSet.transit) },
-                { type: 'row', key: 'Sonnenuntergang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set) : '-' },
+                { type: 'row', key: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise)+tz : '-' },
+                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: sunriseSet.hasTransit ? hoursToString(sunriseSet.transit)+tz : '-' },
+                { type: 'row', key: 'Sonnenuntergang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set)+tz : '-' },
                 { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
             ];
