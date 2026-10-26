@@ -77,38 +77,34 @@
                 }
             }
 
+            // Bahnpunkt im Koordinatensystem der Mondbahn-Grafik
+            function moonOrbitPoint(moonCoordinates) {
+                const radius = moonCoordinates.distance/MOON_ORBIT_RADIUS*moon.orbit.radius;
+                return {
+                    x: Math.cos(moonCoordinates.longitude + Math.PI) * radius,
+                    y: moonCoordinates.latitude,
+                    z: Math.sin(moonCoordinates.longitude + Math.PI) * radius
+                };
+            }
+
+            // Apogäum, das jd am nächsten liegt (Kapitel 48), und seine Position auf der Mondbahn
+            function calculateApogee(jd) {
+                const next = calculateNextMoonApsis(jd, ApsisType.Apoapsis);
+                // Abstand zweier Apogäen liegt deutlich unter 32 Tagen, zwei Abstände deutlich darüber
+                const previous = calculateNextMoonApsis(next.time - 32, ApsisType.Apoapsis);
+                const apogee = (next.time - jd < jd - previous.time) ? next : previous;
+                return { time: apogee.time, point: moonOrbitPoint(calculateMoonPosition(apogee.time)) };
+            }
+
             function calculateMoonOrbit(jd) {
                 const stepsize = .5;
                 let polygonLine = [];
 
                 let lastCoordinate = null;
-                let pointMin = undefined; let max = 0;
-                let pointMax = undefined; let min = Math.Infinity;
                 for(let i = -13.8; i < 13.8; i+=stepsize) {
                     const julianDate = jd + i;
 
                     const moonCoordinates = calculateMoonPosition(julianDate);
-
-                    if(pointMin === undefined || moonCoordinates.distance < min) {
-                        min = moonCoordinates.distance;
-                        const radius = moonCoordinates.distance/MOON_ORBIT_RADIUS*moon.orbit.radius;
-
-                        pointMin = {
-                            x: Math.cos(moonCoordinates.longitude + Math.PI) * radius,
-                            y: moonCoordinates.latitude,
-                            z: Math.sin(moonCoordinates.longitude + Math.PI) * radius
-                        };
-                    }
-                    if(pointMax === undefined || moonCoordinates.distance > max) {
-                        max = moonCoordinates.distance;
-                        const radius = moonCoordinates.distance/MOON_ORBIT_RADIUS*moon.orbit.radius;
-
-                        pointMax = {
-                            x: Math.cos(moonCoordinates.longitude + Math.PI) * radius,
-                            y: moonCoordinates.latitude,
-                            z: Math.sin(moonCoordinates.longitude + Math.PI) * radius
-                        };
-                    }
 
                     if(lastCoordinate !== null && lastCoordinate.latitude <= 0 && moonCoordinates.latitude > 0) {
                         //Schnittpunkt mit xz-Ebene berechnen
@@ -126,18 +122,11 @@
                         polygonLine.push(point);
                     }
 
-                    const radius = moonCoordinates.distance/MOON_ORBIT_RADIUS*moon.orbit.radius;
-
-                    const point = {
-                    x: Math.cos(moonCoordinates.longitude + Math.PI) * radius,
-                    y: moonCoordinates.latitude,
-                    z: Math.sin(moonCoordinates.longitude + Math.PI) * radius
-                    };
-                    polygonLine.push(point);
+                    polygonLine.push(moonOrbitPoint(moonCoordinates));
 
                     lastCoordinate = moonCoordinates;
                 }
-                return {polygonLine,pointMin,pointMax};
+                return polygonLine;
             }
 
             function drawEarthWithIndicatorAndMoon(ctx, radius, eclipticalLength, vernalPoint, indicatorDirection, moonCoordinates, ascendingNodeMoon) {
@@ -259,13 +248,12 @@
             ctx.save();
             ctx.rotate(-springEquinoxLength);
 
-            const moonOrbit = calculateMoonOrbit(julianDate);
+            drawPolygonLine(ctx, calculateMoonOrbit(julianDate), 'black', false);
 
-            drawPolygonLine(ctx, moonOrbit.polygonLine, 'black', false);
-
+            const apogee = calculateApogee(julianDate);
             ctx.fillStyle = 'violet';
             ctx.beginPath();
-            ctx.arc(moonOrbit.pointMax.x, -moonOrbit.pointMax.z, 5, 0, Math.PI*2,false);
+            ctx.arc(apogee.point.x, -apogee.point.z, 5, 0, Math.PI*2,false);
             ctx.fill();
             ctx.closePath();
 
@@ -667,7 +655,7 @@
             <li>Die dargestellte Mondbahn umfasst die Positionen des Mondes der letzten 13,5 Tage und der nächsten 13,5 Tage.</li>
             <li>Der Teil der Mondbahn, der unterhalb der Ekliptik liegt, ist gestrichelt dargestellt. Der Teil oberhalb der Ekliptik ist durchgezogen dargestellt.</li>
             <li>Der aufsteigende Knoten - der Punkt an dem der Mond die Ekliptik von "unten" nach "oben" schneidet - ist grün markiert.</li>
-            <li>Der maximale Abstand des Mondes von der Erde ist auf der Mondbahn violett markiert. Entsprechend ist der geringste Abstand in etwa gegenübergesetzt.</li>
+            <li>Das Apogäum - der Punkt mit dem größten Abstand des Mondes von der Erde - ist auf der Mondbahn violett markiert (das zeitlich nächstgelegene Apogäum nach Meeus, Kapitel 48). Das Perigäum mit dem geringsten Abstand liegt in etwa gegenüber.</li>
         </ul>
     <canvas id="moon" width="500" height="500"></canvas>
     <canvas id="moon1" width="500" height="500"></canvas>
