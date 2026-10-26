@@ -552,7 +552,7 @@
     <h1>Sternzeit und Erdposition</h1>
     <p>Inspiriert von der Frage, welche Bahn die Sonne am Himmel zieht und wann sie untergeht, ist dieses kleine Erde-Sonne-Modell entstanden. Aus einer externen Perspektive lassen sich die Auswirkungen der Erdrotation, der geneigten Erdachse und der elliptischen Bewegung um die Sonne deutlich besser verstehen und nachvollziehen als aus der Sicht der bewegten Erde selbst. Neben der Betrachtung der Sonnenbahn ist die Ausrichtung von Erde und Sonne auch entscheidend für die sichtbaren Sternbilder im Verlauf des Jahres und dient als Orientierung im Universum.
     </p>
-    <p>Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Alle Angaben beziehen sich auf Weltzeit (UTC), Zeitverschiebung und Sommerzeit werden nicht berücksichtigt. Die Knöpfe für Modifikation der Zeit können gedrückt gehalten werden.</p>
+    <p>Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Die Angaben beziehen sich auf Weltzeit (UTC). Mit „Lokalzeit“ werden Datum und Uhrzeit sowie Sonnenauf-, -untergang und -durchgang in der Zeitzone des Browsers angegeben (einschließlich Sommerzeit); Auf-, Untergang und Durchgang gelten dann für den lokalen Kalendertag. Die Knöpfe für Modifikation der Zeit können gedrückt gehalten werden.</p>
 
     <div id="locationControls"></div>
 <p></p>
@@ -645,12 +645,22 @@ Das Frühlingsäquinoktium ist der wichtigste Bezugspunkt im astronomischen Jahr
 <tr>
 <td valign="top">Sonnenaufgang/ Sonnenuntergang</td>
 <td>Sonnenaufgang ist der Moment an dem die Sonne gerade so sichtbar wird, Sonnenuntergang der Moment, an dem sie gerade so verschwindet. Durch Lichtbrechung (Refraktion) befindet sich die Sonne in Wirklichkeit schon unterhalb des Horizontes, obwohl sie noch sichtbar ist. Der Effekt ist unter anderem abhängig von der Lufttemperatur, Druck und Höhe des Beobachters und sorgt für kleine Abweichungen . Neben dem Begriff der Sonnenauf- und Untergänge, gibt es noch verschiedene Phasen der Dämmerung: Bürgerliche Dämmerung, nautische Dämmerung und astronomische Dämmerung.
-Sonnenauf- und Untergang sind symmetrisch zum Sonnendurchgang.
+<br>
+Sonnenauf- und Untergang liegen nahezu symmetrisch zum Sonnendurchgang. Weil sich die Deklination der Sonne im Lauf des Tages ändert, nicht exakt: In Berlin beträgt der Unterschied bis zu ca. 1 Minute, in Polarnähe deutlich mehr.
+<br>
+Berechnet werden die Zeitpunkte nach Meeus, Kapitel 14: Startwerte aus den Formeln 14.1 und 14.2, Rektaszension und Deklination der Sonne aus drei Tageswerten interpoliert und die Zeitpunkte schrittweise mit der Korrektur Δm verfeinert.
+Die Rechnung ist damit auf unter 1 Sekunde genau; die tatsächliche Refraktion weicht je nach Wetter so stark ab, dass Auf- und Untergang in der Praxis um bis zu etwa eine Minute variieren.
+<br>
+Angezeigt wird ein Ereignis nur, wenn es in den angezeigten Tag fällt (UTC-Tag oder mit „Lokalzeit“ der lokale Kalendertag), sonst steht „-“ in der Tabelle.
+Das betrifft Polartag und Polarnacht, aber auch die Tage des Übergangs: Dann gibt es nur einen Untergang oder nur einen Aufgang (z. B. in Tromsø am 16.5.2026 in MESZ nur einen Aufgang um 1:31 Uhr - der Untergang davor lag noch am Vortag, danach beginnt der Polartag bis zum 26.7.;
+in UTC am 29.7.2026 nur einen Untergang um 21:37 Uhr, weil der folgende Aufgang erst nach Mitternacht liegt).
+In Weltzeit kann an Orten fern von Greenwich der Untergang vor dem Aufgang liegen (z. B. Sydney: Untergang gegen 7:00 UTC, Aufgang gegen 21:00 UTC), in Lokalzeit nicht.
 </td>
 </tr>
 <tr>
 <td valign="top">Sonnendurchgang</td>
-<td>Sonnendurchgang bezeichnet den Moment, in dem die Sonne den höchsten Punkt ihrer täglichen Bahn am Himmel erreicht. Dies wird auch als Kulmination der Sonne bezeichnet, der Meridian (Längengrad des Beobachters) ist dann genau zur Sonne ausgerichtet. Der Sonnendurchgang (in Weltzeit) ergibt sich aus der Zeitgleichung und der geographischen Länge des Beobachters. In lokaler Zeit sind noch Zeitzonen zu berücksichtigen.
+<td>Sonnendurchgang bezeichnet den Moment, in dem die Sonne den höchsten Punkt ihrer täglichen Bahn am Himmel erreicht. Dies wird auch als Kulmination der Sonne bezeichnet, der Meridian (Längengrad des Beobachters) ist dann genau zur Sonne ausgerichtet. Der Sonnendurchgang (in Weltzeit) ergibt sich aus der Zeitgleichung und der geographischen Länge des Beobachters; mit „Lokalzeit“ wird er in der Zeitzone des Browsers angegeben.
+In Weltzeit kann der Durchgang an Orten nahe der Datumsgrenze (Länge ±180°) an einzelnen Tagen knapp vor oder nach dem UTC-Tag liegen; dann steht „-“ in der Tabelle.
 </td>
 </tr>
 </table>
