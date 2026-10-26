@@ -97,8 +97,10 @@
          * rows ist ein Array von Objekten mit folgenden Feldern:
          *   { type: 'category', text: 'Kategorie', value: 'optional' }
          *   { type: 'row', key: 'Schlüssel (HTML erlaubt)', value: 'Wert' }
+         * Optional bei beiden: link: 'id' verlinkt den Text auf die Erklärung mit dieser id (#id).
          */
         function renderOutputTable(containerId, rows) {
+            const linked = (html, id) => id ? '<a href="#' + id + '">' + html + '</a>' : html;
             const container = document.getElementById(containerId);
             const table = document.createElement('table');
             for (const row of rows) {
@@ -108,7 +110,7 @@
                         // Kategoriezeile mit eigenem Wert (z.B. Gesamtzeigleichung)
                         const td1 = document.createElement('td');
                         td1.colSpan = 2;
-                        td1.innerHTML = row.text;
+                        td1.innerHTML = linked(row.text, row.link);
                         const td2 = document.createElement('td');
                         td2.textContent = row.value;
                         tr.appendChild(td1);
@@ -117,7 +119,7 @@
                         // Reine Kategorieüberschrift
                         const td = document.createElement('td');
                         td.colSpan = 3;
-                        td.innerHTML = row.text;
+                        td.innerHTML = linked(row.text, row.link);
                         tr.appendChild(td);
                     }
                 } else {
@@ -125,7 +127,7 @@
                     const tdIndent = document.createElement('td');
                     tdIndent.innerHTML = '&nbsp;&nbsp;&nbsp;';
                     const tdKey = document.createElement('td');
-                    tdKey.innerHTML = row.key;
+                    tdKey.innerHTML = linked(row.key, row.link);
                     const tdVal = document.createElement('td');
                     tdVal.textContent = row.value;
                     tr.appendChild(tdIndent);

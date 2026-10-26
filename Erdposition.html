@@ -456,23 +456,23 @@
             const siderealTimeRelative = (((siderealTime- datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
 
             const tableData = [
-                { type: 'category', text: 'Zeitgleichung', value: hoursToString(equationOfTimeFull)+' Minuten ('+equationOfTimeFull.toFixed(2)+' Minuten)' },
+                { type: 'category', text: 'Zeitgleichung', link: 'Zeitgleichung', value: hoursToString(equationOfTimeFull)+' Minuten ('+equationOfTimeFull.toFixed(2)+' Minuten)' },
                 { type: 'row', key: 'Anteil durch Exzentrität', value: hoursToString(equatonOfTimeWithoutTilt)+' Minuten ('+equatonOfTimeWithoutTilt.toFixed(2)+' Minuten)' },
                 { type: 'row', key: 'Anteil durch Neigung der Erdachse', value: hoursToString(equationOfTimeWithoutExcentric)+' Minuten ('+equationOfTimeWithoutExcentric.toFixed(2)+' Minuten)' },
                 { type: 'category', text: 'Position der Erde' },
-                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(eclipticalLength)+' ('+normalizeDegrees(eclipticalLength*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: 'Wahre Anomalie<br>(Winkel zum Perihel)', value: radToDegString(orbitLengthEarth)+' ('+normalizeDegrees(orbitLengthEarth*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: '&Delta; (UTC-Sternzeit)', value: hoursToString(siderealTimeRelative)+' (entspricht \u2248'+normalizeDegrees(siderealTimeRelative*15-180).toFixed(4)+'° ekliptikaler Länge)' },
+                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', link: 'EkliptikaleLaenge', value: radToDegString(eclipticalLength)+' ('+normalizeDegrees(eclipticalLength*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Wahre Anomalie<br>(Winkel zum Perihel)', link: 'WahreAnomalie', value: radToDegString(orbitLengthEarth)+' ('+normalizeDegrees(orbitLengthEarth*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: '&Delta; (UTC-Sternzeit)', link: 'DeltaSternzeit', value: hoursToString(siderealTimeRelative)+' (entspricht \u2248'+normalizeDegrees(siderealTimeRelative*15-180).toFixed(4)+'° ekliptikaler Länge)' },
                 { type: 'row', key: 'Abstand Erde-Sonne', value: orbitRadiusEarth.toFixed(5)+' AE ('+(orbitRadiusEarth*AU_KM).toFixed(2)+' km)' },
                 { type: 'category', text: 'Zeitpunkte besonderer Erdposition im Jahr' },
-                { type: 'row', key: 'Perihel (grober Näherungswert)', value: gregorianDateToString(julianDayToDate(perihelDate))+' ('+radToDegString(calculateEarthTrueAnomaly(perihelDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Aphel (grober Näherungswert)', value: gregorianDateToString(julianDayToDate(aphelDate))+' ('+radToDegString(calculateEarthTrueAnomaly(aphelDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Frühlingsäquinoktium (Tag- und Nachtgleiche)', value: gregorianDateToString(julianDayToDate(springEquinoxDate))+' ('+radToDegString(springEquinoxLength)+' wahre Anomalie)' },
-                { type: 'row', key: 'Sommersolstitium (Sonnenwende)', value: gregorianDateToString(julianDayToDate(summerSolsticeDate))+' ('+radToDegString(calculateEarthTrueAnomaly(summerSolsticeDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Herbstäquinoktium (Tag- und Nachtgleiche)', value: gregorianDateToString(julianDayToDate(autumnEquinoxDate))+' ('+radToDegString(calculateEarthTrueAnomaly(autumnEquinoxDate))+' wahre Anomalie)' },
-                { type: 'row', key: 'Wintersolstitium (Sonnenwende)', value: gregorianDateToString(julianDayToDate(winterSolsticeDate))+' ('+radToDegString(calculateEarthTrueAnomaly(winterSolsticeDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Perihel (grober Näherungswert)', link: 'Perihel', value: gregorianDateToString(julianDayToDate(perihelDate))+' ('+radToDegString(calculateEarthTrueAnomaly(perihelDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Aphel (grober Näherungswert)', link: 'Aphel', value: gregorianDateToString(julianDayToDate(aphelDate))+' ('+radToDegString(calculateEarthTrueAnomaly(aphelDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Frühlingsäquinoktium (Tag- und Nachtgleiche)', link: 'Aequinoktium', value: gregorianDateToString(julianDayToDate(springEquinoxDate))+' ('+radToDegString(springEquinoxLength)+' wahre Anomalie)' },
+                { type: 'row', key: 'Sommersolstitium (Sonnenwende)', link: 'Solstitium', value: gregorianDateToString(julianDayToDate(summerSolsticeDate))+' ('+radToDegString(calculateEarthTrueAnomaly(summerSolsticeDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Herbstäquinoktium (Tag- und Nachtgleiche)', link: 'Aequinoktium', value: gregorianDateToString(julianDayToDate(autumnEquinoxDate))+' ('+radToDegString(calculateEarthTrueAnomaly(autumnEquinoxDate))+' wahre Anomalie)' },
+                { type: 'row', key: 'Wintersolstitium (Sonnenwende)', link: 'Solstitium', value: gregorianDateToString(julianDayToDate(winterSolsticeDate))+' ('+radToDegString(calculateEarthTrueAnomaly(winterSolsticeDate))+' wahre Anomalie)' },
                 { type: 'category', text: 'Position des Mondes' },
-                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(moon.longitude)+' ('+normalizeDegrees(moon.longitude*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', link: 'EkliptikaleLaenge', value: radToDegString(moon.longitude)+' ('+normalizeDegrees(moon.longitude*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Ekliptikale Breite', value: (moon.latitude*RAD2DEG).toFixed(2)+'°' },
                 { type: 'row', key: 'Abstand zur Erde', value: Math.round(moon.distance)+' km' },
                 { type: 'row', key: 'Abstand zur Ekliptik', value: Math.round(moonDistanceEcliptic)+' km' },
@@ -480,13 +480,13 @@
                 { type: 'row', key: 'RA / DEK', value: normalizeDegrees(moonRaDec.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDec.dec*RAD2DEG).toFixed(4)+'°' },
                 { type: 'row', key: 'Mondphase', value: (moonPhase*100).toFixed(2)+'%' },
                 { type: 'category', text: 'Ortsbezogene Daten' },
-                { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: 'Höhe Sonne', value: (sunAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
-                { type: 'row', key: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise)+tz : '-' },
-                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: sunriseSet.hasTransit ? hoursToString(sunriseSet.transit)+tz : '-' },
-                { type: 'row', key: 'Sonnenuntergang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set)+tz : '-' },
-                { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
+                { type: 'row', key: 'Azimut Sonne', link: 'HoeheAzimut', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Höhe Sonne', link: 'HoeheAzimut', value: (sunAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
+                { type: 'row', key: 'Sonnenaufgang', link: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise)+tz : '-' },
+                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', link: 'Sonnendurchgang', value: sunriseSet.hasTransit ? hoursToString(sunriseSet.transit)+tz : '-' },
+                { type: 'row', key: 'Sonnenuntergang', link: 'Sonnenaufgang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set)+tz : '-' },
+                { type: 'row', key: 'Azimut Mond', link: 'HoeheAzimut', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Höhe Mond', link: 'HoeheAzimut', value: (moonAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
             ];
             renderOutputTable('outputTable', tableData);
 
@@ -591,12 +591,12 @@
 <td valign="top">Julianisches Datum</td><td>Ein in der Astronomie verwendetes Zeitmaß. Es zählt fortlaufend die Anzahl der Tage seit dem 1. Januar 4713 v.Chr. Ein Tag beginnt um 12 Uhr Mittags in Greenwich (Nullmeridian), Uhrzeiten werden als Bruchteile eines Tages angegeben. Das Julianische Datum hat seinen Ursprung in einem 1583 n.Chr. erschienenen Buch von Joseph Scaliger, das verschiedene Kalendersysteme beleuchtete. Die genaue Messung und Referenzierung der Zeit stellt auch heute noch einige Herausforderungen. Zwar haben wir mittlerweile sehr gleichmäßig laufende Atomuhren, über Jahrhunderte hinweg dienten jedoch astronomische Beobachtung als Referenz. Die koordinierte Weltzeit (UTC) ist letztlich ein Kompromiss aus internationaler Atomzeit und astronomisch basierter Universalzeit.
 </tr>
 <tr>
-<td valign="top">Zeitgleichung</td>
+<td valign="top" id="Zeitgleichung">Zeitgleichung</td>
 <td>Im Durchschnitt vergehen genau 24 Stunden, bis die Sonne zum Mittag wieder im Süden steht. Durch die Neigung der Erdachse und der elliptischen Bahn um die Sonne schwankt die genaue Zeitdauer innerhalb eines Jahres. Die Zeitgleichung gibt die Differenz der "wahren Sonnenzeit" (Zeit, die eine Sonnenuhr zeigt) zur "mittleren Zeit" (Zeit auf der Uhr) an. Dieser Unterschied kann bis zu 20 Minuten betragen und ändert sich im Laufe des Jahres.
 </td>
 </tr>
 <tr>
-<td valign="top">Ekliptikale Länge</td>
+<td valign="top" id="EkliptikaleLaenge">Ekliptikale Länge</td>
 <td>Die Erde bewegt sich (annähernd) in einer Ebene um die Sonne, diese Ebene wird Ekliptik genannt. Die Ekliptikale Länge gibt den Winkel der Erde in Bezug zum Frühlingspunkt an.
 </td>
 </tr>
@@ -605,17 +605,17 @@
 Die Richtung, die die Sonne zu diesem Zeitpunkt hat, gilt als Referenz für astronomische Koordinatensysteme (ekliptisches und äquatoriales Koordinatensystem). Da sich die Erde nicht auf einer perfekten Bahn um die Sonne bewegt, verschiebt sich der Frühlingspunkt geringfügig im Laufe der Zeit. Als Bezugsangabe ist es daher wichtig, von welchem Frühlingspunkt die Rede ist.</td>
 </tr>
 <tr>
-<td>Wahre Anomalie</td>
+<td valign="top" id="WahreAnomalie">Wahre Anomalie</td>
 <td>Die "wahre Anomalie" ist eine weitere Bezugsangabe der Erdposition. Sie gibt den Winkel zwischen Schwerpunkt des Sonnensystems, Perihel (Punkt, der auf der elliptischen Bahn am nächsten am Schwerpunkt ist) und Erde an. In guter Vereinfachung lässt sich die Sonne als Schwerpunkt annehmen. Die "wahre Anomalie" entsteht aus der Berechnung der Planetenbahn (Kepplergleichung) und ist bis auf den Bezugspunkt sehr ähnlich zur Ekliptikalen Länge. Durch die unterschiedlichen Definitionen werden jedoch verschiedene Effekte berücksichtigt, die zu kleinen Abweichungen führen.
 </td>
 </tr>
 <tr>
-<td valign="top">Δ (UTC-Sternzeit)</td>
+<td valign="top" id="DeltaSternzeit">Δ (UTC-Sternzeit)</td>
 <td>Die Differenz aus normaler Uhrzeit (Stunden und Minuten) und Sternzeit ist zwar keine formale Angabe, beschreibt aber einen interessanten Zusammenhang: Zur ersten Sonnendurchquerung nach dem Frühlingsäquinoktium - besteht eine definierte Differenz von 12 Stunden, anschließend laufen die Uhren je Tag um ca. 4 Minuten auseinander. Aus der Differenz lässt sich somit auf die Position schließen. Eine Abweichung entsteht durch die Exzentrik - die Umrechnung von Differenz in ekliptikale Länge schwankt genau um diesen Anteil der Zeitgleichung. Der Anteil der geneigten Erdachse wird dagegen indirekt berücksichtigt. Daneben gibt es nur eine kleine konstante Verschiebung die sich aus der Definition der Sternzeit ergibt.
 </td>
 </tr>
 <tr>
-<td valign="top">Perihel</td>
+<td valign="top" id="Perihel">Perihel</td>
 <td>Perihel ist der Punkt, an dem die Erde am nächsten zur Sonne ist. Die Erde beschreibt eine leicht elliptische Bahn um die Sonne, die Sonne steht dabei in einem der Brennpunkte der Ellipse.
 Die beiden Brennpunkte der Ellipse sind in der Grafik der Erdbahn als kleine schwarze Punkte dargestellt. Die Sonne ist natürlich in der Darstellung viel zu groß, real befindet sie sich im rechten Brennpunkt. Die Erde bewegt sich in der Nähe des Perihels schneller auf ihrer Bahn um die Sonne, aktuell ist also der Winter auf der Nordhalbkugel etwas kürzer, als der Sommer.
 Im Jahr 1246 fielen Frühlingsäquinoktium und Perihel zusammen.
@@ -623,27 +623,28 @@ Eine direkte Berechnung des Perihels ohne iterative Näherung ist nicht einfach.
 </td>
 </tr>
 <tr>
-<td valign="top">Aphel</td>
+<td valign="top" id="Aphel">Aphel</td>
 <td>Aphel ist der Punkt, an dem die Erde die größte Entfernung zur Sonne hat.</td>
 </tr>
 <tr>
-<td valign="top">Frühlingsäquinoktium</td>
+<td valign="top" id="Aequinoktium">Frühlingsäquinoktium</td>
 <td>
 Das Äquinoktium (lateinisch für „gleiche Nacht“) ist genau der Zeitpunkt, zu dem die Tag- und Nachtgleiche eintritt, bzw. die Sonne den Äquator überschreitet. Zu diesem Zeitpunkt ist die Erdachse nur seitlich zur Sonne geneigt, auf jedem Breitengrad wird genau die Hälfte von der Sonne beschienen.
 
 Das Frühlingsäquinoktium ist der wichtigste Bezugspunkt im astronomischen Jahr: Sternzeit, sowie ekliptikales und äquatoriales Koordinatensystem beziehen sich darauf. Außerdem markiert es den Beginn der Tierkreiszeichen (Sternzeichen). Bis zur Einführung des julianischen Kalenders im Jahr 45v.Chr. war der März der erste Monat des römischen Jahres.
 </td>
 </tr>
-<td valign="top">Sommersolstitium/ Wintersolstitium</td>
+<tr>
+<td valign="top" id="Solstitium">Sommersolstitium/ Wintersolstitium</td>
 <td>Das Solstitium (lateinisch für „Sonnenstillstand“) ist der Zeitpunkt im Jahr, an dem die Sonne ihren höchsten oder tiefsten Stand am Himmel erreicht. Dies markiert den Beginn des astronomischen Sommers oder Winters. Zur Sommersonnenwende ist der Tag auf der Nordhalbkugel am längsten, zur Wintersonnenwende am kürzesten.
 </td>
 </tr>
 <tr>
-<td>Höhe/Azimut</td>
-<td>Höhe und Azimut sind Angaben des horizontalen Koordinatensystems. Höhe gibt den Winkel zum Horizont an, Azimut die Richtung. Der Blick nach Süden, Westen, Norden, Osten entprechen 0°, 90°, 180° udn 270°, </td>
+<td valign="top" id="HoeheAzimut">Höhe/Azimut</td>
+<td>Höhe und Azimut sind Angaben des horizontalen Koordinatensystems. Höhe gibt den Winkel zum Horizont an, Azimut die Richtung. Der Blick nach Süden, Westen, Norden, Osten entprechen 0°, 90°, 180° und 270°, </td>
 </tr>
 <tr>
-<td valign="top">Sonnenaufgang/ Sonnenuntergang</td>
+<td valign="top" id="Sonnenaufgang">Sonnenaufgang/ Sonnenuntergang</td>
 <td>Sonnenaufgang ist der Moment an dem die Sonne gerade so sichtbar wird, Sonnenuntergang der Moment, an dem sie gerade so verschwindet. Durch Lichtbrechung (Refraktion) befindet sich die Sonne in Wirklichkeit schon unterhalb des Horizontes, obwohl sie noch sichtbar ist. Der Effekt ist unter anderem abhängig von der Lufttemperatur, Druck und Höhe des Beobachters und sorgt für kleine Abweichungen . Neben dem Begriff der Sonnenauf- und Untergänge, gibt es noch verschiedene Phasen der Dämmerung: Bürgerliche Dämmerung, nautische Dämmerung und astronomische Dämmerung.
 <br>
 Sonnenauf- und Untergang liegen nahezu symmetrisch zum Sonnendurchgang. Weil sich die Deklination der Sonne im Lauf des Tages ändert, nicht exakt: In Berlin beträgt der Unterschied bis zu ca. 1 Minute, in Polarnähe deutlich mehr.
@@ -658,7 +659,7 @@ In Weltzeit kann an Orten fern von Greenwich der Untergang vor dem Aufgang liege
 </td>
 </tr>
 <tr>
-<td valign="top">Sonnendurchgang</td>
+<td valign="top" id="Sonnendurchgang">Sonnendurchgang</td>
 <td>Sonnendurchgang bezeichnet den Moment, in dem die Sonne den höchsten Punkt ihrer täglichen Bahn am Himmel erreicht. Dies wird auch als Kulmination der Sonne bezeichnet, der Meridian (Längengrad des Beobachters) ist dann genau zur Sonne ausgerichtet. Der Sonnendurchgang (in Weltzeit) ergibt sich aus der Zeitgleichung und der geographischen Länge des Beobachters; mit „Lokalzeit“ wird er in der Zeitzone des Browsers angegeben.
 In Weltzeit kann der Durchgang an Orten nahe der Datumsgrenze (Länge ±180°) an einzelnen Tagen knapp vor oder nach dem UTC-Tag liegen; dann steht „-“ in der Tabelle.
 </td>

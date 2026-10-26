@@ -520,37 +520,37 @@
 
             const tableData = [
                 { type: 'category', text: 'Sonne' },
-                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(eclipticalLength)+' ('+normalizeDegrees(eclipticalLength*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', link: 'Ekliptik', value: radToDegString(eclipticalLength)+' ('+normalizeDegrees(eclipticalLength*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Abstand Erde-Sonne', value: orbitRadiusEarth.toFixed(5)+' AE ('+(orbitRadiusEarth*AU_KM).toFixed(2)+' km)' },
-                { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK)', value: normalizeDegrees(raDec.ra*RAD2DEG).toFixed(4)+'° / '+(raDec.dec*RAD2DEG).toFixed(4)+'°' },
+                { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK)', link: 'desc_equatorial', value: normalizeDegrees(raDec.ra*RAD2DEG).toFixed(4)+'° / '+(raDec.dec*RAD2DEG).toFixed(4)+'°' },
                 { type: 'category', text: 'Mond' },
-                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', value: radToDegString(moonCoordinates.longitude)+' ('+normalizeDegrees(moonCoordinates.longitude*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: 'Ekliptikale Breite', value: (moonCoordinates.latitude*RAD2DEG).toFixed(2)+'°' },
+                { type: 'row', key: 'Ekliptikale Länge<br>(zum mittl. Frühlingspunkt des aktuellen Datums)', link: 'Ekliptik', value: radToDegString(moonCoordinates.longitude)+' ('+normalizeDegrees(moonCoordinates.longitude*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Ekliptikale Breite', link: 'Ekliptik', value: (moonCoordinates.latitude*RAD2DEG).toFixed(2)+'°' },
                 { type: 'row', key: 'Abstand zur Erde', value: Math.round(moonCoordinates.distance)+' km' },
-                { type: 'row', key: 'Nächstes Perigäum (erdnächster Punkt)', value: gregorianDateToString(julianDayToDate(nextPerigee.time)).slice(0, 16)+' UTC ('+Math.round(nextPerigee.distance)+' km)' },
-                { type: 'row', key: 'Nächstes Apogäum (erdfernster Punkt)', value: gregorianDateToString(julianDayToDate(nextApogee.time)).slice(0, 16)+' UTC ('+Math.round(nextApogee.distance)+' km)' },
+                { type: 'row', key: 'Nächstes Perigäum (erdnächster Punkt)', link: 'Apsiden', value: gregorianDateToString(julianDayToDate(nextPerigee.time)).slice(0, 16)+' UTC ('+Math.round(nextPerigee.distance)+' km)' },
+                { type: 'row', key: 'Nächstes Apogäum (erdfernster Punkt)', link: 'Apsiden', value: gregorianDateToString(julianDayToDate(nextApogee.time)).slice(0, 16)+' UTC ('+Math.round(nextApogee.distance)+' km)' },
                 { type: 'row', key: 'Abstand zur Ekliptik', value: Math.round(moonDistanceEcliptic)+' km' },
                 { type: 'row', key: 'Aufsteigender Knoten<br>(ekliptikale Länge)', value: radToDegString(ascendingNodeMoon)+' ('+normalizeDegrees(ascendingNodeMoon*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK)', value: normalizeDegrees(moonRaDecRaw.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDecRaw.dec*RAD2DEG).toFixed(4)+'°' },
-                { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK, scheinbar)', value: normalizeDegrees(moonRaDec.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDec.dec*RAD2DEG).toFixed(4)+'°' },
-                { type: 'row', key: 'Elongation (geozentrisch)', value: (elongation*RAD2DEG).toFixed(2)+'° '+(elongationSigned >= 0 ? 'östlich' : 'westlich')+' der Sonne' },
+                { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK)', link: 'desc_equatorial', value: normalizeDegrees(moonRaDecRaw.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDecRaw.dec*RAD2DEG).toFixed(4)+'°' },
+                { type: 'row', key: 'Äquatoriale Koordinaten (RA/DEK, scheinbar)', link: 'Parallaxe', value: normalizeDegrees(moonRaDec.ra*RAD2DEG).toFixed(4)+'° / '+(moonRaDec.dec*RAD2DEG).toFixed(4)+'°' },
+                { type: 'row', key: 'Elongation (geozentrisch)', link: 'Elongation', value: (elongation*RAD2DEG).toFixed(2)+'° '+(elongationSigned >= 0 ? 'östlich' : 'westlich')+' der Sonne' },
                 { type: 'row', key: 'Beleuchteter Anteil', value: (moonPhase*100).toFixed(2)+'%' },
-                { type: 'row', key: 'Positionswinkel Achse', value: radToDegString(moonAxis.positionAngle)+' ('+(moonAxis.positionAngle*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: 'Positionswinkel heller Rand', value: radToDegString(moonRand)+' ('+(moonRand*RAD2DEG).toFixed(4)+'°)' },
-                { type: 'row', key: 'Libration (selenografische Länge/Breite)', value: (normalizeAngleSigned(moonAxis.libration.longitude)*RAD2DEG).toFixed(4)+'° / '+(normalizeAngleSigned(moonAxis.libration.latitude)*RAD2DEG).toFixed(4)+'°' },
+                { type: 'row', key: 'Positionswinkel Achse', link: 'PositionswinkelAchse', value: radToDegString(moonAxis.positionAngle)+' ('+(moonAxis.positionAngle*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Positionswinkel heller Rand', link: 'PositionswinkelRand', value: radToDegString(moonRand)+' ('+(moonRand*RAD2DEG).toFixed(4)+'°)' },
+                { type: 'row', key: 'Libration (selenografische Länge/Breite)', link: 'Libration', value: (normalizeAngleSigned(moonAxis.libration.longitude)*RAD2DEG).toFixed(4)+'° / '+(normalizeAngleSigned(moonAxis.libration.latitude)*RAD2DEG).toFixed(4)+'°' },
                 { type: 'category', text: 'Ortsbezogene Daten' },
                 { type: 'row', key: 'Azimut Sonne', value: radToDegString(sunAzimuthAltitude.azimuth)+' ('+(sunAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Höhe Sonne', value: (sunAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
-                { type: 'row', key: 'Sonnenaufgang', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise)+tz : '-' },
-                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', value: sunriseSet.hasTransit ? hoursToString(sunriseSet.transit)+tz : '-' },
-                { type: 'row', key: 'Sonnenuntergang', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set)+tz : '-' },
+                { type: 'row', key: 'Sonnenaufgang', link: 'Tageszeiten', value: sunriseSet.hasRise ? hoursToString(sunriseSet.rise)+tz : '-' },
+                { type: 'row', key: 'Sonnendurchgang (wahrer Mittag)', link: 'Tageszeiten', value: sunriseSet.hasTransit ? hoursToString(sunriseSet.transit)+tz : '-' },
+                { type: 'row', key: 'Sonnenuntergang', link: 'Tageszeiten', value: sunriseSet.hasSet ? hoursToString(sunriseSet.set)+tz : '-' },
                 { type: 'row', key: 'Azimut Mond', value: radToDegString(moonAzimuthAltitude.azimuth)+' ('+(moonAzimuthAltitude.azimuth*RAD2DEG).toFixed(4)+'°)' },
                 { type: 'row', key: 'Höhe Mond', value: (moonAzimuthAltitude.altitude*RAD2DEG).toFixed(2)+'°' },
-                { type: 'row', key: 'Mond \u2013 parallaktischer Winkel', value: (moonParallacticAngle*RAD2DEG).toFixed(2)+'°' },
-                { type: 'row', key: 'Mondaufgang', value: moonRiseSet.hasRise ? hoursToString(moonRiseSet.rise)+tz : '-' },
-                { type: 'row', key: 'Monddurchgang', value: moonRiseSet.hasTransit ? hoursToString(moonRiseSet.transit)+tz : '-' },
-                { type: 'row', key: 'Kulmination', value: hoursToString(moonRiseSet.maxAltitudeTime)+tz },
-                { type: 'row', key: 'Monduntergang', value: moonRiseSet.hasSet ? hoursToString(moonRiseSet.set)+tz : '-' },
+                { type: 'row', key: 'Mond \u2013 parallaktischer Winkel', link: 'ParallaktischerWinkel', value: (moonParallacticAngle*RAD2DEG).toFixed(2)+'°' },
+                { type: 'row', key: 'Mondaufgang', link: 'Tageszeiten', value: moonRiseSet.hasRise ? hoursToString(moonRiseSet.rise)+tz : '-' },
+                { type: 'row', key: 'Monddurchgang', link: 'Durchgang', value: moonRiseSet.hasTransit ? hoursToString(moonRiseSet.transit)+tz : '-' },
+                { type: 'row', key: 'Höchster Stand', link: 'Durchgang', value: hoursToString(moonRiseSet.maxAltitudeTime)+tz },
+                { type: 'row', key: 'Monduntergang', link: 'Tageszeiten', value: moonRiseSet.hasSet ? hoursToString(moonRiseSet.set)+tz : '-' },
             ];
             renderOutputTable('outputTable', tableData);
 
@@ -661,13 +661,14 @@
     <canvas id="solarSystem" width="620" height="620"></canvas>
     Mondbahn um die Erde:
         <ul>
-            <li>Die Erde befindet sich im Zentrum, rot dargestellt ist die Richtung des Meridians des Beobachtungsortes.</li>
-            <li>Der Mond ist grau dargestellt. Die Größen von Mond, Erde und Abstand sind nicht maßstabsgetreu.</li>
-            <li>Die jeweils helleren Teile von Erde und Mond zeigen die von der Sonne beleuchteten Seiten.</li>
-            <li>Die dargestellte Mondbahn umfasst die Positionen des Mondes der letzten 13,5 Tage und der nächsten 13,5 Tage.</li>
-            <li>Der Teil der Mondbahn, der unterhalb der Ekliptik liegt, ist gestrichelt dargestellt. Der Teil oberhalb der Ekliptik ist durchgezogen dargestellt.</li>
-            <li>Der aufsteigende Knoten - der Punkt an dem der Mond die Ekliptik von "unten" nach "oben" schneidet - ist grün markiert.</li>
-            <li>Das Apogäum - der Punkt mit dem größten Abstand des Mondes von der Erde - ist auf der Mondbahn violett markiert (das zeitlich nächstgelegene <a href="#Apsiden">Apogäum</a>). Das Perigäum mit dem geringsten Abstand liegt in etwa gegenüber.</li>
+            <li><b>Erde</b> im Zentrum, <b>hellblau</b>: von Sonne beleuchteter Teil</li>
+            <li><b>roter Zeiger</b> - Richtung des Meridians Sdes Beobachtungsortes.</li>
+            <li><b>Mond</b>: Hellgrau von Sonne beleuchteter Teil</li>
+            <li><b>Mondbahn</b> umfasst die Positionen des Mondes der letzten 13,5 Tage und der nächsten 13,5 Tage.</li>
+            <li><b>Gestrichelt</b>: Teil der Mondbahn, der unterhalb der Ekliptik liegt. Der Teil oberhalb der Ekliptik ist durchgezogen dargestellt.</li>
+            <li><b>Aufsteigende Knoten (grün markiert)</b> - der Punkt an dem der Mond die Ekliptik von "unten" nach "oben" schneidet.</li>
+            <li><b>Apogäum (violett markiert)</b> - Punkt mit dem größten Abstand des Mondes zur Erde - ist auf der Mondbahn violett markiert. Das Perigäum mit dem geringsten Abstand liegt in etwa gegenüber.</li>
+            <li>Größen von Mond, Erde und Abstand sind nicht maßstabsgetreu.</li>
         </ul>
     <canvas id="moon" width="500" height="500"></canvas>
     <canvas id="moon1" width="500" height="500"></canvas>
@@ -696,11 +697,11 @@
             <td>Das Julianische Datum (JD) ist eine kontinuierliche Zählung von Tagen und Bruchteilen eines Tages seit dem 1. Januar 4713 v. Chr. um 12:00 Uhr UTC. Es wird in der Astronomie verwendet, um Zeitpunkte präzise zu beschreiben, da es die Komplexität von Kalendern und Zeitzonen vermeidet.</td>
         </tr> -->
         <tr>
-            <td id="Ekliptik"><b>Ekliptik und Ekliptikale Koordinaten (Länge und Breite)</b></td>
+            <td valign="top" id="Ekliptik"><b>Ekliptikale Koordinaten</b></td>
             <td>Die ekliptikalen Koordinaten bezeichnen ein polares Koordinatensystem, das auf der Ebene basiert, in der die Erde um die Sonne kreist (Ekliptik). Die <i>Länge</i> bezeichnet den Winkel innerhalb der Ekliptik von einem Referenzpunkt (dem Frühlingspunkt) aus, die <i>Breite</i> gibt den Winkel senkrecht zur Ekliptik an ("oberhalb" oder "unterhalb" der Ebene).</td>
         </tr>
         <tr>
-            <td id="desc_equatorial"><b>Äquatoriale Koordinaten (RA/DEK)</b></td>
+            <td valign="top" id="desc_equatorial"><b>Äquatoriale Koordinaten (RA/DEK)</b></td>
             <td>Die äquatorialen Koordinaten bezeichnen ein polares Koordinatensystem, das auf der Ebene des Äquators basiert. Es ist vergleichbar mit dem geografischen Koordinatensystem auf der Erde.
                 Die RA (Rektazension) ist der Winkel, gemessen in Stunden, Minuten und Sekunden, von einem Referenzpunkt (dem Frühlingspunkt) entlang des Himmelsäquators.
                 Die DEK (Deklination) ist der Winkel, gemessen in Grad, Minuten und Sekunden, senkrecht zum Himmelsäquator, der angibt, wie weit ein Himmelskörper nördlich oder südlich des Äquators liegt.
@@ -708,24 +709,21 @@
             </td>
         </tr>
         <tr>
-            <td id="Parallaxe"><b>Parallaxe und scheinbare Äquatoriale Koordinaten (RA/DEK)</b></td>
+            <td valign="top" id="Parallaxe"><b>Parallaxe und scheinbare Äquatoriale Koordinaten (RA/DEK)</b></td>
             <td>Die scheinbaren äquatorialen Koordinaten berücksichtigen die Position des Beobachters auf der Erde.
                 Der Fehler, der durch die Annahme entsteht, dass der Beobachter sich im Erdmittelpunkt befindet, wird als Parallaxe bezeichnet.
             </td>
         </tr>
         <tr>
-            <td id="Apsiden"><b>Perigäum und Apogäum</b></td>
-            <td>Da die Mondbahn eine Ellipse ist, schwankt der Abstand des Mondes zur Erde.
+            <td valign="top" id="Apsiden"><b>Perigäum und Apogäum</b></td>
+            <td>Die Mondbahn ist elliptisch.
                 Der erdnächste Punkt der Bahn heißt <i>Perigäum</i> (ca. 356&nbsp;000 bis 370&nbsp;000 km), der erdfernste <i>Apogäum</i> (ca. 404&nbsp;000 bis 406&nbsp;700 km).
-                Von einem Perigäum zum nächsten vergeht im Mittel ein anomalistischer Monat (27,55 Tage). Weil die Sonne die Mondbahn stört, schwanken die tatsächlichen Abstände und Zeitpunkte deutlich, beim Perigäum stärker als beim Apogäum.
                 Fällt ein Vollmond in die Nähe des Perigäums, erscheint der Mond besonders groß („Supermond“).
-                Die Zeitpunkte und Entfernungen werden nach Meeus, Kapitel 48, berechnet: Ausgehend von einem mittleren Perigäum bzw. Apogäum werden periodische Korrekturen addiert.
-                Meeus gibt die Genauigkeit des Zeitpunkts mit bis zu 31 Minuten (Perigäum) bzw. 3 Minuten (Apogäum) an.
-                Die Bahnellipse selbst dreht sich: Die Linie Perigäum–Apogäum (Apsidenlinie) läuft in ca. 8,85 Jahren einmal herum.
+                Die Linie Perigäum–Apogäum (Apsidenlinie) läuft in ca. 8,85 Jahren einmal herum.
             </td>
         </tr>
         <tr>
-            <td id="Elongation"><b>Elongation</b></td>
+            <td valign="top"  id="Elongation"><b>Elongation</b></td>
             <td>Die Elongation ist der Winkelabstand des Mondes von der Sonne, von der Erde aus gesehen (0° bis 180°).
                 Bei Neumond ist sie nahezu 0°, bei Halbmond etwa 90°, bei Vollmond nahezu 180°. Der beleuchtete Anteil der Mondscheibe hängt direkt von ihr ab.
                 Steht der Mond östlich der Sonne, ist er zunehmend und am Abendhimmel zu sehen; steht er westlich, ist er abnehmend und am Morgenhimmel zu sehen.
@@ -734,40 +732,33 @@
             </td>
         </tr>
         <tr>
-            <td id="Durchgang"><b>Monddurchgang und Kulmination</b></td>
+            <td valign="top" id="Durchgang"><b>Monddurchgang und höchster Stand (des Tages)</b></td>
             <td>Der <i>Monddurchgang</i> (Meridiandurchgang) ist der Zeitpunkt, zu dem der Mond den Meridian des Beobachtungsortes überquert:
                 Er steht dann genau im Süden (auf der Südhalbkugel im Norden), sein Stundenwinkel ist 0. Der Durchgang ist also über die Richtung definiert.
-                Die <i>Kulmination</i> ist hier der Zeitpunkt, zu dem der Mond seine größte Höhe über dem Horizont erreicht - sie ist über die Höhe definiert.
+                Der <i>höchste Stand</i> ist der Zeitpunkt, zu dem der Mond seine größte Höhe (an diesem Tag) erreicht.
                 <br>
                 Bei einem Fixstern fallen beide Zeitpunkte zusammen, weil sich seine Deklination nicht ändert.
-                Der Mond dagegen ändert seine Deklination innerhalb eines Monats um bis zu ca. ±28°, also um bis zu ca. 0,3° pro Stunde.
-                Bewegt er sich dabei auf den Zenit des Beobachters zu, steigt er nach dem Durchgang noch kurz weiter, die Kulmination folgt dem Durchgang;
-                bewegt er sich vom Zenit weg, liegt die Kulmination kurz davor.
-                Der Unterschied beträgt in mittleren Breiten nur wenige Minuten (in Berlin bis ca. 6 Minuten), in der Nähe des Äquators etwas mehr, weil die Höhe dort um den Meridian herum nur sehr langsam zu- und abnimmt.
+                Der Mond dagegen ändert seine Deklination um bis zu ca. 0,3° pro Stunde.
                 <br>
-                Da ein <a href="#LunarerTag">lunarer Tag</a> ca. 24 Stunden 50 Minuten dauert, kommt der Mond jeden Tag später in den Meridian. Etwa einmal im Monat fällt der Durchgang deshalb in keinen Kalendertag - in der Tabelle steht dann „-“.
-                <br>
-                Die Kulmination wird immer angegeben, als höchster Stand <i>innerhalb des angezeigten Tages</i>. Das ist nicht in jedem Fall eine Kulmination im eigentlichen Sinn:
-                <ul>
-                    <li>Gibt es an dem Tag keinen Durchgang, liegt der höchste Stand am Anfang oder Ende des Tages (0:00 oder 24:00 Uhr, siehe <a href="#Tageszeiten">Zeitangaben</a>).
-                        Das kann auch an Tagen mit Durchgang passieren: Steigt die Deklination schnell, steht der Mond kurz vor dem nächsten Durchgang um 24 Uhr höher als beim Durchgang am frühen Morgen
+                Auf der Nordhalbkugel gilt: Bei steigender Deklination ist der höchste Stand kurz nach dem Durchgang, bei sinkender Deklination kurz vor dem Durchgang.
+                Auf der Südhalbkugel ist es umgekehrt. Der Unterschied beträgt in mittleren Breiten nur wenige Minuten (in Berlin bis ca. 6 Minuten), in der Nähe des Äquators etwas mehr, weil die Höhe dort um den Meridian herum nur sehr langsam zu- und abnimmt.
+
+                Liegt der Scheitel kurz vor oder nach dem Tag, ist der höchste Stand des Tages am Anfang oder Ende des Tages (0:00 oder 24:00 Uhr, siehe <a href="#Tageszeiten">Zeitangaben</a>):
+                        Um 0:00 Uhr sinkt der Mond bereits, oder um 24:00 Uhr steigt er noch. Das ist dann kein Scheitel - der liegt am Vor- oder Folgetag.
+                        So ist es an Tagen ohne Durchgang, es kann aber auch an Tagen mit Durchgang passieren: Steigt die Deklination schnell, steht der Mond kurz vor dem nächsten Durchgang um 24 Uhr höher als beim Durchgang am frühen Morgen
                         (z. B. in Berlin am 2.7.2026, UTC: Durchgang um 0:48 Uhr, höchster Stand um 24:00 Uhr).
-                        In Berlin liegt der höchste Stand an rund 25 Tagen im Jahr am Tagesrand.</li>
-                    <li>Auch wenn der Mond den ganzen Tag unter dem Horizont bleibt, wird eine Kulmination angegeben - dann der Zeitpunkt, an dem er dem Horizont am nächsten kommt.
-                        Das kommt nur in hohen Breiten vor, z. B. in Tromsø an rund 90 Tagen im Jahr; Auf- und Untergang stehen dann auf „-“.</li>
-                </ul>
-                Beide Zeitpunkte werden für den Erdmittelpunkt (geozentrisch) berechnet.
+                        In Berlin liegt der höchste Stand an rund 25 Tagen im Jahr am Tagesrand.
             </td>
         </tr>
         <tr>
-            <td id="Tageszeiten"><b>Zeitangaben: 0 Uhr und 24 Uhr</b></td>
-            <td>Auf- und Untergänge, Durchgänge und Kulmination werden für den Kalendertag berechnet, der den eingestellten Zeitpunkt enthält:
+            <td valign="top" id="Tageszeiten"><b>Zeitangaben: 0 Uhr und 24 Uhr</b></td>
+            <td>Auf- und Untergänge, Durchgänge und der höchste Stand werden für den Kalendertag berechnet, der den eingestellten Zeitpunkt enthält:
                 ohne „Lokalzeit“ für den Tag in Weltzeit (UTC), mit „Lokalzeit“ für den Kalendertag in der Zeitzone des Browsers; die Zeiten werden dann auch in Lokalzeit angegeben (z. B. MEZ oder MESZ).
                 Der Tag reicht von <i>0:00 Uhr</i> (Anfang des Tages) bis <i>24:00 Uhr</i> (Ende des Tages).
                 24:00 Uhr ist derselbe Zeitpunkt wie 0:00 Uhr des Folgetags, wird aber bewusst so angezeigt: So ist erkennbar, dass ein Wert am Ende und nicht am Anfang des angezeigten Tages liegt.
                 <br>
-                Genau 0:00 oder 24:00 Uhr erscheint praktisch nur bei der Kulmination des Mondes, wenn der höchste Stand des Tages am Tagesrand liegt: Um 0:00 Uhr sinkt der Mond bereits, oder um 24:00 Uhr steigt er noch.
-                Das ist dann keine Kulmination im eigentlichen Sinn, sondern nur die größte Höhe innerhalb des Tages; die eigentliche Kulmination liegt am Vor- oder Folgetag.
+                Genau 0:00 oder 24:00 Uhr erscheint praktisch nur beim höchsten Stand des Mondes, wenn er am Tagesrand liegt: Um 0:00 Uhr sinkt der Mond bereits, oder um 24:00 Uhr steigt er noch.
+                Das ist dann nicht der Scheitel des Tagesbogens, sondern nur die größte Höhe innerhalb des Tages; der Scheitel liegt am Vor- oder Folgetag (siehe <a href="#Durchgang">höchster Stand</a>).
                 Minuten werden abgerundet, ein Ereignis um 23:59:40 Uhr wird also als 23:59 angezeigt.
                 <br>
                 Ein Ereignis wird nur angezeigt, wenn es in den Tag fällt; sonst steht „-“ in der Tabelle.
@@ -782,26 +773,26 @@
             </td>
         </tr>
         <tr>
-            <td id="LunarerTag"><b>Lunarer Tag</b></td>
+            <td valign="top" id="LunarerTag"><b>Lunarer Tag</b></td>
             <td>Der lunare Tag ist die Zeit zwischen zwei aufeinanderfolgenden Monddurchgängen, im Mittel ca. 24 Stunden 50 Minuten.
                 Er ist länger als ein Sonnentag, weil der Mond auf seiner Bahn täglich um ca. 12° nach Osten weiterwandert und die Erde sich entsprechend weiter drehen muss, bis er wieder im Meridian steht.
                 Die Dauer ergibt sich aus dem synodischen Monat: 24 h · 29,53 / 28,53.
             </td>
         </tr>
         <tr>
-            <td><b>Positionswinkel der Achse</b></td>
+            <td valign="top" id="PositionswinkelAchse"><b>Positionswinkel der Achse</b></td>
             <td>
                 Winkel der Rotationsachse des Mondes, gesehen von der Erde aus. Er beschreibt die Orientierung der Rotationsachse des Mondes relativ zum Himmel und gibt an, in welche Richtung die Nordpolregion des Mondes zeigt.
             </td>
         </tr>
         <tr>
-            <td><b>Positionswinkel des hellen Rands</b></td>
+            <td valign="top" id="PositionswinkelRand"><b>Positionswinkel des hellen Rands</b></td>
             <td>
                 Der Positionswinkel des hellen Rands des Mondes ist der Winkel zwischen der Richtung zum hellen Rand des Mondes und einem Referenzpunkt, gemessen im Uhrzeigersinn von Norden aus. Er gibt an, in welche Richtung der helle Rand des Mondes zeigt, was besonders bei der Beobachtung von Mondphasen relevant ist.
             </td>
         </tr>
         <tr>
-            <td><b>Selenographische Koordinaten</b></td>
+            <td valign="top" ><b>Selenographische Koordinaten</b></td>
             <td>
                 Der Mond hat ein eigenes Koordinatensystem (selenographische Koordinaten), mit einem Äquator, sowie Nord- und Südpol.
                 Die selenographische Länge wird von einem Nullmeridian aus gemessen, der durch das Zentrum der sichtbaren Mondscheibe verläuft.
@@ -809,7 +800,7 @@
             </td>
         </tr>
         <tr>
-            <td id="Libration"><b>Libration</b></td>
+            <td valign="top" id="Libration"><b>Libration</b></td>
             <td>Libration ist die scheinbare Schwankung der Ausrichtung eines Himmelskörpers, insbesondere des Mondes.
                 Aufgrund seiner unregelmäßigen Bewegung um die Erde zeigt der Mond von der Erde aus gesehen nicht immer genau die gleiche Seite - der selenographische Mittelpunkt eiert um den Mittelpunkt der sichtbaren Mondscheibe herum.
                 Im Laufe der Zeit ist es so möglich, ca. 59% der Mondoberfläche von der Erde aus zu sehen.
@@ -817,37 +808,10 @@
                 und die Libration in Breite die scheinbare Bewegung senkrecht dazu beschreibt.
             </td>
         </tr>
-
-        <!--<tr>
-            <td><b>Frühlingsäquinoktium</b></td>
-            <td>Das Frühlingsäquinoktium ist der Zeitpunkt, an dem die Sonne den Himmelsäquator von Süden nach Norden überquert. Es markiert den astronomischen Frühling auf der Nordhalbkugel und den Herbst auf der Südhalbkugel.</td>
-        </tr>-->
         <tr>
-            <td><b>Parallaktischer Winkel</b></td>
+            <td valign="top" id="ParallaktischerWinkel"><b>Parallaktischer Winkel</b></td>
             <td>Der parallaktische Winkel ist der Winkel zwischen der Richtung zu einem Himmelskörper und der Richtung zum Zenit, gemessen in der Horizontalebene. Er ist wichtig für die Korrektur von Beobachtungen aufgrund der Erdrotation.</td>
         </tr>
-
-
-        <!--<tr>
-            <td><b>Mittlere Anomalie</b></td>
-            <td>Die mittlere Anomalie ist ein Maß für die Position eines Himmelskörpers auf seiner Bahn zu einem bestimmten Zeitpunkt, basierend auf der Annahme, dass                                          der Körper sich mit konstanter Geschwindigkeit auf einer Kreisbahn bewegt. Sie wird verwendet, um die tatsächliche Position eines Himmelskörpers auf seiner elliptischen Bahn zu berechnen.</td>
-        </tr>
-        <tr>
-            <td><b>Mittlere Elongation</b></td>
-            <td>Die mittlere Elongation ist der Winkel zwischen der Sonne und einem Himmelskörper, gemessen von der Erde aus. Sie wird verwendet, um die Phasen des Mondes zu beschreiben, da sie angibt, wie weit der Mond von der Sonne entfernt ist.</td>
-        </tr>
-        <tr>
-            <td><b>Mittlere Länge des Mondes</b></td>
-            <td>Die mittlere Länge des Mondes ist die ekliptikale Länge des Mondes, berechnet unter der Annahme, dass er sich mit konstanter Geschwindigkeit auf einer Kreisbahn bewegt. Sie wird verwendet, um die tatsächliche Position des Mondes auf seiner ellipt  ischen Bahn zu berechnen.</td>
-        </tr>
-        <tr>
-            <td><b>Optische Liberation</b></td>
-            <td>Die optische Liberation ist die scheinbare Bewegung von Merkmalen auf der Oberfläche eines Himmelskörpers, insbesondere des Mondes, aufgrund der Perspektive von der Erde aus. Sie ermöglicht es, mehr als die Hälfte der Mondoberfläche von der Erde aus zu sehen.</td>
-        </tr>
-        <tr>
-            <td><b>Rising Knot</b></td>
-            <td>Der Rising Knot (aufsteigender Knoten) ist der Punkt, an dem die Bahn eines Himmelskörpers die Ekliptik von Süden nach Norden schneidet. Er ist wichtig für die Berechnung der Position von Himmelskörpern und ihrer Phasen.</td>
-        </tr>-->
     </table>
 
 
