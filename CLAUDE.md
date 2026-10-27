@@ -30,7 +30,9 @@ The C++ files live in `cpp/` (`astro.cpp`, `astro.h`, examples in `cpp/beispiele
 
 When changing an algorithm, change `astro.js` and `cpp/astro.cpp` together; their results agree to about 1e-11.
 
-**`render.js`** — small shared 3D rendering helpers: `createRotationMatrix(axle, angle)` and `multiplyMatrix(m1, m2)`. Used by the moon surface renderer in `Mond.html`.
+**`render.js`** — small shared 3D rendering helpers: rotation matrices (`createRotationMatrix(axle, angle)`, `multiplyMatrix()`, `transposeMatrix()`, `applyMatrix()`) and canvas line drawing for spheres (`drawPolygonLine()`, `calculateLatitudePoints()`, `calculateLongitudePoints()`). Used by `Erdposition.html` (tilted Earth view), `Mond.html` and `moonRender.js`.
+
+**`moonRender.js`** — moon surface rendering shared by `Mond.html` and the Node.js script `renderMoon.js` (renders moon phase PNGs, needs `npm install canvas`): `drawMoonPhaseTexture()` (pixel-by-pixel mapping of the NASA LROC texture) and `drawMoonPhasePicture()` (moon photo `mond2.png` with pixel-by-pixel shadow). Both take phase, position angle of the axis, libration and parallactic angle into account. Depends on globals from `astro.js` and `render.js`.
 
 **`ui.js`** — shared UI state and formatting helpers (`radToDegString`, time formatting, common variables like `datetime`, `latitude`, `longitude` in degrees, `useLocalTime`). `getLocation()` turns the inputs into the location object for `astro.js`, `siderealTimeHours(jd)` gives Greenwich sidereal time in hours, `normalizeDegrees()` normalizes display values in degrees. `dayUtcOffset()` and `timeZoneLabel()` give the time zone for day-based values (rise/set) depending on the "Lokalzeit" checkbox; `calculateSunRiseSet()`/`calculateMoonRiseSet()` take it as optional third argument `utcOffset`. Loaded after `astro.js` by the pages that opt into the shared modules.
 
@@ -44,8 +46,8 @@ When changing an algorithm, change `astro.js` and `cpp/astro.cpp` together; thei
 
 | File | Uses shared JS | Description |
 |------|----------------|-------------|
-| `Erdposition.html` | yes (`astro.js`, `render.js`, `ui.js`) | 2D Earth orbit, sidereal time, moon orbit around Earth |
-| `Mond.html` | yes (`astro.js`, `render.js`, `ui.js`) | 3D moon phase rendering with matrix transforms, libration, pixel-by-pixel surface mapping |
+| `Erdposition.html` | yes (`astro.js`, `render.js`, `ui.js`) | 2D Earth orbit around the Sun (equinoxes/solstices, perihelion/aphelion, meridian direction, moon position), view of the Earth with tilted axis and lit half; table with sidereal time, equation of time, sun and moon position, sunrise/sunset |
+| `Mond.html` | yes (`astro.js`, `render.js`, `moonRender.js`, `ui.js`) | Moon orbit around the Earth (±13.5 days, ascending node, apogee, part below the ecliptic), textured moon phase rendering with libration and parallactic angle, sky chart of the moon's path (altitude/azimuth); table with rise/set/transit, perigee/apogee, elongation, position angles |
 | `Mondbahn.html` | yes (`astro.js`, `ui.js`) | Heliocentric Earth and Moon orbit over a given year: adjustable Earth–Moon exaggeration, zoom/pan, new/full moons, charts for distance to the Sun and orbit curvature |
 
 Pages that do not load `astro.js` embed (an older copy of) the calculation logic inline. When changing algorithms, check whether the inline copy in `Astro-Berechnungen.html` also needs updating.
