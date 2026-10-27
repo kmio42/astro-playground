@@ -1,5 +1,5 @@
 /*
- * Sichtbarkeit von Sonne und Mond von einem Standpunkt aus (Konzept-Sichtbarkeit.md, Stufe 1).
+ * Sichtbarkeit von Sonne und Mond von einem Standpunkt aus (Konzept-Sichtbarkeit.md, Stufen 1 und 2).
  * Ohne DOM: im Browser nach astro.js laden (alle Namen global), in Node.js über require('./visibility.js').
  *
  * Konventionen (anders als astro.js in Grad, weil alle Werte aus Eingaben stammen und angezeigt werden):
@@ -13,6 +13,10 @@
  * Sichtbar ist eine Richtung, wenn sie in einem Sichtbereich-Rechteck liegt (oder keine Rechtecke definiert sind)
  * und über der Horizontlinie. Die Horizontlinie verbindet die Punkte linear im Azimut, ringsum geschlossen;
  * ohne Punkte liegt sie bei 0°, mit einem Punkt überall auf dessen Höhe.
+ *
+ * Stufe 2: Aus OSM-Gebäuden (horizonFromBuildings) und Geländekacheln (terrainProfile, horizonFromTerrain) entsteht
+ * eine berechnete Horizontlinie im 0,25°-Raster; compileViewpoint(viewpoint, profile) nimmt das Maximum aus ihr und
+ * der Hand-Horizontlinie.
  */
 (function (root) {
     'use strict';
@@ -30,6 +34,10 @@
 
     // Sonnenhöhe, unter der der Mond mit der Option requireDark als sichtbar gilt [°]
     const DARK_SUN_ALTITUDE = -6;
+
+    // Berechnete Horizontlinie (Gebäude, Gelände): ein Wert je 0,25° Azimut
+    const HORIZON_STEP = 0.25;
+    const HORIZON_BINS = 360 / HORIZON_STEP;
 
     // Winkel in Grad auf [0, 360)
     function wrap360(deg) {
@@ -52,32 +60,55 @@
     /**
      * Standpunkt für die Rechnung vorbereiten: Horizontpunkte sortiert, kleinste sichtbare Höhe für die
      * schnelle Vorprüfung.
+     * @param profile optional: berechnete Horizontlinie aus Gebäuden und Gelände, HORIZON_BINS Werte [°] für die
+     *   Azimute 0°, 0,25°, 0,5° …; nicht endliche Werte gelten als 0°. Mit Profil zählt das Maximum aus
+     *   Hand-Horizontlinie und Profil; ohne Hand-Punkte allein das Profil (darf unter 0° liegen).
      */
-    function compileViewpoint(viewpoint) {
+    function compileViewpoint(viewpoint, profile) {
         const horizon = (viewpoint.horizon || [])
             .filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]))
             .map(p => [wrap360(p[0]), p[1]])
             .sort((p, q) => p[0] - q[0]);
         const sectors = (viewpoint.sectors || []).filter(s =>
             [s.azimuthFrom, s.azimuthTo, s.altitudeFrom, s.altitudeTo].every(Number.isFinite));
+        const prof = profile && profile.length === HORIZON_BINS
+            ? Float32Array.from(profile, v => Number.isFinite(v) ? v : 0) : null;
 
-        // Unter dieser Höhe ist nichts sichtbar [°]
-        let minAltitude = horizon.length ? Math.min(...horizon.map(p => p[1])) : 0;
+        // Unter dieser Höhe ist nichts sichtbar [°]; beide Linien sind untere Schranken des Maximums
+        const handMin = horizon.length ? Math.min(...horizon.map(p => p[1])) : null;
+        const profileMin = prof ? prof.reduce((m, v) => Math.min(m, v), Infinity) : null;
+        let minAltitude = handMin === null && profileMin === null ? 0 : Math.max(handMin ?? -90, profileMin ?? -90);
         if (sectors.length) {
             minAltitude = Math.max(minAltitude, Math.min(...sectors.map(s => Math.min(s.altitudeFrom, s.altitudeTo))));
         }
-        return { compiled: true, name: viewpoint.name, horizon, sectors, minAltitude };
+        return { compiled: true, name: viewpoint.name, horizon, profile: prof, sectors, minAltitude };
     }
 
     function compiled(viewpoint) {
         return viewpoint.compiled ? viewpoint : compileViewpoint(viewpoint);
     }
 
-    /** Höhe der Horizontlinie im Azimut [°] */
+    /** Höhe der Horizontlinie im Azimut [°]: Hand-Punkte, berechnetes Profil oder das Maximum aus beiden */
     function horizonAltitude(viewpoint, azimuth) {
-        const pts = compiled(viewpoint).horizon;
+        const vp = compiled(viewpoint);
+        const hand = handHorizonAltitude(vp.horizon, azimuth);
+        if (!vp.profile) return hand === null ? 0 : hand;
+        const auto = profileAltitude(vp.profile, azimuth);
+        return hand === null ? auto : Math.max(hand, auto);
+    }
+
+    /** Wert eines Horizontprofils (HORIZON_BINS Werte) im Azimut, linear zwischen den Stützstellen [°] */
+    function profileAltitude(profile, azimuth) {
+        const x = wrap360(azimuth) / HORIZON_STEP;
+        const i = Math.min(Math.floor(x), HORIZON_BINS - 1);
+        const j = (i + 1) % HORIZON_BINS;
+        return profile[i] + (profile[j] - profile[i]) * (x - i);
+    }
+
+    // Hand-Horizontlinie im Azimut [°]; null ohne Punkte
+    function handHorizonAltitude(pts, azimuth) {
         const n = pts.length;
-        if (n === 0) return 0;
+        if (n === 0) return null;
         if (n === 1) return pts[0][1];
         const A = wrap360(azimuth);
 
@@ -108,6 +139,338 @@
         return vp.sectors.some(s =>
             altitude >= Math.min(s.altitudeFrom, s.altitudeTo) && altitude <= Math.max(s.altitudeFrom, s.altitudeTo)
             && azimuthInRange(azimuth, s.azimuthFrom, s.azimuthTo));
+    }
+
+    // ---------------------------------------------------------------
+    //  Umgebung: Gebäude aus OpenStreetMap und Gelände (Stufe 2)
+    //  Orte hier als { latitude, longitude } in Grad, Höhen in m über NN.
+    // ---------------------------------------------------------------
+
+    const EARTH_RADIUS_M = 6371000;         // mittlerer Erdradius [m]
+    const TERRAIN_REFRACTION = 0.13;        // Refraktionskoeffizient k: Krümmung wirkt nur zu (1 − k)
+
+    /**
+     * Gebäudehöhe aus OSM-Tags: height → building:levels × 3 m + roof:levels × 1,5 m → 10 m.
+     * @return { height [m], source: 'height' | 'levels' | 'default' }
+     */
+    function buildingHeight(tags = {}) {
+        const num = v => {
+            const x = parseFloat(String(v ?? '').replace(',', '.'));
+            return Number.isFinite(x) ? x : null;
+        };
+        const h = num(tags.height);
+        if (h !== null && h > 0) return { height: h, source: 'height' };
+        const levels = num(tags['building:levels']);
+        if (levels !== null && levels > 0) {
+            return { height: levels * 3 + (num(tags['roof:levels']) || 0) * 1.5, source: 'levels' };
+        }
+        return { height: 10, source: 'default' };
+    }
+
+    /** Ebene Näherung um origin (bis einige km genau genug): (lat, lon) [°] → [x Ost, y Nord] [m] */
+    function localProjection(origin) {
+        const k = EARTH_RADIUS_M * DEG2RAD;
+        const c = Math.cos(origin.latitude * DEG2RAD);
+        return (lat, lon) => [(lon - origin.longitude) * k * c, (lat - origin.latitude) * k];
+    }
+
+    // Punkt in Entfernung distance [m] und Azimut azimuth [°] auf der Kugel
+    function destinationPoint(origin, azimuth, distance) {
+        const phi1 = origin.latitude * DEG2RAD, theta = azimuth * DEG2RAD, delta = distance / EARTH_RADIUS_M;
+        const sinPhi2 = Math.sin(phi1) * Math.cos(delta) + Math.cos(phi1) * Math.sin(delta) * Math.cos(theta);
+        const phi2 = Math.asin(sinPhi2);
+        const dLambda = Math.atan2(Math.sin(theta) * Math.sin(delta) * Math.cos(phi1), Math.cos(delta) - Math.sin(phi1) * sinPhi2);
+        return { latitude: phi2 * RAD2DEG, longitude: origin.longitude + dLambda * RAD2DEG };
+    }
+
+    /** Liegt der Punkt im Gebäude? Ringe als [[lat, lon], …], gerade/ungerade Regel (Innenhöfe sind außen) */
+    function pointInBuilding(rings, lat, lon) {
+        let inside = false;
+        for (const ring of rings) {
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const [yi, xi] = ring[i], [yj, xj] = ring[j];
+                if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    /** Nächste Kante zum Punkt: { ring, edge (Index des Anfangspunkts), distance [m] } oder null */
+    function nearestEdge(rings, lat, lon) {
+        const project = localProjection({ latitude: lat, longitude: lon });
+        let best = null;
+        rings.forEach((ring, r) => {
+            for (let i = 0; i + 1 < ring.length; i++) {
+                const [ax, ay] = project(ring[i][0], ring[i][1]), [bx, by] = project(ring[i + 1][0], ring[i + 1][1]);
+                const ex = bx - ax, ey = by - ay, len2 = ex * ex + ey * ey;
+                const s = len2 > 0 ? Math.min(1, Math.max(0, -(ax * ex + ay * ey) / len2)) : 0;
+                const d = Math.hypot(ax + s * ex, ay + s * ey);
+                if (!best || d < best.distance) best = { ring: r, edge: i, distance: d };
+            }
+        });
+        return best;
+    }
+
+    /** Fassaden-Azimut einer Kante: Richtung der Wandnormale nach außen [°] */
+    function facadeAzimuth(rings, ringIndex, edgeIndex) {
+        const ring = rings[ringIndex];
+        const [lat1, lon1] = ring[edgeIndex], [lat2, lon2] = ring[edgeIndex + 1];
+        const mid = { latitude: (lat1 + lat2) / 2, longitude: (lon1 + lon2) / 2 };
+        const project = localProjection(mid);
+        const [ax, ay] = project(lat1, lon1), [bx, by] = project(lat2, lon2);
+        const len = Math.hypot(bx - ax, by - ay) || 1;
+        const nx = (by - ay) / len, ny = -(bx - ax) / len;          // rechts der Kantenrichtung
+        // Normale zeigt nach außen, wenn ein Punkt 0,5 m daneben nicht im Gebäude liegt
+        const k = 0.5 / (EARTH_RADIUS_M * DEG2RAD);
+        const probe = [mid.latitude + ny * k, mid.longitude + nx * k / Math.cos(mid.latitude * DEG2RAD)];
+        const outward = pointInBuilding(rings, probe[0], probe[1]) ? -1 : 1;
+        return wrap360(Math.atan2(outward * nx, outward * ny) * RAD2DEG);
+    }
+
+    /**
+     * Horizontlinie aus Gebäuden: Für jedes Azimut (Raster HORIZON_STEP) wird der Strahl mit allen Gebäudekanten
+     * geschnitten; der Höhenwinkel zur Dachkante ist atan((ground + height − eyeElevation) / Entfernung).
+     * @param buildings [{ id, rings: [[[lat, lon], …], …], height [m], ground [m ü. NN, ohne Gelände 0] }]
+     * @param origin Standpunkt { latitude, longitude } [°]
+     * @param eyeElevation Augenhöhe [m ü. NN]
+     * @param exclude Kennungen, die nicht zählen (eigenes Gebäude)
+     * @return { altitude [°] (NaN: kein Gebäude), building (Index in buildings oder −1), distance [m] } je Azimut
+     */
+    function horizonFromBuildings(buildings, origin, eyeElevation, exclude = []) {
+        const excluded = new Set(exclude);
+        const altitude = new Float32Array(HORIZON_BINS).fill(NaN);
+        const building = new Int32Array(HORIZON_BINS).fill(-1);
+        const distance = new Float32Array(HORIZON_BINS).fill(NaN);
+        const project = localProjection(origin);
+
+        buildings.forEach((b, index) => {
+            if (excluded.has(b.id)) return;
+            const dz = (b.ground || 0) + b.height - eyeElevation;
+            for (const ring of b.rings) {
+                const pts = ring.map(p => project(p[0], p[1]));
+                for (let i = 0; i + 1 < pts.length; i++) {
+                    const [px, py] = pts[i], [qx, qy] = pts[i + 1];
+                    const ex = qx - px, ey = qy - py;
+                    // Azimutbereich der Kante (kürzerer Weg); Kanten durch den Standpunkt auslassen
+                    const a1 = Math.atan2(px, py) * RAD2DEG;
+                    const span = wrap360(Math.atan2(qx, qy) * RAD2DEG - a1 + 180) - 180;
+                    if (Math.abs(span) > 179.9) continue;
+                    const from = Math.min(a1, a1 + span), to = Math.max(a1, a1 + span);
+                    for (let k = Math.ceil(from / HORIZON_STEP); k * HORIZON_STEP <= to; k++) {
+                        const A = k * HORIZON_STEP * DEG2RAD;
+                        const dx = Math.sin(A), dy = Math.cos(A);
+                        const denom = dx * ey - dy * ex;                // d × E
+                        if (Math.abs(denom) < 1e-12) continue;
+                        const t = (px * ey - py * ex) / denom;           // (P × E) / (d × E)
+                        if (t <= 0) continue;
+                        const dist = Math.max(t, 1);
+                        const alt = Math.atan2(dz, dist) * RAD2DEG;
+                        const bin = ((k % HORIZON_BINS) + HORIZON_BINS) % HORIZON_BINS;
+                        if (!(alt <= altitude[bin])) {                   // auch wenn noch NaN
+                            altitude[bin] = alt;
+                            building[bin] = index;
+                            distance[bin] = dist;
+                        }
+                    }
+                }
+            }
+        });
+        return { altitude, building, distance };
+    }
+
+    // Zoomstufen der Geländekacheln nach Entfernung: nah fein (z 14 ≈ 6 m/Pixel), fern grob
+    const TERRAIN_BANDS = [
+        { maxDistance: 2000, zoom: 14 },
+        { maxDistance: 10000, zoom: 12 },
+        { maxDistance: 40000, zoom: 10 },
+        { maxDistance: Infinity, zoom: 8 },
+    ];
+
+    function terrainZoom(distance) {
+        return TERRAIN_BANDS.find(b => distance <= b.maxDistance).zoom;
+    }
+
+    // Kachelkoordinaten mit Nachkommastellen (Web-Mercator, unabhängig von der Pixelzahl je Kachel)
+    function tileCoord(lat, lon, zoom) {
+        const n = 2 ** zoom;
+        const phi = lat * DEG2RAD;
+        return [(lon + 180) / 360 * n, (1 - Math.log(Math.tan(phi) + 1 / Math.cos(phi)) / Math.PI) / 2 * n];
+    }
+
+    /**
+     * Benötigte Terrarium-Kacheln für einen Umkreis, je Entfernungsband in dessen Zoomstufe.
+     * @param zoom optional: nur diese Zoomstufe (z. B. 14 für die Fußpunkte der Gebäude)
+     * @return [{ z, x, y }]
+     */
+    function terrainTileList(origin, radius, zoom) {
+        const bands = zoom === undefined ? TERRAIN_BANDS : [{ maxDistance: Infinity, zoom }];
+        const result = [];
+        const seen = new Set();
+        let inner = 0;
+        for (const band of bands) {
+            if (inner >= radius) break;
+            const r = Math.min(band.maxDistance, radius) + 100;
+            const dLat = r / EARTH_RADIUS_M * RAD2DEG;
+            const dLon = dLat / Math.max(Math.cos(origin.latitude * DEG2RAD), 0.01);
+            const z = band.zoom, n = 2 ** z;
+            const [x0, y0] = tileCoord(Math.min(origin.latitude + dLat, 85), origin.longitude - dLon, z);
+            const [x1, y1] = tileCoord(Math.max(origin.latitude - dLat, -85), origin.longitude + dLon, z);
+            for (let tx = Math.floor(x0); tx <= Math.floor(x1); tx++) {
+                for (let ty = Math.max(0, Math.floor(y0)); ty <= Math.min(n - 1, Math.floor(y1)); ty++) {
+                    const x = ((tx % n) + n) % n;
+                    const key = z + '/' + x + '/' + ty;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        result.push({ z, x, y: ty });
+                    }
+                }
+            }
+            inner = band.maxDistance;
+        }
+        return result;
+    }
+
+    /** Terrarium-Pixel (RGBA) dekodieren: Höhe = R · 256 + G + B / 256 − 32768 [m] */
+    function decodeTerrarium(rgba) {
+        const n = rgba.length / 4;
+        const out = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            out[i] = rgba[4 * i] * 256 + rgba[4 * i + 1] + rgba[4 * i + 2] / 256 - 32768;
+        }
+        return out;
+    }
+
+    /**
+     * Abfrage der Geländehöhe aus dekodierten Kacheln, bilinear zwischen den Pixelmitten.
+     * @param tiles Map 'z/x/y' → Float32Array(size · size); die Kachelgröße (256 bei AWS, 512 bei Mapterhorn)
+     *   ergibt sich aus der Länge
+     * @return sampleElevation(lat, lon, distance = 0) [m]; wählt die Zoomstufe nach distance, fehlt die
+     *   Kachel, die nächstgröbere; NaN, wenn keine vorhanden ist
+     */
+    function createTerrainSampler(tiles) {
+        const tileKey = (z, tx, ty) => {
+            const n = 2 ** z;
+            return z + '/' + (((tx % n) + n) % n) + '/' + ty;
+        };
+        // Pixel in globalen Pixelkoordinaten bei size Pixeln je Kachel; NaN ohne passende Kachel
+        function pixel(z, size, X, Y) {
+            const tx = Math.floor(X / size), ty = Math.floor(Y / size);
+            const t = tiles.get(tileKey(z, tx, ty));
+            return t && t.length === size * size ? t[(Y - ty * size) * size + (X - tx * size)] : NaN;
+        }
+        function sampleAt(lat, lon, z) {
+            const [cx, cy] = tileCoord(lat, lon, z);
+            const t = tiles.get(tileKey(z, Math.floor(cx), Math.floor(cy)));
+            if (!t) return NaN;
+            const size = Math.round(Math.sqrt(t.length));
+            const fx = cx * size - 0.5, fy = cy * size - 0.5;
+            const X = Math.floor(fx), Y = Math.floor(fy), u = fx - X, v = fy - Y;
+            let sum = 0, weight = 0;
+            for (const [dx, dy, w] of [[0, 0, (1 - u) * (1 - v)], [1, 0, u * (1 - v)], [0, 1, (1 - u) * v], [1, 1, u * v]]) {
+                const h = pixel(z, size, X + dx, Y + dy);
+                if (Number.isFinite(h)) { sum += w * h; weight += w; }
+            }
+            return weight > 1e-9 ? sum / weight : NaN;
+        }
+        return function sampleElevation(lat, lon, distance = 0) {
+            for (let z = terrainZoom(distance); z >= TERRAIN_BANDS[TERRAIN_BANDS.length - 1].zoom; z--) {
+                const h = sampleAt(lat, lon, z);
+                if (Number.isFinite(h)) return h;
+            }
+            return NaN;
+        };
+    }
+
+    // Entfernungen entlang eines Strahls: bis 2 km alle 25 m, darüber Schritte von 1 % der Entfernung
+    function terrainDistances(radius, minDistance) {
+        const d = [];
+        let x = minDistance;
+        for (; x <= Math.min(2000, radius); x += 25) d.push(x);
+        for (x = Math.max(x, 2000) * 1.01; x < radius; x *= 1.01) d.push(x);
+        if (d[d.length - 1] < radius) d.push(radius);
+        return d;
+    }
+
+    /**
+     * Geländeprofil um den Standpunkt: je Azimut die obere konvexe Hülle der Punkte (Entfernung, Höhe), Höhe schon
+     * um die Erdkrümmung abgesenkt (Δz = d² / 2R · (1 − k)). Der höchste Höhenwinkel von einem Auge aus liegt immer
+     * auf einer Ecke dieser Hülle; so genügen wenige Zahlen pro Richtung und die Augenhöhe bleibt änderbar.
+     * @param sampleElevation (lat, lon, distance) → Höhe [m ü. NN] oder NaN (z. B. aus createTerrainSampler)
+     * @param options { radius [m] (50 km), minDistance [m] (100; davor erzeugt das grobe Raster Phantom-Hindernisse),
+     *   eyeRange [min, max] [m ü. NN] (Ecken außerhalb dieses Augenhöhenbereichs werden weggelassen) }
+     * @return { radius, hulls: je Azimut [d0, z0, d1, z1, …] (d [m] gerundet, z [m] auf 0,1 m) }
+     */
+    function terrainProfile(sampleElevation, origin, options = {}) {
+        const radius = options.radius || 50000;
+        const distances = terrainDistances(radius, options.minDistance ?? 100);
+        const drop = distances.map(d => d * d / (2 * EARTH_RADIUS_M) * (1 - TERRAIN_REFRACTION));
+        const hulls = new Array(HORIZON_BINS);
+        const xs = [], zs = [];
+        for (let k = 0; k < HORIZON_BINS; k++) {
+            // Obere Hülle, Entfernung aufsteigend (Andrew)
+            xs.length = 0;
+            zs.length = 0;
+            distances.forEach((d, i) => {
+                const p = destinationPoint(origin, k * HORIZON_STEP, d);
+                const h = sampleElevation(p.latitude, p.longitude, d);
+                if (!Number.isFinite(h)) return;
+                // Meer statt Meeresboden (Bathymetrie in den Kacheln)
+                const z = Math.max(h, 0) - drop[i];
+                while (xs.length >= 2) {
+                    const n = xs.length;
+                    const cross = (xs[n - 1] - xs[n - 2]) * (z - zs[n - 2]) - (zs[n - 1] - zs[n - 2]) * (d - xs[n - 2]);
+                    if (cross < 0) break;
+                    xs.pop();
+                    zs.pop();
+                }
+                xs.push(d);
+                zs.push(z);
+            });
+            let first = 0, last = xs.length - 1;
+            if (options.eyeRange && xs.length) {
+                const a = bestHullIndex(xs, zs, options.eyeRange[0]), b = bestHullIndex(xs, zs, options.eyeRange[1]);
+                first = Math.min(a, b);
+                last = Math.max(a, b);
+            }
+            const hull = [];
+            for (let i = first; i <= last; i++) hull.push(Math.round(xs[i]), Math.round(zs[i] * 10) / 10);
+            hulls[k] = hull;
+        }
+        return { radius, hulls };
+    }
+
+    // Index der Hüllenecke mit dem größten Höhenwinkel vom Auge in Höhe eye
+    function bestHullIndex(xs, zs, eye) {
+        let best = 0;
+        for (let i = 1; i < xs.length; i++) {
+            if ((zs[i] - eye) * xs[best] > (zs[best] - eye) * xs[i]) best = i;
+        }
+        return best;
+    }
+
+    /** Horizontlinie aus dem Geländeprofil für eine Augenhöhe [m ü. NN] → HORIZON_BINS Werte [°] (NaN: keine Daten) */
+    function horizonFromTerrain(profile, eyeElevation) {
+        const out = new Float32Array(HORIZON_BINS).fill(NaN);
+        profile.hulls.forEach((hull, k) => {
+            let best = -Infinity;
+            for (let i = 0; i + 1 < hull.length; i += 2) {
+                best = Math.max(best, Math.atan2(hull[i + 1] - eyeElevation, hull[i]));
+            }
+            if (best > -Infinity) out[k] = best * RAD2DEG;
+        });
+        return out;
+    }
+
+    /** Maximum mehrerer Horizontprofile, NaN-Werte zählen nicht (null-Einträge werden übersprungen) */
+    function combineProfiles(...profiles) {
+        const out = new Float32Array(HORIZON_BINS).fill(NaN);
+        for (const p of profiles) {
+            if (!p) continue;
+            for (let k = 0; k < HORIZON_BINS; k++) {
+                if (Number.isFinite(p[k]) && !(p[k] <= out[k])) out[k] = p[k];
+            }
+        }
+        return out;
     }
 
     // ---------------------------------------------------------------
@@ -446,7 +809,11 @@
 
     const api = {
         VisibilityLevel,
-        azimuthInRange, compileViewpoint, horizonAltitude, isDirectionVisible,
+        HORIZON_STEP, HORIZON_BINS,
+        azimuthInRange, compileViewpoint, horizonAltitude, profileAltitude, isDirectionVisible,
+        buildingHeight, localProjection, destinationPoint, pointInBuilding, nearestEdge, facadeAzimuth,
+        horizonFromBuildings, terrainZoom, terrainTileList, decodeTerrarium, createTerrainSampler,
+        terrainProfile, horizonFromTerrain, combineProfiles,
         apparentAltitude, sunDirection, moonDirection, createMoonEphemeris, findFullMoons,
         visibilityLevel, findVisibilityIntervals, computeLevelGrid, computeLevelSeries, observationDirection,
     };
