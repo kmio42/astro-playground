@@ -14,7 +14,7 @@ The main calculation library (no external dependencies), a JavaScript port of th
 - Solar position: equation of time, obliquity, true anomaly, distance, sidereal time
 - Rise/set times for sun and moon
 - Solstices and equinoxes, perihelion and aphelion
-- Coordinate transforms: ecliptic → equatorial → horizontal, topocentric (parallax)
+- Coordinate transforms: ecliptic → equatorial → horizontal, topocentric (parallax), atmospheric refraction
 - Lunar position with 60+ periodic correction terms, illuminated fraction, libration and position angle, ascending node, perigee/apogee, node passages
 - Helper utilities: angle normalization, interpolation
 
@@ -41,6 +41,7 @@ All pages run directly in a browser without a build step.
 |------|-------------|
 | `Erdposition.html` | Solar position, rise/set times, equation of time, solstices/equinoxes, sidereal time, 2D Earth orbit visualization |
 | `Mond.html` | moon orbit around Earth, 3D moon phase rendering with pixel-by-pixel surface mapping |
+| `Sichtbarkeit.html` | When are sun and moon visible from a balcony or window: visibility mask per viewpoint, horizon diagram, OSM map, yearly sun overview, moon visibility dates (uses `visibility.js`) |
 ---
 
 ## CLI Interface for nodejs

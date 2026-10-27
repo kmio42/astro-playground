@@ -15,6 +15,8 @@ firefox Mond.html
 firefox Erdposition.html
 ```
 
+Exception: `Sichtbarkeit.html` needs a local web server for the map, because the OpenStreetMap tile servers block requests without a Referer (as sent from `file://`): `python3 -m http.server 8000`, then open `http://localhost:8000/Sichtbarkeit.html`.
+
 The C++ files live in `cpp/` (`astro.cpp`, `astro.h`, examples in `cpp/beispiele/`, documented in `cpp/README.md`). They have no Makefile and are not integrated into any HTML page — they are a standalone reimplementation in the `astro::` namespace, kept compatible with C++11 (Arduino cores). Build an example: `cd cpp/beispiele && g++ -std=c++11 -I.. sonne.cpp ../astro.cpp -o sonne`.
 
 ## Architecture
@@ -24,7 +26,7 @@ The C++ files live in `cpp/` (`astro.cpp`, `astro.h`, examples in `cpp/beispiele
 - **Constants**: `DEG2RAD`, `RAD2DEG`, `AU_KM`, `EARTH_RADIUS`, `MOON_RADIUS`, `MOON_ORBIT_RADIUS`, `EARTH_SEMI_MAJOR_AXIS`, `OBLIQUITY_J2000`, `EquinoxType`, `ApsisType`
 - **Time**: `julianDayFromCalendar()`, `julianDayFromDate()`, `julianDayToDate()`, `julianDayMidnight()`, `deltaT()`, `taiMinusUtc()`, `dynamicalTime()`, `julianDayFromDynamicalTime()`, `calculateEaster()`
 - **Solar**: `calculateSunPosition()`, `calculateObliquity()`, `calculateEquationOfTime()`, `calculateEarthTrueAnomaly()`, `calculateEarthEccentricity()`, `calculateGreenwichSiderealTime()`, `calculateLocalSiderealTime()`, `calculateSunRiseSet()`, `calculateEquinoxSolstice()`, `calculateNextEarthApsis()`
-- **Coordinate transforms**: `calculateEquatorial()`, `calculateHorizontal()`, `calculateTopocentric()`, `calculateParallacticAngle()`
+- **Coordinate transforms**: `calculateEquatorial()`, `calculateHorizontal()`, `calculateTopocentric()`, `calculateParallacticAngle()`, `calculateRefraction()` (formula 15.4, true → apparent altitude)
 - **Lunar**: `calculateMoonPosition()`, `calculateMoonPositionSimple()`, `calculateMoonIlluminatedFraction()`, `calculateMoonOrientation()` (libration, position angle), `calculateMoonAscendingNode()`, `calculateMoonRiseSet()`, `calculateNextMoonApsis()`, `calculateNextMoonNode()`
 - **Utilities**: `interpolate()`, `normalizeAngle()`, `normalizeAngleSigned()`, `angleFromDms()`
 
@@ -35,6 +37,8 @@ When changing an algorithm, change `astro.js` and `cpp/astro.cpp` together; thei
 **`moonRender.js`** — moon surface rendering shared by `Mond.html` and the Node.js script `renderMoon.js` (renders moon phase PNGs, needs `npm install canvas`): `drawMoonPhaseTexture()` (pixel-by-pixel mapping of the NASA LROC texture) and `drawMoonPhasePicture()` (moon photo `mond2.png` with pixel-by-pixel shadow). Both take phase, position angle of the axis, libration and parallactic angle into account. Depends on globals from `astro.js` and `render.js`.
 
 **`ui.js`** — shared UI state and formatting helpers (`radToDegString`, time formatting, common variables like `datetime`, `latitude`, `longitude` in degrees, `useLocalTime`). `getLocation()` turns the inputs into the location object for `astro.js`, `siderealTimeHours(jd)` gives Greenwich sidereal time in hours, `normalizeDegrees()` normalizes display values in degrees. `dayUtcOffset()` and `timeZoneLabel()` give the time zone for day-based values (rise/set) depending on the "Lokalzeit" checkbox; `calculateSunRiseSet()`/`calculateMoonRiseSet()` take it as optional third argument `utcOffset`. Loaded after `astro.js` by the pages that opt into the shared modules.
+
+**`visibility.js`** — visibility of sun and moon from a viewpoint (concept in `Konzept-Sichtbarkeit.md`). DOM-free IIFE like `astro.js` (browser: globals, Node: `require`). Unlike `astro.js` it works in **degrees**, azimuth from **north**, apparent altitude (with refraction). A viewpoint `{ name, sectors, horizon, observations }` is a mask: visible = inside a sector rectangle (or no sectors) and above the horizon line. Provides `sunDirection()`, `moonDirection()` (topocentric, hourly ephemeris + interpolation), `visibilityLevel()`, `findVisibilityIntervals()`, `computeLevelGrid()`/`computeLevelSeries()`, `findFullMoons()`, `observationDirection()`. Tests: `node testVisibility.js` (also compares `calculateRefraction` with `cpp/astro.cpp` if g++ is available).
 
 **`cpp/astro.cpp` / `cpp/astro.h`** — C++ reimplementation of the same algorithms in the `astro::` namespace. Standalone, no build integration. `JulianDay` holds UT and applies ΔT (leap-second table) itself; `ASTRO_EXACT_DELTA_T=0` switches to a fixed 69.184 s. Also in `cpp/`: `moon_testbench.cpp` (accuracy vs. NASA, results in `Testbench-Mond.md`), `Plan-Mondaufgang.md`.
 
@@ -48,6 +52,7 @@ When changing an algorithm, change `astro.js` and `cpp/astro.cpp` together; thei
 |------|----------------|-------------|
 | `Erdposition.html` | yes (`astro.js`, `render.js`, `ui.js`) | 2D Earth orbit around the Sun (equinoxes/solstices, perihelion/aphelion, meridian direction, moon position), view of the Earth with tilted axis and lit half; table with sidereal time, equation of time, sun and moon position, sunrise/sunset |
 | `Mond.html` | yes (`astro.js`, `render.js`, `moonRender.js`, `ui.js`) | Moon orbit around the Earth (±13.5 days, ascending node, apogee, part below the ecliptic), textured moon phase rendering with libration and parallactic angle, sky chart of the moon's path (altitude/azimuth); table with rise/set/transit, perigee/apogee, elongation, position angles |
+| `Sichtbarkeit.html` | yes (`astro.js`, `ui.js`, `visibility.js`, Leaflet from cdnjs) | When are sun and moon visible from a balcony/window: viewpoints with sector rectangles and horizon line (drawn in a horizon diagram or typed in tables), observations for calibration, OSM map (Leaflet) with sectors and sun/moon directions, yearly heatmap and sun hours, day timeline, moon visibility list; state in localStorage `sichtbarkeit`, JSON export/import |
 | `Mondbahn.html` | yes (`astro.js`, `ui.js`) | Heliocentric Earth and Moon orbit over a given year: adjustable Earth–Moon exaggeration, zoom/pan, new/full moons, charts for distance to the Sun and orbit curvature |
 
 Pages that do not load `astro.js` embed (an older copy of) the calculation logic inline. When changing algorithms, check whether the inline copy in `Astro-Berechnungen.html` also needs updating.

@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sonne und Mond vom Balkon</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --muted: #8a8984;
+            --grid: #e6e5e1;
+            --axis: #b9b8b2;
+            --accent: #2a78d6;
+            --moon: #7d6fd0;
+            --sun: #eda100;
+            --partial: #f5d88c;
+            --hidden: #d9d8d2;
+            --night: #3b4256;
+            --mask: rgba(110, 108, 100, 0.38);
+            --highlight: #fff3d1;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --muted: #8f8e86;
+                --grid: #2f2f2d;
+                --axis: #55544f;
+                --accent: #3987e5;
+                --moon: #9d90ec;
+                --sun: #e0a10a;
+                --partial: #8a6c1f;
+                --hidden: #45443f;
+                --night: #0d0f16;
+                --mask: rgba(0, 0, 0, 0.5);
+                --highlight: #3a3220;
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --muted: #8f8e86;
+            --grid: #2f2f2d;
+            --axis: #55544f;
+            --accent: #3987e5;
+            --moon: #9d90ec;
+            --sun: #e0a10a;
+            --partial: #8a6c1f;
+            --hidden: #45443f;
+            --night: #0d0f16;
+            --mask: rgba(0, 0, 0, 0.5);
+            --highlight: #3a3220;
+        }
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        /* Bedienelemente aus ui.js an die Farben anpassen */
+        #locationControls > div, #timeControls > div {
+            background-color: var(--surface-2) !important;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        #locationControls input[type="text"] { width: 9em; }
+        .feedback.invalid::after { content: " ✗"; color: #d03b3b; }
+        #timeButtons { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+        #timeButtons br { display: none; }
+        #timeButtons button { float: none !important; margin: 0 !important; width: 7em !important; }
+        canvas {
+            display: block;
+            width: 100%;
+            touch-action: none;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 20px;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls input[type="number"] { width: 5em; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            font-size: 0.9em;
+            color: var(--text-2);
+            margin: 4px 0 6px;
+        }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before {
+            background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px);
+        }
+        .legend .swatch::before {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        .figure { position: relative; margin-bottom: 6px; }
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--axis);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.85em;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            display: none;
+            z-index: 1000;
+        }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 14px; }
+        h2 { margin-top: 30px; }
+        h3 { margin: 16px 0 6px; font-size: 1em; }
+        button { padding: 3px 10px; }
+        table.data { border-collapse: collapse; font-size: 0.92em; }
+        table.data th, table.data td {
+            padding: 3px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--grid);
+            font-variant-numeric: tabular-nums;
+        }
+        table.data th { color: var(--text-2); font-weight: 600; }
+        table.data input[type="number"] { width: 5.5em; }
+        table.data tr.clickable { cursor: pointer; }
+        table.data tr.clickable:hover td { background: var(--surface-2); }
+        table.data tr.full td { background: var(--highlight); }
+        .tables { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: flex-start; }
+        .scroll { overflow-x: auto; max-width: 100%; }
+        #map { height: 420px; border-radius: 6px; margin-bottom: 6px; background: var(--surface-2); }
+        .empty { color: var(--muted); font-style: italic; }
+        .value { color: var(--text-2); font-variant-numeric: tabular-nums; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script src="visibility.js"></script>
+    <script>
+
+    /////////////////////////////////////////////////////////////////
+    //                  Zustand und Speicherung                    //
+    /////////////////////////////////////////////////////////////////
+
+        const STORAGE_KEY = 'sichtbarkeit';
+        const DEFAULT_SETTINGS = {
+            moonListMonths: 3, moonMinDuration: 10, moonMinIllumination: 0, moonOnlyDark: false,
+            showMonthPaths: true, showHourLines: true, showMoon: true,
+        };
+        const ALT_MIN = -5, ALT_MAX = 90;           // Höhenbereich des Horizontdiagramms [°]
+        const YEAR_STEP = 2;                        // Raster der Jahres-Heatmap [min]
+        const MONTH_NAMES = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+        const COMPASS = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+        const LEVEL_TEXT = ['unter dem Horizont', 'verdeckt', 'teilweise sichtbar', 'sichtbar'];
+
+        let state = loadState();
+        let compiledVps = [];       // vorbereitete Standpunkte (compileViewpoint)
+        let maskVersion = 0;        // zählt Änderungen an den Masken (für Zwischenspeicher)
+        let ready = false;          // update() erst nach der Initialisierung
+
+        // Gespeicherten Zustand prüfen und ergänzen (auch für Import)
+        function normalizeState(s) {
+            const num = Number;
+            const list = Array.isArray(s.viewpoints) && s.viewpoints.length ? s.viewpoints : [{ name: 'Balkon' }];
+            const viewpoints = list.map(v => ({
+                name: String(v.name || 'Standpunkt'),
+                sectors: (Array.isArray(v.sectors) ? v.sectors : []).map(x => ({
+                    azimuthFrom: num(x.azimuthFrom), azimuthTo: num(x.azimuthTo),
+                    altitudeFrom: num(x.altitudeFrom), altitudeTo: num(x.altitudeTo),
+                })).filter(x => Object.values(x).every(Number.isFinite)),
+                horizon: (Array.isArray(v.horizon) ? v.horizon : [])
+                    .filter(p => Array.isArray(p) && Number.isFinite(num(p[0])) && Number.isFinite(num(p[1])))
+                    .map(p => [num(p[0]), num(p[1])]),
+                observations: (Array.isArray(v.observations) ? v.observations : [])
+                    .filter(o => o && !isNaN(new Date(o.time).getTime()))
+                    .map(o => ({ time: String(o.time), body: o.body === 'moon' ? 'moon' : 'sun',
+                                 event: o.event === 'appear' ? 'appear' : 'disappear' })),
+            }));
+            const selected = Number.isInteger(s.selected) && s.selected >= -1 && s.selected < viewpoints.length
+                ? s.selected : 0;
+            return { viewpoints, selected, settings: { ...DEFAULT_SETTINGS, ...(s.settings || {}) } };
+        }
+
+        function loadState() {
+            try {
+                const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                if (s) return normalizeState(s);
+            } catch (e) { /* kein oder ungültiger Speicherstand */ }
+            return normalizeState({});
+        }
+
+        function saveState() {
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* Speicher gesperrt */ }
+        }
+
+        function recompile() {
+            compiledVps = state.viewpoints.map(compileViewpoint);
+            maskVersion++;
+        }
+
+        // Ausgewählte Standpunkte (alle bei „Alle Standpunkte“)
+        function activeIndices() {
+            return state.selected === -1 ? state.viewpoints.map((_, i) => i) : [state.selected];
+        }
+        function activeCompiled() {
+            return activeIndices().map(i => compiledVps[i]);
+        }
+        function editableViewpoint() {
+            return state.selected >= 0 ? state.viewpoints[state.selected] : null;
+        }
+
+        // Maske geändert: speichern, Tabellen und alle Ansichten neu
+        function maskChanged(rebuildTables = true) {
+            recompile();
+            saveState();
+            if (rebuildTables) renderTables();
+            redrawAll();
+        }
+
+        // Für Eingaben in den Tabellen: erst nach einer kurzen Pause neu rechnen
+        let maskTimer = null;
+        function maskChangedSoon() {
+            recompile();
+            drawHorizonChart();
+            clearTimeout(maskTimer);
+            maskTimer = setTimeout(() => maskChanged(false), 400);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Zeit und Formatierung                      //
+    /////////////////////////////////////////////////////////////////
+
+        const pad = n => String(n).padStart(2, '0');
+
+        function currentJd() {
+            return julianDayFromDate(datetime);
+        }
+
+        // Kalendertag (Lokalzeit oder UT), der jd enthält: { start, end } [jd]; mit Zeitumstellung 23 bzw. 25 h
+        function dayWindow(jd) {
+            if (useLocalTime) {
+                const d = julianDayToDate(jd);
+                return {
+                    start: julianDayFromDate(new Date(d.getFullYear(), d.getMonth(), d.getDate())),
+                    end: julianDayFromDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)),
+                };
+            }
+            const start = julianDayMidnight(jd);
+            return { start, end: start + 1 };
+        }
+
+        // Jahr des eingestellten Zeitpunkts (Lokalzeit oder UT)
+        function selectedYear() {
+            return useLocalTime ? datetime.getFullYear() : datetime.getUTCFullYear();
+        }
+
+        // Tagesanfänge eines Jahres [jd]
+        function yearDayStarts(year) {
+            const starts = [];
+            if (useLocalTime) {
+                for (let d = 0; ; d++) {
+                    const date = new Date(year, 0, 1 + d);
+                    if (date.getFullYear() !== year) break;
+                    starts.push(julianDayFromDate(date));
+                }
+            } else {
+                const first = julianDayFromCalendar(year, 1, 1, 0);
+                const days = julianDayFromCalendar(year + 1, 1, 1, 0) - first;
+                for (let d = 0; d < days; d++) starts.push(first + d);
+            }
+            return starts;
+        }
+
+        // Datum/Uhrzeit-Teile eines jd in der gewählten Zeitzone (auf die Minute gerundet)
+        function timeParts(jd) {
+            const t = new Date(Math.round(julianDayToDate(jd).getTime() / 60000) * 60000);
+            return useLocalTime
+                ? { y: t.getFullYear(), mo: t.getMonth(), d: t.getDate(), h: t.getHours(), mi: t.getMinutes(), wd: t.getDay() }
+                : { y: t.getUTCFullYear(), mo: t.getUTCMonth(), d: t.getUTCDate(), h: t.getUTCHours(), mi: t.getUTCMinutes(), wd: t.getUTCDay() };
+        }
+        function fmtTime(jd) {
+            const p = timeParts(jd);
+            return pad(p.h) + ':' + pad(p.mi);
+        }
+        function fmtDate(jd, weekday = true) {
+            const p = timeParts(jd);
+            return (weekday ? WEEKDAYS[p.wd] + ' ' : '') + pad(p.d) + '.' + pad(p.mo + 1) + '.';
+        }
+        function fmtDuration(minutes) {
+            const m = Math.round(minutes);
+            return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + pad(m % 60) + ' min';
+        }
+        function fmtNum(x, digits = 1) {
+            return x.toFixed(digits).replace('.', ',');
+        }
+        function compass(azimuth) {
+            return COMPASS[Math.round(normalizeDegrees(azimuth) / 22.5) % 16];
+        }
+        function fmtDirection(dir) {
+            return fmtNum(dir.azimuth, 0) + '° ' + compass(dir.azimuth) + ', ' + fmtNum(dir.altitude) + '°';
+        }
+        function phaseSymbol(k, waxing) {
+            if (k < 0.06) return '🌑';
+            if (k >= 0.94) return '🌕';
+            if (waxing) return k < 0.35 ? '🌒' : k < 0.65 ? '🌓' : '🌔';
+            return k < 0.35 ? '🌘' : k < 0.65 ? '🌗' : '🌖';
+        }
+
+        // Zeitpunkt setzen und alles aktualisieren (Klick in Heatmap, Mondliste)
+        function setDatetime(date) {
+            datetime = date;
+            fillGregorianDate(datetime);
+            const jd = julianDayFromDate(datetime);
+            fillJulianDate(jd);
+            fillSiderealTime(siderealTimeHours(jd));
+            update();
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Zeichenhilfen                              //
+    /////////////////////////////////////////////////////////////////
+
+        function css(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        // Canvas auf Breite des Containers und Gerätepixel einstellen
+        function setupCanvas(canvas, cssHeight) {
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.clientWidth;
+            canvas.style.height = cssHeight + 'px';
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(cssHeight * dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { ctx, w, h: cssHeight };
+        }
+
+        // Farbe aus einer CSS-Variablen als [r, g, b, a] (für ImageData)
+        function cssColor(name) {
+            const probe = document.createElement('canvas').getContext('2d');
+            probe.fillStyle = css(name);
+            probe.fillRect(0, 0, 1, 1);
+            return Array.from(probe.getImageData(0, 0, 1, 1).data);
+        }
+
+        // Text mit Rand in Hintergrundfarbe, damit er über Linien lesbar bleibt
+        function haloText(ctx, text, x, y, color) {
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = css('--surface');
+            ctx.lineJoin = 'round';
+            ctx.strokeText(text, x, y);
+            ctx.fillStyle = color;
+            ctx.fillText(text, x, y);
+        }
+
+        function showTooltip(tip, x, y, text) {
+            tip.textContent = text;
+            tip.style.display = 'block';
+            const parent = tip.parentElement.clientWidth;
+            tip.style.left = Math.min(x + 12, parent - tip.offsetWidth - 4) + 'px';
+            tip.style.top = (y + 14) + 'px';
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Horizontdiagramm                           //
+    /////////////////////////////////////////////////////////////////
+
+        let hzView = { azMin: 0, azMax: 360 };
+        let hzGeom = null;          // { left, top, pw, ph }
+        let hzMode = 'view';        // 'view', 'sector', 'horizon'
+        let hzDrag = null;          // laufende Mausaktion
+        let hzMaskCache = { key: null, canvas: null };
+        let pathCache = { key: null, months: [], hours: [] };
+        let dayPathCache = { key: null, sun: [], moon: [] };
+
+        const azToX = a => hzGeom.left + (a - hzView.azMin) / (hzView.azMax - hzView.azMin) * hzGeom.pw;
+        const altToY = h => hzGeom.top + (ALT_MAX - h) / (ALT_MAX - ALT_MIN) * hzGeom.ph;
+        const xToAz = x => hzView.azMin + (x - hzGeom.left) / hzGeom.pw * (hzView.azMax - hzView.azMin);
+        const yToAlt = y => ALT_MAX - (y - hzGeom.top) / hzGeom.ph * (ALT_MAX - ALT_MIN);
+
+        // Sonnenbahnen am 21. jedes Monats und Stundenlinien (Analemma) für das Jahr
+        function computeYearPaths() {
+            const loc = getLocation();
+            const year = selectedYear();
+            const key = [latitude, longitude, year, useLocalTime].join('|');
+            if (pathCache.key === key) return pathCache;
+
+            const months = [];
+            for (let m = 0; m < 12; m++) {
+                const start = useLocalTime ? julianDayFromDate(new Date(year, m, 21)) : julianDayFromCalendar(year, m + 1, 21, 0);
+                const pts = [];
+                for (let k = 0; k <= 144; k++) {
+                    const d = sunDirection(start + k / 144, loc);
+                    pts.push([d.azimuth, d.altitude]);
+                }
+                months.push({ label: MONTH_NAMES[m], pts });
+            }
+
+            // Stundenlinien in Normalzeit (ohne Sommerzeit), damit jede Linie geschlossen bleibt
+            const offset = useLocalTime ? -new Date(year, 0, 1).getTimezoneOffset() / 60 : 0;
+            const first = julianDayFromCalendar(year, 1, 1, 0);
+            const hours = [];
+            for (let H = 0; H < 24; H++) {
+                const pts = [];
+                for (let d = 0; d <= 366; d += 4) {
+                    const dir = sunDirection(first + d + (H - offset) / 24, loc);
+                    pts.push([dir.azimuth, dir.altitude]);
+                }
+                hours.push({ label: H + ' h', pts });
+            }
+            pathCache = { key, months, hours };
+            return pathCache;
+        }
+
+        // Bahnen von Sonne und Mond am gewählten Tag
+        function computeDayPaths() {
+            const loc = getLocation();
+            const day = dayWindow(currentJd());
+            const key = [latitude, longitude, day.start, day.end].join('|');
+            if (dayPathCache.key === key) return dayPathCache;
+            const sun = [], moon = [];
+            const n = Math.round((day.end - day.start) * 288);      // alle 5 min
+            for (let k = 0; k <= n; k++) {
+                const jd = day.start + k / 288;
+                const s = sunDirection(jd, loc);
+                const m = moonDirection(jd, loc);
+                sun.push([s.azimuth, s.altitude]);
+                moon.push([m.azimuth, m.altitude]);
+            }
+            dayPathCache = { key, sun, moon };
+            return dayPathCache;
+        }
+
+        // Linie durch Punkte (Azimut, Höhe); beim Durchgang durch Nord wird sie unterbrochen
+        function strokePath(ctx, pts) {
+            ctx.beginPath();
+            let prev = null;
+            for (const [a, h] of pts) {
+                if (prev === null || Math.abs(a - prev) > 180) ctx.moveTo(azToX(a), altToY(h));
+                else ctx.lineTo(azToX(a), altToY(h));
+                prev = a;
+            }
+            ctx.stroke();
+        }
+
+        // Verdeckte Bereiche als halbtransparentes Bild (zwischengespeichert)
+        function maskImage(vps) {
+            const scale = 2;      // ein Testpunkt pro 2×2 CSS-Pixel
+            const cw = Math.ceil(hzGeom.pw / scale), ch = Math.ceil(hzGeom.ph / scale);
+            const key = [maskVersion, state.selected, hzView.azMin, hzView.azMax, cw, ch, css('--mask')].join('|');
+            if (hzMaskCache.key === key) return hzMaskCache.canvas;
+            const canvas = document.createElement('canvas');
+            canvas.width = cw;
+            canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            const img = ctx.createImageData(cw, ch);
+            const [r, g, b, a] = cssColor('--mask');
+            for (let j = 0; j < ch; j++) {
+                const h = yToAlt(hzGeom.top + (j + 0.5) * scale);
+                for (let i = 0; i < cw; i++) {
+                    const A = xToAz(hzGeom.left + (i + 0.5) * scale);
+                    if (!vps.some(vp => isDirectionVisible(vp, A, h))) {
+                        const o = (j * cw + i) * 4;
+                        img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = a;
+                    }
+                }
+            }
+            ctx.putImageData(img, 0, 0);
+            hzMaskCache = { key, canvas };
+            return canvas;
+        }
+
+        // Teilbereiche eines Azimutbereichs from → to im Uhrzeigersinn, ohne Sprung über Nord
+        function azimuthSpans(from, to) {
+            const f = normalizeDegrees(from);
+            const span = normalizeDegrees(to - from) || 360;
+            return f + span <= 360 ? [[f, f + span]] : [[f, 360], [0, f + span - 360]];
+        }
+
+        function drawHorizonChart() {
+            const canvas = document.getElementById('horizonChart');
+            const { ctx, w, h } = setupCanvas(canvas, Math.max(260, Math.min(420, canvas.clientWidth * 0.45)));
+            hzGeom = { left: 38, top: 10, pw: w - 38 - 10, ph: h - 10 - 26 };
+            const { left, top, pw, ph } = hzGeom;
+            const vps = activeCompiled();
+            const loc = getLocation();
+
+            ctx.fillStyle = css('--surface');
+            ctx.fillRect(0, 0, w, h);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(left, top, pw, ph);
+            ctx.clip();
+
+            // Maske
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(maskImage(vps), left, top, pw, ph);
+
+            // Gitter
+            const span = hzView.azMax - hzView.azMin;
+            const azStep = span > 180 ? 30 : span > 90 ? 15 : span > 40 ? 5 : 2;
+            ctx.strokeStyle = css('--grid');
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let a = Math.ceil(hzView.azMin / azStep) * azStep; a <= hzView.azMax; a += azStep) {
+                ctx.moveTo(azToX(a), top);
+                ctx.lineTo(azToX(a), top + ph);
+            }
+            for (let alt = 0; alt <= ALT_MAX; alt += 10) {
+                ctx.moveTo(left, altToY(alt));
+                ctx.lineTo(left + pw, altToY(alt));
+            }
+            ctx.stroke();
+            ctx.strokeStyle = css('--axis');
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            ctx.moveTo(left, altToY(0));
+            ctx.lineTo(left + pw, altToY(0));
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const paths = computeYearPaths();
+            const sunColor = css('--sun');
+
+            // Stundenlinien
+            if (state.settings.showHourLines) {
+                ctx.strokeStyle = css('--muted');
+                ctx.lineWidth = 0.8;
+                ctx.setLineDash([2, 3]);
+                for (const line of paths.hours) strokePath(ctx, line.pts);
+                ctx.setLineDash([]);
+            }
+
+            // Sonnenbahnen der Monate
+            if (state.settings.showMonthPaths) {
+                ctx.strokeStyle = sunColor;
+                ctx.globalAlpha = 0.45;
+                ctx.lineWidth = 1;
+                for (const m of paths.months) strokePath(ctx, m.pts);
+                ctx.globalAlpha = 1;
+            }
+
+            // Sichtbereiche und Horizontlinien der aktiven Standpunkte
+            const accent = css('--accent');
+            vps.forEach(vp => {
+                ctx.strokeStyle = accent;
+                ctx.lineWidth = 1.5;
+                for (const s of vp.sectors) {
+                    const h0 = Math.min(s.altitudeFrom, s.altitudeTo), h1 = Math.max(s.altitudeFrom, s.altitudeTo);
+                    for (const [a0, a1] of azimuthSpans(s.azimuthFrom, s.azimuthTo)) {
+                        ctx.strokeRect(azToX(a0), altToY(h1), azToX(a1) - azToX(a0), altToY(h0) - altToY(h1));
+                    }
+                }
+                // Horizontlinie in 0,5°-Schritten (geschlossen über Nord)
+                if (vp.horizon.length) {
+                    ctx.beginPath();
+                    for (let a = 0; a <= 360; a += 0.5) {
+                        const y = altToY(horizonAltitude(vp, a));
+                        if (a === 0) ctx.moveTo(azToX(a), y); else ctx.lineTo(azToX(a), y);
+                    }
+                    ctx.stroke();
+                }
+            });
+            // Punkte des bearbeitbaren Standpunkts
+            const editable = editableViewpoint();
+            if (editable) {
+                ctx.fillStyle = accent;
+                for (const [a, alt] of editable.horizon) {
+                    ctx.beginPath();
+                    ctx.arc(azToX(normalizeDegrees(a)), altToY(alt), 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                // Beobachtungen als Kreuze
+                ctx.strokeStyle = css('--text');
+                ctx.lineWidth = 1.5;
+                for (const o of editable.observations) {
+                    const d = observationDirection(o, loc);
+                    if (!d) continue;
+                    const x = azToX(d.azimuth), y = altToY(d.altitude);
+                    ctx.beginPath();
+                    ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4);
+                    ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4);
+                    ctx.stroke();
+                }
+            }
+            // Neues Rechteck beim Aufziehen
+            if (hzDrag && hzDrag.type === 'sector' && hzDrag.current) {
+                const [a0, h0] = hzDrag.startPos, [a1, h1] = hzDrag.current;
+                ctx.setLineDash([5, 3]);
+                ctx.strokeStyle = accent;
+                ctx.strokeRect(azToX(a0), altToY(h0), azToX(a1) - azToX(a0), altToY(h1) - altToY(h0));
+                ctx.setLineDash([]);
+            }
+
+            // Bahnen und Positionen des gewählten Tages
+            const day = computeDayPaths();
+            ctx.lineWidth = 2.2;
+            ctx.strokeStyle = sunColor;
+            strokePath(ctx, day.sun);
+            if (state.settings.showMoon) {
+                ctx.strokeStyle = css('--moon');
+                strokePath(ctx, day.moon);
+            }
+            const jd = currentJd();
+            const pxPerDeg = pw / span;
+            const sun = sunDirection(jd, loc);
+            const bodies = [{ dir: sun, color: sunColor }];
+            if (state.settings.showMoon) bodies.push({ dir: moonDirection(jd, loc), color: css('--moon') });
+            for (const b of bodies) {
+                ctx.beginPath();
+                ctx.arc(azToX(b.dir.azimuth), altToY(b.dir.altitude), Math.max(5, b.dir.radius * pxPerDeg), 0, 2 * Math.PI);
+                ctx.fillStyle = b.color;
+                ctx.fill();
+                ctx.strokeStyle = css('--surface');
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Beschriftung der Monatsbahnen am höchsten Punkt; nahe beieinander liegende zusammengefasst
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            if (state.settings.showMonthPaths) {
+                const labels = [];
+                for (const m of paths.months) {
+                    const top1 = m.pts.reduce((best, p) => p[1] > best[1] ? p : best, m.pts[0]);
+                    if (top1[1] < ALT_MIN || top1[0] < hzView.azMin || top1[0] > hzView.azMax) continue;
+                    const x = azToX(top1[0]), y = altToY(top1[1]) - 2;
+                    const near = labels.find(l => Math.abs(l.y - y) < 10 && Math.abs(l.x - x) < 40);
+                    if (near) near.text += '/' + m.label; else labels.push({ x, y, text: m.label });
+                }
+                for (const l of labels) haloText(ctx, l.text, l.x, l.y, css('--text-2'));
+            }
+            // Stundenlinien am oberen Ende beschriften
+            if (state.settings.showHourLines) {
+                for (const line of paths.hours) {
+                    const p = line.pts.reduce((best, q) => q[1] > best[1] ? q : best, line.pts[0]);
+                    if (p[1] < 2 || p[0] < hzView.azMin || p[0] > hzView.azMax) continue;
+                    haloText(ctx, line.label, azToX(p[0]), altToY(p[1]) - 2, css('--muted'));
+                }
+            }
+
+            // Achsen
+            ctx.fillStyle = css('--text-2');
+            ctx.textBaseline = 'top';
+            for (let a = Math.ceil(hzView.azMin / azStep) * azStep; a <= hzView.azMax; a += azStep) {
+                const label = a % 45 === 0 ? COMPASS[(a / 22.5) % 16] : a + '°';
+                ctx.fillText(label, azToX(a), top + ph + 6);
+            }
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let alt = 0; alt <= ALT_MAX; alt += 10) ctx.fillText(alt + '°', left - 5, altToY(alt));
+            ctx.strokeStyle = css('--axis');
+            ctx.lineWidth = 1;
+            ctx.strokeRect(left + 0.5, top + 0.5, pw - 1, ph - 1);
+        }
+
+        // Nächster Horizontpunkt des bearbeitbaren Standpunkts unter der Maus (Index oder −1)
+        function hitHorizonPoint(x, y) {
+            const vp = editableViewpoint();
+            if (!vp) return -1;
+            let best = -1, bestDist = 8;
+            vp.horizon.forEach(([a, h], i) => {
+                const d = Math.hypot(azToX(normalizeDegrees(a)) - x, altToY(h) - y);
+                if (d < bestDist) { best = i; bestDist = d; }
+            });
+            return best;
+        }
+
+        const round1 = x => Math.round(x * 10) / 10;
+        const clampAlt = h => Math.min(ALT_MAX, Math.max(ALT_MIN, h));
+        const clampAz = a => Math.min(360, Math.max(0, a));
+
+        function setupHorizonInteraction() {
+            const canvas = document.getElementById('horizonChart');
+            const tip = document.getElementById('horizonTooltip');
+            const pos = ev => {
+                const r = canvas.getBoundingClientRect();
+                return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+            };
+
+            canvas.addEventListener('contextmenu', ev => ev.preventDefault());
+            canvas.addEventListener('pointerdown', ev => {
+                const { x, y } = pos(ev);
+                const A = clampAz(xToAz(x)), h = clampAlt(yToAlt(y));
+                const vp = editableViewpoint();
+                canvas.setPointerCapture(ev.pointerId);
+                if (hzMode === 'horizon' && vp) {
+                    const hit = hitHorizonPoint(x, y);
+                    if (hit >= 0 && (ev.button === 2 || ev.shiftKey)) {
+                        vp.horizon.splice(hit, 1);
+                        maskChanged();
+                        return;
+                    }
+                    if (ev.button !== 0) return;
+                    let index = hit;
+                    if (index < 0) {
+                        vp.horizon.push([round1(A), round1(h)]);
+                        index = vp.horizon.length - 1;
+                        recompile();
+                        drawHorizonChart();
+                    }
+                    hzDrag = { type: 'point', index, moved: hit < 0 };
+                } else if (hzMode === 'sector' && vp && ev.button === 0) {
+                    hzDrag = { type: 'sector', startPos: [A, h], current: null };
+                } else {
+                    hzDrag = { type: 'pan', x, view: { ...hzView } };
+                }
+            });
+            canvas.addEventListener('pointermove', ev => {
+                const { x, y } = pos(ev);
+                const A = clampAz(xToAz(x)), h = clampAlt(yToAlt(y));
+                if (hzDrag && hzDrag.type === 'point') {
+                    editableViewpoint().horizon[hzDrag.index] = [round1(A), round1(h)];
+                    hzDrag.moved = true;
+                    recompile();
+                    drawHorizonChart();
+                } else if (hzDrag && hzDrag.type === 'sector') {
+                    hzDrag.current = [A, h];
+                    drawHorizonChart();
+                } else if (hzDrag && hzDrag.type === 'pan') {
+                    const span = hzDrag.view.azMax - hzDrag.view.azMin;
+                    let min = hzDrag.view.azMin - (x - hzDrag.x) / hzGeom.pw * span;
+                    min = Math.min(360 - span, Math.max(0, min));
+                    hzView = { azMin: min, azMax: min + span };
+                    drawHorizonChart();
+                }
+                // Tooltip: Richtung und ob sie frei ist
+                if (x < hzGeom.left || x > hzGeom.left + hzGeom.pw || y < hzGeom.top || y > hzGeom.top + hzGeom.ph) {
+                    tip.style.display = 'none';
+                    return;
+                }
+                const free = activeCompiled().some(vp => isDirectionVisible(vp, A, h));
+                showTooltip(tip, x, y, `Azimut ${fmtNum(A)}° (${compass(A)}) · Höhe ${fmtNum(h)}° · ${free ? 'frei' : 'verdeckt'}`);
+            });
+            const finish = () => {
+                const drag = hzDrag;
+                hzDrag = null;
+                if (!drag) return;
+                if (drag.type === 'point' && drag.moved) {
+                    maskChanged();
+                } else if (drag.type === 'sector' && drag.current) {
+                    const [a0, h0] = drag.startPos, [a1, h1] = drag.current;
+                    const r = x => Math.round(x * 2) / 2;
+                    if (Math.abs(a1 - a0) >= 1 && Math.abs(h1 - h0) >= 1) {
+                        editableViewpoint().sectors.push({
+                            azimuthFrom: r(Math.min(a0, a1)), azimuthTo: r(Math.max(a0, a1)),
+                            altitudeFrom: r(Math.min(h0, h1)), altitudeTo: r(Math.max(h0, h1)),
+                        });
+                        maskChanged();
+                    } else {
+                        drawHorizonChart();
+                    }
+                }
+            };
+            canvas.addEventListener('pointerup', finish);
+            canvas.addEventListener('pointercancel', finish);
+            canvas.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+            canvas.addEventListener('wheel', ev => {
+                ev.preventDefault();
+                const { x } = pos(ev);
+                const A = xToAz(x);
+                const span = hzView.azMax - hzView.azMin;
+                const newSpan = Math.min(360, Math.max(15, span * (ev.deltaY > 0 ? 1.25 : 0.8)));
+                let min = A - (A - hzView.azMin) * newSpan / span;
+                min = Math.min(360 - newSpan, Math.max(0, min));
+                hzView = { azMin: min, azMax: min + newSpan };
+                drawHorizonChart();
+            }, { passive: false });
+            canvas.addEventListener('dblclick', () => {
+                if (hzMode !== 'view') return;
+                hzView = { azMin: 0, azMax: 360 };
+                drawHorizonChart();
+            });
+        }
+
+        // Ausschnitt auf die Sichtbereiche des Standpunkts setzen
+        function zoomToSectors() {
+            const sectors = activeCompiled().flatMap(vp => vp.sectors);
+            if (!sectors.length) { hzView = { azMin: 0, azMax: 360 }; drawHorizonChart(); return; }
+            const spans = sectors.flatMap(s => azimuthSpans(s.azimuthFrom, s.azimuthTo));
+            let min = Math.min(...spans.map(s => s[0])) - 10, max = Math.max(...spans.map(s => s[1])) + 10;
+            min = Math.max(0, min);
+            max = Math.min(360, Math.max(max, min + 15));
+            hzView = { azMin: min, azMax: max };
+            drawHorizonChart();
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Tabellen der Maske                         //
+    /////////////////////////////////////////////////////////////////
+
+        function el(tag, props = {}, children = []) {
+            const e = document.createElement(tag);
+            Object.assign(e, props);
+            for (const c of children) e.append(c);
+            return e;
+        }
+
+        function numberInput(value, onChange, step = 0.5) {
+            const input = el('input', { type: 'number', step, value: String(value) });
+            input.addEventListener('input', () => {
+                const v = parseFloat(input.value);
+                if (Number.isFinite(v)) onChange(v);
+            });
+            return input;
+        }
+
+        function deleteButton(onClick) {
+            const b = el('button', { textContent: '×', title: 'Löschen' });
+            b.addEventListener('click', onClick);
+            return b;
+        }
+
+        function renderTables() {
+            const vp = editableViewpoint();
+            const sectorsBox = document.getElementById('sectorTable');
+            const horizonBox = document.getElementById('horizonTable');
+            const obsBox = document.getElementById('observationTable');
+            document.getElementById('maskTables').style.display = vp ? '' : 'none';
+            document.getElementById('maskTablesHint').style.display = vp ? 'none' : '';
+            if (!vp) return;
+
+            // Sichtbereiche
+            const sTable = el('table', { className: 'data' }, [el('tr', {}, ['Azimut von', 'bis', 'Höhe von', 'bis', ''].map(t => el('th', { textContent: t })))]);
+            vp.sectors.forEach((s, i) => {
+                const field = (key) => el('td', {}, [numberInput(s[key], v => { s[key] = v; maskChangedSoon(); })]);
+                sTable.append(el('tr', {}, [field('azimuthFrom'), field('azimuthTo'), field('altitudeFrom'), field('altitudeTo'),
+                    el('td', {}, [deleteButton(() => { vp.sectors.splice(i, 1); maskChanged(); })])]));
+            });
+            if (!vp.sectors.length) sTable.append(el('tr', {}, [el('td', { colSpan: 5, className: 'empty', textContent: 'keine – ganzer Himmel' })]));
+            sectorsBox.replaceChildren(sTable);
+
+            // Horizontpunkte, nach Azimut sortiert
+            vp.horizon.sort((p, q) => normalizeDegrees(p[0]) - normalizeDegrees(q[0]));
+            const hTable = el('table', { className: 'data' }, [el('tr', {}, ['Azimut', 'Höhe', ''].map(t => el('th', { textContent: t })))]);
+            vp.horizon.forEach((p, i) => {
+                hTable.append(el('tr', {}, [
+                    el('td', {}, [numberInput(p[0], v => { p[0] = v; maskChangedSoon(); })]),
+                    el('td', {}, [numberInput(p[1], v => { p[1] = v; maskChangedSoon(); })]),
+                    el('td', {}, [deleteButton(() => { vp.horizon.splice(i, 1); maskChanged(); })]),
+                ]));
+            });
+            if (!vp.horizon.length) hTable.append(el('tr', {}, [el('td', { colSpan: 3, className: 'empty', textContent: 'keine – Horizont 0°' })]));
+            horizonBox.replaceChildren(hTable);
+
+            // Beobachtungen
+            const loc = getLocation();
+            const oTable = el('table', { className: 'data' }, [el('tr', {}, ['Zeitpunkt (Lokalzeit)', 'Gestirn', 'Ereignis', 'Richtung', '', ''].map(t => el('th', { textContent: t })))]);
+            vp.observations.forEach((o, i) => {
+                const dirCell = el('td', { className: 'value' });
+                const refresh = () => {
+                    const d = observationDirection(o, getLocation());
+                    dirCell.textContent = d ? fmtDirection(d) : '–';
+                };
+                const d = new Date(o.time);
+                const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                const timeInput = el('input', { type: 'datetime-local', value: local });
+                timeInput.addEventListener('change', () => {
+                    const t = new Date(timeInput.value);
+                    if (isNaN(t.getTime())) return;
+                    o.time = t.toISOString();
+                    refresh();
+                    maskChanged(false);
+                });
+                const select = (options, key) => {
+                    const s = el('select', {}, options.map(([v, t]) => el('option', { value: v, textContent: t, selected: o[key] === v })));
+                    s.addEventListener('change', () => { o[key] = s.value; refresh(); maskChanged(false); });
+                    return s;
+                };
+                const take = el('button', { textContent: '→ Horizont', title: 'Richtung als Horizontpunkt übernehmen' });
+                take.addEventListener('click', () => {
+                    const dir = observationDirection(o, getLocation());
+                    if (dir) { vp.horizon.push([round1(dir.azimuth), round1(dir.altitude)]); maskChanged(); }
+                });
+                oTable.append(el('tr', {}, [
+                    el('td', {}, [timeInput]),
+                    el('td', {}, [select([['sun', 'Sonne'], ['moon', 'Mond']], 'body')]),
+                    el('td', {}, [select([['disappear', 'verschwand'], ['appear', 'erschien']], 'event')]),
+                    dirCell,
+                    el('td', {}, [take]),
+                    el('td', {}, [deleteButton(() => { vp.observations.splice(i, 1); maskChanged(); })]),
+                ]));
+                refresh();
+            });
+            if (!vp.observations.length) oTable.append(el('tr', {}, [el('td', { colSpan: 6, className: 'empty', textContent: 'keine' })]));
+            obsBox.replaceChildren(oTable);
+        }
+
+        function addSector() {
+            const vp = editableViewpoint();
+            if (!vp) return;
+            vp.sectors.push({ azimuthFrom: 90, azimuthTo: 270, altitudeFrom: 0, altitudeTo: 90 });
+            maskChanged();
+        }
+        function addHorizonPoint() {
+            const vp = editableViewpoint();
+            if (!vp) return;
+            vp.horizon.push([180, 10]);
+            maskChanged();
+        }
+        function addObservation() {
+            const vp = editableViewpoint();
+            if (!vp) return;
+            vp.observations.push({ time: new Date(Math.round(datetime.getTime() / 60000) * 60000).toISOString(),
+                                   body: 'sun', event: 'disappear' });
+            maskChanged();
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Standpunkte, Export/Import                 //
+    /////////////////////////////////////////////////////////////////
+
+        function renderViewpointSelect() {
+            const select = document.getElementById('viewpointSelect');
+            const options = state.viewpoints.map((vp, i) => el('option', { value: String(i), textContent: vp.name }));
+            if (state.viewpoints.length > 1) options.push(el('option', { value: '-1', textContent: 'Alle Standpunkte (von irgendeinem aus)' }));
+            select.replaceChildren(...options);
+            select.value = String(state.selected);
+            const editable = state.selected >= 0;
+            document.getElementById('renameViewpoint').disabled = !editable;
+            document.getElementById('deleteViewpoint').disabled = !editable || state.viewpoints.length < 2;
+            for (const r of document.querySelectorAll('input[name="hzMode"]')) r.disabled = !editable && r.value !== 'view';
+            if (!editable) {
+                hzMode = 'view';
+                document.querySelector('input[name="hzMode"][value="view"]').checked = true;
+            }
+        }
+
+        function selectViewpoint(index) {
+            state.selected = index;
+            saveState();
+            renderViewpointSelect();
+            renderTables();
+            redrawAll();
+        }
+
+        function newViewpoint() {
+            const name = prompt('Name des neuen Standpunkts:', 'Fenster');
+            if (!name) return;
+            state.viewpoints.push({ name, sectors: [], horizon: [], observations: [] });
+            recompile();
+            selectViewpoint(state.viewpoints.length - 1);
+        }
+        function renameViewpoint() {
+            const vp = editableViewpoint();
+            if (!vp) return;
+            const name = prompt('Neuer Name:', vp.name);
+            if (!name) return;
+            vp.name = name;
+            recompile();
+            saveState();
+            renderViewpointSelect();
+            redrawAll();
+        }
+        function deleteViewpoint() {
+            const vp = editableViewpoint();
+            if (!vp || state.viewpoints.length < 2 || !confirm(`Standpunkt „${vp.name}“ löschen?`)) return;
+            state.viewpoints.splice(state.selected, 1);
+            recompile();
+            selectViewpoint(0);
+        }
+
+        function exportJson() {
+            const data = { location: { latitude, longitude }, ...state };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = el('a', { href: URL.createObjectURL(blob), download: 'sichtbarkeit.json' });
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        }
+        function importJson(file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const data = JSON.parse(reader.result);
+                    state = normalizeState(data);
+                    recompile();
+                    saveState();
+                    if (data.location && Number.isFinite(data.location.latitude) && Number.isFinite(data.location.longitude)) {
+                        setLocation(data.location.latitude, data.location.longitude);
+                    }
+                    renderViewpointSelect();
+                    renderTables();
+                    redrawAll();
+                } catch (e) {
+                    alert('Datei konnte nicht gelesen werden: ' + e.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Ort setzen (Karte, Import) wie über die Eingabefelder
+        function setLocation(lat, lon) {
+            latitude = lat;
+            longitude = lon;
+            document.getElementById('latitude').value = lat.toFixed(6);
+            document.getElementById('longitude').value = lon.toFixed(6);
+            fillSiderealTime(siderealTimeHours(currentJd()));
+            saveData();
+            update();
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Karte                                      //
+    /////////////////////////////////////////////////////////////////
+
+        let leafletMap = null, locationMarker = null, overlayLayer = null;
+        const VP_COLORS = ['--accent', '--moon', '--sun', '--text-2'];
+
+        // Punkt in Entfernung dist [m] und Azimut az [°] vom Standort (ebene Näherung)
+        function destination(lat, lon, az, dist) {
+            const R = 6371000;
+            const a = az * DEG2RAD;
+            return [lat + dist * Math.cos(a) / R * RAD2DEG,
+                    lon + dist * Math.sin(a) / (R * Math.cos(lat * DEG2RAD)) * RAD2DEG];
+        }
+
+        function initMap() {
+            if (typeof L === 'undefined') {
+                document.getElementById('map').innerHTML = '<p class="hint" style="padding:12px">Karte nicht verfügbar (Leaflet konnte nicht geladen werden – keine Internetverbindung?).</p>';
+                return;
+            }
+            // OSM-Kacheln verlangen einen Referer; von file:// aus kommt nur „Access blocked“
+            if (location.protocol === 'file:') document.getElementById('mapFileHint').style.display = '';
+            leafletMap = L.map('map').setView([latitude, longitude], 17);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende',
+            }).addTo(leafletMap);
+            overlayLayer = L.layerGroup().addTo(leafletMap);
+            locationMarker = L.marker([latitude, longitude], { draggable: true, title: 'Standort (ziehen zum Verschieben)' }).addTo(leafletMap);
+            locationMarker.on('dragend', () => {
+                const p = locationMarker.getLatLng();
+                setLocation(p.lat, p.lng);
+            });
+        }
+
+        function drawMap() {
+            if (!leafletMap) return;
+            const here = [latitude, longitude];
+            locationMarker.setLatLng(here);
+            if (!leafletMap.getBounds().pad(-0.1).contains(here)) leafletMap.panTo(here);
+            overlayLayer.clearLayers();
+            const loc = getLocation();
+
+            // Sonnenwenden: Auf- und Untergangsrichtung
+            const year = selectedYear();
+            for (const [type, label] of [[EquinoxType.Summer, '21.6.'], [EquinoxType.Winter, '21.12.']]) {
+                const jd = calculateEquinoxSolstice(year, type);
+                const rs = calculateSunRiseSet(jd, loc);
+                const midnight = julianDayMidnight(jd);
+                for (const [has, hours, what] of [[rs.hasRise, rs.rise, 'Sonnenaufgang'], [rs.hasSet, rs.set, 'Sonnenuntergang']]) {
+                    if (!has) continue;
+                    const az = sunDirection(midnight + hours / 24, loc).azimuth;
+                    L.polyline([here, destination(latitude, longitude, az, 140)],
+                               { color: css('--muted'), weight: 1.5, dashArray: '4 4' })
+                        .bindTooltip(`${what} ${label}: ${fmtNum(az, 0)}° ${compass(az)}`).addTo(overlayLayer);
+                }
+            }
+
+            // Sichtbereiche und Horizontpunkte
+            activeIndices().forEach((idx, n) => {
+                const vp = compiledVps[idx];
+                const color = css(VP_COLORS[n % VP_COLORS.length]);
+                for (const s of vp.sectors) {
+                    const pts = [here];
+                    const span = normalizeDegrees(s.azimuthTo - s.azimuthFrom) || 360;
+                    for (let k = 0; k <= 36; k++) pts.push(destination(latitude, longitude, s.azimuthFrom + span * k / 36, 100));
+                    L.polygon(pts, { color, weight: 1.5, fillOpacity: 0.12 })
+                        .bindTooltip(`${vp.name}: ${fmtNum(s.azimuthFrom, 0)}°–${fmtNum(s.azimuthTo, 0)}°, Höhe ${fmtNum(s.altitudeFrom, 0)}°–${fmtNum(s.altitudeTo, 0)}°`)
+                        .addTo(overlayLayer);
+                }
+                for (const [a, h] of vp.horizon) {
+                    L.polyline([here, destination(latitude, longitude, a, 70)], { color, weight: 1, opacity: 0.8 })
+                        .bindTooltip(`${vp.name}: Horizont ${fmtNum(a, 0)}° ${compass(a)}, ${fmtNum(h)}°`).addTo(overlayLayer);
+                }
+            });
+
+            // Sonne und Mond zum gewählten Zeitpunkt
+            const jd = currentJd();
+            const vps = activeCompiled();
+            for (const [dir, colorName, name] of [[sunDirection(jd, loc), '--sun', 'Sonne'], [moonDirection(jd, loc), '--moon', 'Mond']]) {
+                const level = Math.max(...vps.map(vp => visibilityLevel(dir, vp)));
+                const visible = level >= VisibilityLevel.Partial;
+                const below = level === VisibilityLevel.Below;
+                L.polyline([here, destination(latitude, longitude, dir.azimuth, 170)], {
+                    color: css(colorName), weight: visible ? 4 : 2.5, dashArray: visible ? null : '6 6', opacity: below ? 0.45 : 0.95,
+                }).bindTooltip(`${name}: ${fmtDirection(dir)} – ${LEVEL_TEXT[level]}`).addTo(overlayLayer);
+            }
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Jahres-Heatmap                             //
+    /////////////////////////////////////////////////////////////////
+
+        let yearCache = { key: null };
+        let yearGeom = null;
+
+        function computeYear() {
+            const year = selectedYear();
+            const key = [latitude, longitude, year, useLocalTime, maskVersion, state.selected].join('|');
+            if (yearCache.key === key) return yearCache;
+            const loc = getLocation();
+            const starts = yearDayStarts(year);
+            const grid = computeLevelGrid('sun', starts, YEAR_STEP, loc, activeCompiled());
+            // Sonnenstunden je Tag: Mittelpunkt sichtbar bzw. über dem Horizont
+            const visibleHours = new Float32Array(starts.length), dayHours = new Float32Array(starts.length);
+            for (let d = 0; d < starts.length; d++) {
+                for (let k = 0; k < grid.slots; k++) {
+                    const l = grid.levels[d * grid.slots + k];
+                    if (l === VisibilityLevel.Visible) visibleHours[d] += YEAR_STEP / 60;
+                    if (l !== VisibilityLevel.Below) dayHours[d] += YEAR_STEP / 60;
+                }
+            }
+            // Tage mit Zeitumstellung (Offset ändert sich gegenüber dem Vortag)
+            const dstChanges = [];
+            if (useLocalTime) {
+                for (let d = 1; d < starts.length; d++) {
+                    const o0 = julianDayToDate(starts[d - 1] + 0.5).getTimezoneOffset();
+                    const o1 = julianDayToDate(starts[d] + 0.5).getTimezoneOffset();
+                    if (o0 !== o1) dstChanges.push(d);
+                }
+            }
+            yearCache = { key, year, starts, grid, visibleHours, dayHours, dstChanges };
+            return yearCache;
+        }
+
+        function drawYearChart() {
+            const data = computeYear();
+            const canvas = document.getElementById('yearChart');
+            const { ctx, w, h } = setupCanvas(canvas, 300);
+            yearGeom = { left: 38, top: 8, pw: w - 38 - 10, ph: h - 8 - 22 };
+            const { left, top, pw, ph } = yearGeom;
+            const days = data.starts.length, slots = data.grid.slots;
+
+            ctx.fillStyle = css('--surface');
+            ctx.fillRect(0, 0, w, h);
+
+            // Raster als Bild: Spalte = Tag, Zeile = Uhrzeit (0 h oben)
+            const colors = ['--night', '--hidden', '--partial', '--sun'].map(cssColor);
+            const img = new ImageData(days, slots);
+            for (let d = 0; d < days; d++) {
+                for (let k = 0; k < slots; k++) {
+                    const c = colors[data.grid.levels[d * slots + k]];
+                    const o = (k * days + d) * 4;
+                    img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+                }
+            }
+            const off = document.createElement('canvas');
+            off.width = days;
+            off.height = slots;
+            off.getContext('2d').putImageData(img, 0, 0);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(off, left, top, pw, ph);
+
+            // Zeitumstellung
+            ctx.strokeStyle = css('--text');
+            ctx.setLineDash([3, 3]);
+            ctx.lineWidth = 1;
+            for (const d of data.dstChanges) {
+                const x = left + d / days * pw;
+                ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + ph); ctx.stroke();
+            }
+            ctx.setLineDash([]);
+
+            // Gewählter Tag und Uhrzeit
+            const sel = selectedYearPosition(data);
+            if (sel) {
+                ctx.strokeStyle = css('--accent');
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(sel.x, top); ctx.lineTo(sel.x, top + ph);
+                ctx.moveTo(left, sel.y); ctx.lineTo(left + pw, sel.y);
+                ctx.stroke();
+            }
+
+            // Achsen
+            ctx.fillStyle = css('--text-2');
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let hr = 0; hr <= 24; hr += 3) ctx.fillText(hr + ' h', left - 5, top + hr / 24 * ph);
+            drawMonthAxis(ctx, data, left, pw, top + ph + 4);
+            ctx.strokeStyle = css('--axis');
+            ctx.strokeRect(left + 0.5, top + 0.5, pw - 1, ph - 1);
+
+            drawSunHoursChart(data);
+        }
+
+        // Monatsbeschriftung unter einer Tagesachse
+        function drawMonthAxis(ctx, data, left, pw, y) {
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = css('--text-2');
+            const days = data.starts.length;
+            for (let m = 0; m < 12; m++) {
+                const first = useLocalTime ? julianDayFromDate(new Date(data.year, m, 1)) : julianDayFromCalendar(data.year, m + 1, 1, 0);
+                const next = useLocalTime ? julianDayFromDate(new Date(data.year, m + 1, 1)) : julianDayFromCalendar(data.year, m + 2, 1, 0);
+                const d0 = Math.round(first - data.starts[0]), d1 = Math.round(next - data.starts[0]);
+                ctx.fillText(MONTH_NAMES[m], left + (d0 + d1) / 2 / days * pw, y);
+                if (m > 0) ctx.fillRect(left + d0 / days * pw, y - 4, 1, 4);
+            }
+        }
+
+        // Position des gewählten Zeitpunkts in der Heatmap (null außerhalb des Jahres)
+        function selectedYearPosition(data) {
+            const jd = currentJd();
+            const d = data.starts.findIndex((s, i) => jd >= s && (i + 1 >= data.starts.length || jd < data.starts[i + 1]));
+            if (d < 0 || jd < data.starts[0]) return null;
+            const frac = (jd - data.starts[d]) * 24;
+            return { x: yearGeom.left + (d + 0.5) / data.starts.length * yearGeom.pw, y: yearGeom.top + Math.min(24, frac) / 24 * yearGeom.ph };
+        }
+
+        function drawSunHoursChart(data) {
+            const canvas = document.getElementById('sunHoursChart');
+            const { ctx, w, h } = setupCanvas(canvas, 170);
+            const left = 38, top = 8, pw = w - 38 - 10, ph = h - 8 - 22;
+            const days = data.starts.length;
+            const maxH = Math.max(4, Math.ceil(Math.max(...data.dayHours) / 2) * 2);
+            const x = d => left + (d + 0.5) / days * pw;
+            const y = v => top + ph - v / maxH * ph;
+
+            ctx.fillStyle = css('--surface');
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = css('--grid');
+            ctx.fillStyle = css('--text-2');
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            const step = maxH > 12 ? 4 : 2;
+            for (let v = 0; v <= maxH; v += step) {
+                ctx.beginPath(); ctx.moveTo(left, y(v)); ctx.lineTo(left + pw, y(v)); ctx.stroke();
+                ctx.fillText(v + ' h', left - 5, y(v));
+            }
+            // Fläche: Mittelpunkt sichtbar
+            ctx.fillStyle = css('--sun');
+            ctx.globalAlpha = 0.35;
+            ctx.beginPath();
+            ctx.moveTo(x(0), y(0));
+            for (let d = 0; d < days; d++) ctx.lineTo(x(d), y(data.visibleHours[d]));
+            ctx.lineTo(x(days - 1), y(0));
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            const line = (values, color, dash) => {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.6;
+                ctx.setLineDash(dash);
+                ctx.beginPath();
+                for (let d = 0; d < days; d++) d ? ctx.lineTo(x(d), y(values[d])) : ctx.moveTo(x(d), y(values[d]));
+                ctx.stroke();
+                ctx.setLineDash([]);
+            };
+            line(data.dayHours, css('--muted'), [4, 3]);
+            line(data.visibleHours, css('--sun'), []);
+            const sel = selectedYearPosition(data);
+            if (sel) {
+                ctx.strokeStyle = css('--accent');
+                ctx.beginPath(); ctx.moveTo(sel.x, top); ctx.lineTo(sel.x, top + ph); ctx.stroke();
+            }
+            drawMonthAxis(ctx, data, left, pw, top + ph + 4);
+            ctx.strokeStyle = css('--axis');
+            ctx.strokeRect(left + 0.5, top + 0.5, pw - 1, ph - 1);
+
+            // Summe im Jahr
+            const total = data.visibleHours.reduce((s, v) => s + v, 0);
+            document.getElementById('yearSummary').textContent =
+                `Im Jahr ${data.year} ist die Sonne insgesamt etwa ${Math.round(total)} Stunden sichtbar (Mittelpunkt), ` +
+                `an ${data.visibleHours.filter(v => v > 0).length} von ${days} Tagen.`;
+        }
+
+        function setupYearInteraction() {
+            const canvas = document.getElementById('yearChart');
+            const tip = document.getElementById('yearTooltip');
+            const cell = ev => {
+                const r = canvas.getBoundingClientRect();
+                const x = ev.clientX - r.left, y = ev.clientY - r.top;
+                const g = yearGeom, data = yearCache;
+                if (!g || !data.starts || x < g.left || x > g.left + g.pw || y < g.top || y > g.top + g.ph) return null;
+                const d = Math.min(data.starts.length - 1, Math.floor((x - g.left) / g.pw * data.starts.length));
+                const k = Math.min(data.grid.slots - 1, Math.floor((y - g.top) / g.ph * data.grid.slots));
+                return { x, y, d, k, jd: data.starts[d] + (k + 0.5) * YEAR_STEP / 1440, level: data.grid.levels[d * data.grid.slots + k] };
+            };
+            canvas.addEventListener('pointermove', ev => {
+                const c = cell(ev);
+                if (!c) { tip.style.display = 'none'; return; }
+                const hours = yearCache.visibleHours[c.d];
+                showTooltip(tip, c.x, c.y, `${fmtDate(c.jd)} ${fmtTime(c.jd)} – Sonne ${LEVEL_TEXT[c.level]} · Tag: ${fmtDuration(hours * 60)} sichtbar`);
+            });
+            canvas.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+            canvas.addEventListener('click', ev => {
+                const c = cell(ev);
+                if (c) setDatetime(julianDayToDate(c.jd));
+            });
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Tagesdetail                                //
+    /////////////////////////////////////////////////////////////////
+
+        function drawDay() {
+            const loc = getLocation();
+            const day = dayWindow(currentJd());
+            const vps = activeCompiled();
+            const step = 2;
+            const series = {
+                sun: computeLevelSeries('sun', day.start, day.end, step, loc, vps),
+                moon: computeLevelSeries('moon', day.start, day.end, step, loc, vps),
+            };
+
+            const canvas = document.getElementById('dayChart');
+            const { ctx, w, h } = setupCanvas(canvas, 96);
+            const left = 52, top = 6, pw = w - 52 - 10, rowH = 28, gap = 8;
+            const x = jd => left + (jd - day.start) / (day.end - day.start) * pw;
+            ctx.fillStyle = css('--surface');
+            ctx.fillRect(0, 0, w, h);
+
+            const rows = [['sun', 'Sonne', ['--surface-2', '--hidden', '--partial', '--sun']],
+                          ['moon', 'Mond', ['--surface-2', '--hidden', '--moon', '--moon']]];
+            ctx.font = '12px Arial';
+            rows.forEach(([body, label, colorNames], r) => {
+                const y = top + r * (rowH + gap);
+                const colors = colorNames.map(css);
+                const s = series[body];
+                for (let k = 0; k < s.levels.length; k++) {
+                    const l = s.levels[k];
+                    ctx.fillStyle = colors[l];
+                    ctx.globalAlpha = body === 'moon' && l === VisibilityLevel.Partial ? 0.5 : 1;
+                    const x0 = x(day.start + k * s.step), x1 = x(Math.min(day.end, day.start + (k + 1) * s.step));
+                    ctx.fillRect(x0, y, x1 - x0 + 0.5, rowH);
+                }
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = css('--text-2');
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, left - 6, y + rowH / 2);
+            });
+
+            // Stunden (Uhrzeit der gewählten Zeitzone)
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.font = '11px Arial';
+            const yAxis = top + 2 * rowH + gap + 4;
+            const p = timeParts(day.start + 0.25);
+            for (let hr = 0; hr <= 25; hr++) {
+                const jd = useLocalTime ? julianDayFromDate(new Date(p.y, p.mo, p.d, hr)) : day.start + hr / 24;
+                if (jd > day.end + 1e-6) break;
+                const xx = x(jd);
+                ctx.fillStyle = css('--axis');
+                ctx.fillRect(xx, yAxis - 3, 1, 3);
+                if (hr % 3 === 0) {
+                    ctx.fillStyle = css('--text-2');
+                    ctx.fillText(fmtTime(jd), xx, yAxis);
+                }
+            }
+            const now = currentJd();
+            ctx.strokeStyle = css('--accent');
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(x(now), top - 2); ctx.lineTo(x(now), top + 2 * rowH + gap + 2); ctx.stroke();
+
+            // Tabelle der Intervalle
+            const multi = vps.length > 1;
+            const table = el('table', { className: 'data' }, [el('tr', {}, ['', 'von', 'bis', 'Dauer', 'Eintritt', 'Austritt', 'max. Höhe', 'Mittelpunkt / Phase']
+                .concat(multi ? ['Standpunkte'] : []).map(t => el('th', { textContent: t })))]);
+            let any = false;
+            for (const body of ['sun', 'moon']) {
+                for (const iv of findVisibilityIntervals(body, day.start, day.end, loc, vps)) {
+                    any = true;
+                    const extra = body === 'sun'
+                        ? (iv.centerStart !== null ? `${fmtTime(iv.centerStart)}–${fmtTime(iv.centerEnd)}` : 'nur Rand')
+                        : `${phaseSymbol(iv.illuminatedFraction, iv.waxing)} ${Math.round(iv.illuminatedFraction * 100)} %`;
+                    table.append(el('tr', {}, [
+                        el('td', { textContent: body === 'sun' ? 'Sonne' : 'Mond' }),
+                        el('td', { textContent: (iv.startsBefore ? '(' : '') + fmtTime(iv.start) }),
+                        el('td', { textContent: fmtTime(iv.end) + (iv.endsAfter ? ')' : '') }),
+                        el('td', { textContent: fmtDuration(iv.duration) }),
+                        el('td', { textContent: fmtDirection(iv.entry) }),
+                        el('td', { textContent: fmtDirection(iv.exit) }),
+                        el('td', { textContent: fmtNum(iv.maxAltitude) + '°' }),
+                        el('td', { textContent: extra }),
+                    ].concat(multi ? [el('td', { textContent: iv.viewpoints.join(', ') })] : [])));
+                }
+            }
+            if (!any) table.append(el('tr', {}, [el('td', { colSpan: 8, className: 'empty', textContent: 'An diesem Tag sind weder Sonne noch Mond sichtbar.' })]));
+            document.getElementById('dayTable').replaceChildren(table);
+
+            // Auf-/Untergang bei freiem Horizont zum Vergleich
+            const rs = calculateSunRiseSet(currentJd(), loc, dayUtcOffset());
+            const ms = calculateMoonRiseSet(currentJd(), loc, dayUtcOffset());
+            const t = (has, hrs) => has ? hoursToString(hrs) : '–';
+            document.getElementById('dayTitle').textContent = `${fmtDate(day.start + 0.25)}${timeParts(day.start + 0.25).y} (${timeZoneLabel()})`;
+            document.getElementById('dayFree').textContent =
+                `Bei freiem Horizont: Sonne ${t(rs.hasRise, rs.rise)}–${t(rs.hasSet, rs.set)}, Mond Aufgang ${t(ms.hasRise, ms.rise)}, Untergang ${t(ms.hasSet, ms.set)}.`;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Mond-Termine                               //
+    /////////////////////////////////////////////////////////////////
+
+        let moonCache = { key: null };
+
+        function computeMoonList() {
+            const s = state.settings;
+            const day = dayWindow(currentJd());
+            const key = [latitude, longitude, day.start, maskVersion, state.selected, s.moonListMonths, s.moonOnlyDark, useLocalTime].join('|');
+            if (moonCache.key === key) return moonCache;
+            const loc = getLocation();
+            const end = day.start + s.moonListMonths * 30.44;
+            const eph = createMoonEphemeris(day.start - 0.1, end + 0.1);
+            const intervals = findVisibilityIntervals('moon', day.start, end, loc, activeCompiled(),
+                                                      { ephemeris: eph, requireDark: s.moonOnlyDark });
+            moonCache = { key, intervals, fullMoons: findFullMoons(eph) };
+            return moonCache;
+        }
+
+        function drawMoonList() {
+            const s = state.settings;
+            const data = computeMoonList();
+            const list = data.intervals.filter(iv => iv.duration >= s.moonMinDuration
+                                                     && iv.illuminatedFraction * 100 >= s.moonMinIllumination);
+            const multi = activeIndices().length > 1;
+            const table = el('table', { className: 'data' }, [el('tr', {}, ['Datum', 'von', 'bis', 'Dauer', 'Richtung', 'max. Höhe', 'Phase']
+                .concat(multi ? ['Standpunkte'] : []).map(t => el('th', { textContent: t })))]);
+            for (const iv of list) {
+                const mid = (iv.start + iv.end) / 2;
+                const nearFull = data.fullMoons.some(f => Math.abs(f - mid) <= 2);
+                const tr = el('tr', { className: 'clickable' + (nearFull ? ' full' : ''), title: 'Tag anzeigen' }, [
+                    el('td', { textContent: fmtDate(iv.start) }),
+                    el('td', { textContent: (iv.startsBefore ? '(' : '') + fmtTime(iv.start) }),
+                    el('td', { textContent: fmtTime(iv.end) + (iv.endsAfter ? ')' : '') }),
+                    el('td', { textContent: fmtDuration(iv.duration) }),
+                    el('td', { textContent: `${compass(iv.entry.azimuth)} → ${compass(iv.exit.azimuth)}` }),
+                    el('td', { textContent: fmtNum(iv.maxAltitude) + '°' }),
+                    el('td', { textContent: `${phaseSymbol(iv.illuminatedFraction, iv.waxing)} ${Math.round(iv.illuminatedFraction * 100)} %` }),
+                ].concat(multi ? [el('td', { textContent: iv.viewpoints.join(', ') })] : []));
+                tr.addEventListener('click', () => {
+                    setDatetime(julianDayToDate(iv.start));
+                    document.getElementById('daySection').scrollIntoView({ behavior: 'smooth' });
+                });
+                table.append(tr);
+            }
+            if (!list.length) table.append(el('tr', {}, [el('td', { colSpan: 7, className: 'empty', textContent: 'Keine Termine im Zeitraum.' })]));
+            document.getElementById('moonList').replaceChildren(table);
+            document.getElementById('moonSummary').textContent =
+                `${list.length} Termine in ${s.moonListMonths} Monaten ab ${fmtDate(dayWindow(currentJd()).start + 0.25, false)}${timeParts(dayWindow(currentJd()).start + 0.25).y}` +
+                (data.intervals.length !== list.length ? ` (${data.intervals.length - list.length} ausgefiltert)` : '') + '.';
+        }
+
+        function setupMoonControls() {
+            const s = state.settings;
+            const bind = (id, key, parse) => {
+                const input = document.getElementById(id);
+                if (input.type === 'checkbox') input.checked = s[key]; else input.value = String(s[key]);
+                input.addEventListener('change', () => {
+                    const v = input.type === 'checkbox' ? input.checked : parse(input.value);
+                    if (input.type !== 'checkbox' && !Number.isFinite(v)) return;
+                    s[key] = v;
+                    saveState();
+                    drawMoonList();
+                });
+            };
+            bind('moonMonths', 'moonListMonths', Number);
+            bind('moonMinDuration', 'moonMinDuration', parseFloat);
+            bind('moonMinIllumination', 'moonMinIllumination', parseFloat);
+            bind('moonOnlyDark', 'moonOnlyDark');
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                  Aktualisierung und Start                   //
+    /////////////////////////////////////////////////////////////////
+
+        function redrawAll() {
+            drawHorizonChart();
+            drawMap();
+            drawYearChart();
+            drawDay();
+            drawMoonList();
+        }
+
+        // Von ui.js bei jeder Änderung von Zeit oder Ort aufgerufen
+        function update() {
+            if (!ready) return;
+            redrawAll();
+        }
+
+        window.onload = function () {
+            // Ohne gespeicherten Ort Berlin vorbelegen
+            initUI();
+            if (!localStorage.getItem('latitude') && !localStorage.getItem('longitude')) {
+                document.getElementById('latitude').value = '52.52';
+                document.getElementById('longitude').value = '13.405';
+                latitude = 52.52;
+                longitude = 13.405;
+                fillSiderealTime(siderealTimeHours(currentJd()));
+            }
+            // Standard: Lokalzeit
+            document.getElementById('localTime').checked = true;
+            useLocalTime = true;
+            fillGregorianDate(datetime);
+            createTimeButtons('timeButtons', [
+                { label: '10 min', step: 10 * 60000 }, { label: '1 Std', step: 3600000 },
+                { label: '1 Tag', step: 86400000 }, { label: '7 Tage', step: 7 * 86400000 },
+            ]);
+
+            recompile();
+            renderViewpointSelect();
+            renderTables();
+            setupHorizonInteraction();
+            setupYearInteraction();
+            setupMoonControls();
+            initMap();
+
+            document.getElementById('viewpointSelect').addEventListener('change', ev => selectViewpoint(Number(ev.target.value)));
+            for (const r of document.querySelectorAll('input[name="hzMode"]')) {
+                r.addEventListener('change', () => { if (r.checked) hzMode = r.value; });
+            }
+            for (const [id, key] of [['showMonthPaths', 'showMonthPaths'], ['showHourLines', 'showHourLines'], ['showMoon', 'showMoon']]) {
+                const box = document.getElementById(id);
+                box.checked = state.settings[key];
+                box.addEventListener('change', () => { state.settings[key] = box.checked; saveState(); drawHorizonChart(); });
+            }
+            document.getElementById('importFile').addEventListener('change', ev => {
+                if (ev.target.files.length) importJson(ev.target.files[0]);
+                ev.target.value = '';
+            });
+
+            let resizeTimer = null;
+            new ResizeObserver(() => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => { drawHorizonChart(); drawYearChart(); drawDay(); }, 100);
+            }).observe(document.body);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+
+            ready = true;
+            update();
+        };
+    </script>
+</head>
+<body>
+    <h1>Sonne und Mond vom Balkon</h1>
+    <p>Wann ist die Sonne auf dem Balkon, wann sieht man den Mond vom Fenster aus? Für jeden Standpunkt beschreibt eine
+        <b>Sichtmaske</b>, welche Richtungen am Himmel frei sind: ein oder mehrere Sichtbereiche (Azimut und Höhe von–bis)
+        und eine Horizontlinie für Hindernisse wie Nachbarhäuser oder Bäume. Daraus berechnet die Seite, wann Sonne und
+        Mond in einem freien Bereich stehen. Grundlage ist das <a href="Konzept-Sichtbarkeit.md">Konzept</a> (Stufe 1).</p>
+
+    <div id="locationControls"></div>
+    <div id="timeControls"></div>
+    <div id="timeButtons"></div>
+
+    <div class="controls">
+        <label>Standpunkt <select id="viewpointSelect"></select></label>
+        <button onclick="newViewpoint()">Neu</button>
+        <button id="renameViewpoint" onclick="renameViewpoint()">Umbenennen</button>
+        <button id="deleteViewpoint" onclick="deleteViewpoint()">Löschen</button>
+        <span style="flex:1"></span>
+        <button onclick="exportJson()">Exportieren</button>
+        <label><button onclick="document.getElementById('importFile').click()">Importieren</button>
+            <input type="file" id="importFile" accept="application/json,.json" style="display:none"></label>
+    </div>
+
+    <h2>Horizontdiagramm</h2>
+    <div class="controls">
+        <label><input type="radio" name="hzMode" value="view" checked> Ansehen</label>
+        <label><input type="radio" name="hzMode" value="sector"> Sichtbereich aufziehen</label>
+        <label><input type="radio" name="hzMode" value="horizon"> Horizontpunkte setzen</label>
+        <span style="flex:1"></span>
+        <label><input type="checkbox" id="showMonthPaths"> Sonnenbahnen</label>
+        <label><input type="checkbox" id="showHourLines"> Stundenlinien</label>
+        <label><input type="checkbox" id="showMoon"> Mond</label>
+        <button onclick="zoomToSectors()">Auf Sichtbereich</button>
+    </div>
+    <div class="legend">
+        <span class="swatch" style="--c: var(--mask)">verdeckt</span>
+        <span style="--c: var(--accent)">Sichtbereich, Horizontlinie</span>
+        <span style="--c: var(--sun)">Sonne heute</span>
+        <span style="--c: var(--moon)">Mond heute</span>
+        <span style="--c: color-mix(in srgb, var(--sun) 45%, transparent)">Sonnenbahn am 21. jedes Monats</span>
+        <span class="dashed" style="--c: var(--muted)">Stundenlinie (Normalzeit)</span>
+    </div>
+    <div class="figure">
+        <canvas id="horizonChart"></canvas>
+        <div class="tooltip" id="horizonTooltip"></div>
+    </div>
+    <p class="hint">Azimut von Norden über Osten, Süden in der Mitte; Höhe mit Refraktion. Mausrad: zoomen · Ziehen: verschieben ·
+        Doppelklick: ganzer Horizont. Beim Bearbeiten: Rechteck aufziehen bzw. klicken für einen neuen Horizontpunkt,
+        Punkte ziehen, Rechtsklick oder Umschalt+Klick löscht einen Punkt.</p>
+
+    <p id="maskTablesHint" class="hint" style="display:none">Zum Bearbeiten einen einzelnen Standpunkt wählen.</p>
+    <div id="maskTables" class="tables">
+        <div>
+            <h3>Sichtbereiche</h3>
+            <div id="sectorTable"></div>
+            <button onclick="addSector()">+ Sichtbereich</button>
+        </div>
+        <div>
+            <h3>Horizontlinie</h3>
+            <div id="horizonTable"></div>
+            <button onclick="addHorizonPoint()">+ Punkt</button>
+        </div>
+        <div>
+            <h3>Beobachtungen</h3>
+            <div id="observationTable" class="scroll"></div>
+            <button onclick="addObservation()">+ Beobachtung</button>
+            <p class="hint">Wann ist die Sonne oder der Mond hinter einem Hindernis verschwunden oder aufgetaucht?
+                Die Richtung (Mittelpunkt der Scheibe) erscheint als Kreuz im Diagramm und lässt sich als Horizontpunkt übernehmen.</p>
+        </div>
+    </div>
+
+    <h2>Karte</h2>
+    <p id="mapFileHint" class="hint" style="display:none">Die Seite ist als Datei geöffnet. OpenStreetMap liefert dann
+        keine Kartenkacheln („Access blocked“), weil die Nutzungsregeln einen Referer verlangen. Abhilfe: im Ordner
+        <code>python3 -m http.server 8000</code> starten und <code>http://localhost:8000/Sichtbarkeit.html</code> öffnen.</p>
+    <div id="map"></div>
+    <div class="legend">
+        <span style="--c: var(--accent)">Sichtbereich, Horizontpunkte</span>
+        <span style="--c: var(--sun)">Sonne</span>
+        <span style="--c: var(--moon)">Mond</span>
+        <span class="dashed" style="--c: var(--muted)">Sonnenauf-/-untergang am 21.6. und 21.12.</span>
+    </div>
+    <p class="hint">Den Standort-Marker an die eigene Position ziehen. Richtung zu Sonne und Mond zum eingestellten
+        Zeitpunkt: durchgezogen = sichtbar, gestrichelt = verdeckt, blass = unter dem Horizont.</p>
+
+    <h2>Jahresübersicht Sonne</h2>
+    <div class="legend">
+        <span class="swatch" style="--c: var(--sun)">sichtbar</span>
+        <span class="swatch" style="--c: var(--partial)">teilweise</span>
+        <span class="swatch" style="--c: var(--hidden)">über dem Horizont, verdeckt</span>
+        <span class="swatch" style="--c: var(--night)">Nacht</span>
+        <span class="dashed" style="--c: var(--text)">Zeitumstellung</span>
+    </div>
+    <div class="figure">
+        <canvas id="yearChart" style="cursor:crosshair"></canvas>
+        <div class="tooltip" id="yearTooltip"></div>
+    </div>
+    <div class="legend">
+        <span style="--c: var(--sun)">Stunden mit sichtbarer Sonne</span>
+        <span class="dashed" style="--c: var(--muted)">Tageslänge</span>
+    </div>
+    <canvas id="sunHoursChart"></canvas>
+    <p class="hint"><span id="yearSummary"></span> Klick in die Übersicht wählt Tag und Uhrzeit.</p>
+
+    <h2 id="daySection">Tag: <span id="dayTitle"></span></h2>
+    <canvas id="dayChart"></canvas>
+    <p class="hint" id="dayFree"></p>
+    <div id="dayTable" class="scroll"></div>
+
+    <h2>Mond-Termine</h2>
+    <div class="controls">
+        <label>Zeitraum <select id="moonMonths"><option value="3">3 Monate</option><option value="12">12 Monate</option></select></label>
+        <label>mind. <input type="number" id="moonMinDuration" min="0" step="5"> min</label>
+        <label>Beleuchtung mind. <input type="number" id="moonMinIllumination" min="0" max="100" step="5"> %</label>
+        <label><input type="checkbox" id="moonOnlyDark"> nur bei Dunkelheit (Sonne unter −6°)</label>
+    </div>
+    <p class="hint" id="moonSummary"></p>
+    <div id="moonList" class="scroll"></div>
+    <p class="hint">Hervorgehoben: bis zu zwei Tage um Vollmond. Klick auf einen Termin zeigt den Tag.</p>
+</body>
+</html>
