@@ -159,6 +159,13 @@
         table.data tr.full td { background: var(--highlight); }
         .tables { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: flex-start; }
         .scroll { overflow-x: auto; max-width: 100%; }
+        details.help { background: var(--surface-2); border-radius: 6px; padding: 8px 14px; margin: 10px 0 14px; }
+        details.help summary { cursor: pointer; font-weight: 600; }
+        details.help ol { margin: 8px 0; padding-left: 22px; }
+        details.help li { margin: 4px 0; }
+        details.help dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 8px 0; }
+        details.help dt { font-weight: 600; }
+        details.help dd { margin: 0; }
         .scene-views { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
         #sceneForm h3 { margin: 10px 0 4px; }
         #map { height: 420px; border-radius: 6px; margin-bottom: 6px; background: var(--surface-2); }
@@ -2587,6 +2594,12 @@
                 fillSiderealTime(siderealTimeHours(currentJd()));
             }
             // Standard: Lokalzeit
+            // Hilfe „So geht's“: zugeklappt bleibt zugeklappt
+            const help = document.getElementById('help');
+            try { if (localStorage.getItem('sichtbarkeitHelp') === 'closed') help.open = false; } catch (e) { /* ohne Speicher offen */ }
+            help.addEventListener('toggle', () => {
+                try { localStorage.setItem('sichtbarkeitHelp', help.open ? 'open' : 'closed'); } catch (e) { /* egal */ }
+            });
             document.getElementById('localTime').checked = true;
             useLocalTime = true;
             fillGregorianDate(datetime);
@@ -2642,6 +2655,33 @@
         mit Fenstern, Balkonplatte und Brüstung. Daraus ermittelt die Seite, wann Sonne und Mond in einem freien Bereich stehen.
         Grundlage ist das <a href="Konzept-Sichtbarkeit.md">Konzept</a> (Stufen 1 bis 3).</p>
 
+    <details class="help" id="help" open>
+        <summary>So geht's</summary>
+        <ol>
+            <li><b>Ort wählen:</b> Breite und Länge eintragen oder unten in der Karte den Marker auf das eigene Haus ziehen.</li>
+            <li><b>Standpunkt anlegen:</b> ein Platz, von dem aus man schaut, z. B. „Balkon“ oder „Küchenfenster“ (Knopf „Neu“).
+                Stockwerk und Augenhöhe eintragen.</li>
+            <li><b>Freie Sicht beschreiben</b> – ein Weg genügt, sie lassen sich kombinieren:
+                <ul>
+                    <li>im Horizontdiagramm einen <b>Sichtbereich</b> aufziehen (der Himmelsausschnitt, den man sieht),</li>
+                    <li>unter „Karte und Umgebung“ die <b>Umgebung laden</b>: Nachbarhäuser und Berge ergeben eine Horizontlinie,</li>
+                    <li>unter „Wohnung und Balkon“ <b>Raum, Fenster und Balkon</b> mit Maßen eintragen (am genauesten).</li>
+                </ul></li>
+            <li><b>Prüfen:</b> Hat man beobachtet, wann die Sonne hinter einem Haus verschwand, diese Zeit unter „Beobachtungen“
+                eintragen. Das Kreuz im Diagramm sollte auf der Kante des grauen Bereichs liegen.</li>
+            <li><b>Ergebnis ablesen:</b> Jahresübersicht (wann scheint die Sonne herein?), Tag (Uhrzeiten) und Mond-Termine.</li>
+        </ol>
+        <p>Alle Eingaben werden im Browser gespeichert; „Exportieren“ sichert sie als Datei.</p>
+        <dl>
+            <dt>Azimut</dt><dd>Himmelsrichtung in Grad: 0° Norden, 90° Osten, 180° Süden, 270° Westen.</dd>
+            <dt>Höhe</dt><dd>Winkel über dem Horizont: 0° am Horizont, 90° senkrecht oben.</dd>
+            <dt>Sichtbereich</dt><dd>Rechteck am Himmel (Azimut von–bis, Höhe von–bis), in dem man frei sieht. Ohne Sichtbereich
+                gilt der ganze Himmel.</dd>
+            <dt>Horizontlinie</dt><dd>Wie hoch Hindernisse in jeder Richtung reichen. Was darunter liegt, ist verdeckt.</dd>
+            <dt>Sichtmaske</dt><dd>Alles zusammen: die Richtungen, die vom Standpunkt aus frei sind.</dd>
+        </dl>
+    </details>
+
     <div id="locationControls"></div>
     <div id="timeControls"></div>
     <div id="timeButtons"></div>
@@ -2662,8 +2702,13 @@
         <label>Augenhöhe <input type="number" id="vpEyeHeight" step="0.1" min="0"> m</label>
         <span class="value" id="vpEyeInfo"></span>
     </div>
+    <p class="hint">Stockwerk 0 ist das Erdgeschoss. Augenhöhe über dem Fußboden: sitzend etwa 1,2 m, stehend etwa 1,6 m.
+        „Alle Standpunkte“ zeigt, wann man von irgendeinem aus etwas sieht.</p>
 
     <h2>Horizontdiagramm</h2>
+    <p class="hint">Ein abgerollter Rundumblick vom Standpunkt: von links nach rechts die Himmelsrichtung, von unten nach oben die
+        Höhe. Grau ist verdeckt. Die Linien zeigen, wo die Sonne steht – heute kräftig, am 21. jedes Monats blass. Wo eine
+        Sonnenbahn durch den hellen Bereich läuft, scheint die Sonne zu dieser Uhrzeit herein.</p>
     <div class="controls">
         <label><input type="radio" name="hzMode" value="view" checked> Ansehen</label>
         <label><input type="radio" name="hzMode" value="sector"> Sichtbereich aufziehen</label>
@@ -2695,11 +2740,14 @@
     <div id="maskTables" class="tables">
         <div>
             <h3>Sichtbereiche</h3>
+            <p class="hint">Freie Himmelsausschnitte. Im Diagramm mit „Sichtbereich aufziehen“ zeichnen oder hier eintippen.</p>
             <div id="sectorTable"></div>
             <button onclick="addSector()">+ Sichtbereich</button>
         </div>
         <div>
             <h3>Horizontlinie</h3>
+            <p class="hint">Punkte für Hindernisse wie Bäume, die gerade verbunden werden. Mit geladener Umgebung gilt jeweils
+                der höhere Wert.</p>
             <div id="horizonTable"></div>
             <button onclick="addHorizonPoint()">+ Punkt</button>
         </div>
@@ -2757,11 +2805,27 @@
         (Mapzen, AWS Open Data; u. a. SRTM, EU-DEM © Copernicus).</p>
 
     <h2>Wohnung und Balkon</h2>
-    <p class="hint">Raum und Balkon als Kästen aus Wänden, Fensteröffnungen, Balkonplatte, Brüstung und Trennwänden. Für jede
-        Richtung prüft ein Strahl vom Auge, ob er durch ein Fenster bzw. am Balkon vorbei ins Freie kommt; die Laibung (Wandstärke)
-        engt den Blick seitlich ein. Das Ergebnis wirkt in der Sichtmaske zusätzlich zu Sichtbereichen und Horizontlinie.
-        Maße in Metern; „links“ und „rechts“ gelten mit Blick nach draußen. Fenster an Fensterwand und Rückwand zählen ab der
-        linken Raumecke, an den Seitenwänden ab der Fensterwand; der Balkon zählt ebenfalls ab der linken Raumecke.</p>
+    <p class="hint">Hier wird das Zimmer mit seinen Fenstern und der Balkon davor nachgebaut. Die Seite prüft dann für jede Richtung,
+        ob man vom Auge aus durch ein Fenster bzw. am Balkon vorbei ins Freie sieht. Dicke Wände, die Balkonplatte darüber und
+        Trennwände schränken den Blick ein.</p>
+    <details class="help">
+        <summary>Bedienung</summary>
+        <ol>
+            <li>„Raum anlegen“ (Zimmer mit Fenster) oder „Balkon anlegen“. Beides zusammen geht auch, z. B. für das Sofa im
+                Zimmer hinter dem Balkon.</li>
+            <li>In der Karte das eigene Haus an der Fensterseite anklicken und „Wohnung hier“ wählen. Damit stimmt die Richtung
+                der Fassade, und die Wohnung erscheint in der Karte.</li>
+            <li>Maße in Metern eintragen. „Links“ und „rechts“ gelten mit Blick nach draußen. Fenster in der Fensterwand und der
+                Rückwand zählen ab der linken Raumecke, Fenster in den Seitenwänden ab der Fensterwand. Brüstung ist die
+                Unterkante des Fensters, Sturz die Oberkante, jeweils über dem Fußboden. Der Balkon zählt ebenfalls ab der linken
+                Raumecke.</li>
+            <li>Position des Auges eintragen; die Augenhöhe steht oben beim Standpunkt.</li>
+            <li>Kontrolle: Die Draufsicht zeigt den Sonnenfleck auf dem Boden zur eingestellten Zeit. Im Horizontdiagramm erscheinen
+                die Fenster als helle Flächen; fährt man mit der Maus über den grauen Bereich, nennt es das Hindernis.</li>
+        </ol>
+        <p>„Standort aufs Auge setzen“ verschiebt den Kartenmarker an die Stelle des Auges, damit die Nachbarhäuser von dort aus
+            gerechnet werden.</p>
+    </details>
     <div id="sceneForm"></div>
     <div id="sceneViews">
         <div class="scene-views">
@@ -2779,6 +2843,8 @@
     </div>
 
     <h2>Jahresübersicht Sonne</h2>
+    <p class="hint">Jede Spalte ist ein Tag des Jahres, von oben nach unten die Uhrzeit. Gelb heißt: Die Sonne ist vom Standpunkt
+        aus zu sehen. Darunter die Sonnenstunden je Tag.</p>
     <div class="legend">
         <span class="swatch" style="--c: var(--sun)">sichtbar</span>
         <span class="swatch" style="--c: var(--partial)">teilweise</span>
@@ -2798,11 +2864,15 @@
     <p class="hint"><span id="yearSummary"></span> Klick in die Übersicht wählt Tag und Uhrzeit.</p>
 
     <h2 id="daySection">Tag: <span id="dayTitle"></span></h2>
+    <p class="hint">Der gewählte Tag im Detail: wann Sonne und Mond zu sehen sind, mit Uhrzeiten und Richtung. Den Tag oben bei
+        Datum und Zeit einstellen oder in der Jahresübersicht bzw. bei den Mond-Terminen anklicken.</p>
     <canvas id="dayChart"></canvas>
     <p class="hint" id="dayFree"></p>
     <div id="dayTable" class="scroll"></div>
 
     <h2>Mond-Termine</h2>
+    <p class="hint">Wann der Mond in den nächsten Wochen vom Standpunkt aus zu sehen ist. Die Filter blenden kurze Termine, eine
+        schmale Mondsichel oder Termine am hellen Tag aus.</p>
     <div class="controls">
         <label>Zeitraum <select id="moonMonths"><option value="3">3 Monate</option><option value="12">12 Monate</option></select></label>
         <label>mind. <input type="number" id="moonMinDuration" min="0" step="5"> min</label>
