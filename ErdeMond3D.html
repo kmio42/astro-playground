@@ -196,7 +196,37 @@
         float airDepthToGround(float mu) { return AIR_H / max(mu, sqrt(2.0 * AIR_H / 3.14159)); }
     </script>
 
-    <!-- Erde: Tagseite (Lambert), Dämmerung, Stadtlichter, Glanz auf dem Meer, Dunst -->
+    <script type="x-shader/x-fragment" id="shadowChunk">
+        // Schatten: sichtbarer Anteil der Sonnenscheibe an einem Punkt, wenn ein Körper davor steht. Gerechnet
+        // mit den wahren Orten in Erdradien (wie sunVisibleFraction in orbit3d.js), auch wenn vergrößert gezeigt.
+        uniform vec3 uSunPos;          // Sonne, wahrer Ort [Erdradien]
+        uniform float uSunRadius;      // [Erdradien]
+        float sunVisible(float rs, float ro, float d) {
+            if (d >= rs + ro) return 1.0;
+            if (d <= abs(rs - ro)) return ro >= rs ? 0.0 : 1.0 - (ro * ro) / (rs * rs);
+            float area = rs * rs * acos(clamp((d * d + rs * rs - ro * ro) / (2.0 * d * rs), -1.0, 1.0))
+                       + ro * ro * acos(clamp((d * d + ro * ro - rs * rs) / (2.0 * d * ro), -1.0, 1.0))
+                       - 0.5 * sqrt(max((-d + rs + ro) * (d + rs - ro) * (d - rs + ro) * (d + rs + ro), 0.0));
+            return 1.0 - area / (3.14159265 * rs * rs);
+        }
+        // p: Punkt, body/radius: verdeckender Körper (alles wahre Orte); dist: Winkelabstand Körper–Sonne
+        // relativ zum Winkelradius des Körpers (für die Rotfärbung im Kernschatten)
+        float shadowAt(vec3 p, vec3 body, float radius, out float dist) {
+            vec3 toSun = uSunPos - p;
+            vec3 toBody = body - p;
+            dist = 1e9;
+            if (dot(toSun, toBody) <= 0.0) return 1.0;            // Körper liegt nicht zwischen Punkt und Sonne
+            float ls = length(toSun), lb = length(toBody);
+            float rs = uSunRadius / ls;
+            float ro = asin(min(radius / lb, 1.0));
+            float c = length(toSun / ls - toBody / lb);            // Sehne
+            float d = 2.0 * asin(min(c * 0.5, 1.0));
+            dist = d / ro;
+            return sunVisible(rs, ro, d);
+        }
+    </script>
+
+    <!-- Erde: Tagseite (Lambert), Dämmerung, Stadtlichter, Glanz auf dem Meer, Dunst, Mondschatten -->
     <script type="x-shader/x-fragment" id="earthFragment">#version 300 es
         precision highp float;
         uniform sampler2D uDay;
@@ -204,29 +234,35 @@
         uniform sampler2D uWater;
         uniform vec3 uSunDir;      // zur Sonne (Welt)
         uniform float uAir;        // 1 = Atmosphäre zeigen
+        uniform vec3 uMoonPos;     // Mond, wahrer Ort [Erdradien]
+        uniform float uMoonRadius; // [Erdradien]
+        uniform float uShadows;    // 1 = Schatten rechnen
         in vec3 vNormal;
         in vec3 vPosRel;
         in vec2 vUv;
         out vec4 outColor;
         #include srgb
         #include air
+        #include shadow
         void main() {
             vec3 n = normalize(vNormal);
             vec3 v = normalize(-vPosRel);
             float mu0 = dot(n, uSunDir);                    // Sinus der Sonnenhöhe
+            float dist;
+            float sun = uShadows > 0.5 ? shadowAt(n, uMoonPos, uMoonRadius, dist) : 1.0;   // Mondschatten
             vec3 day = texture(uDay, vUv).rgb;
             vec3 night = texture(uNight, vUv).rgb;
             float water = texture(uWater, vUv).r;
 
             // Tagseite: Lambert, an der Grenze etwas weicher (Dämmerung bis etwa −6°)
             float diffuse = max(mu0, 0.0) + 0.04 * smoothstep(-0.1, 0.0, mu0) * (1.0 - smoothstep(0.0, 0.2, mu0));
-            vec3 color = day * diffuse * 1.15;
+            vec3 color = day * diffuse * 1.15 * sun;
 
             // Glanz der Sonne auf dem Meer
             vec3 h = normalize(uSunDir + v);
             float nh = max(dot(n, h), 0.0);
             float spec = (pow(nh, 1500.0) * 0.2 + pow(nh, 60.0) * 0.02) * water * smoothstep(0.0, 0.1, mu0);
-            color += vec3(1.0, 0.95, 0.85) * spec;
+            color += vec3(1.0, 0.95, 0.85) * spec * sun;
 
             // Nachtseite: Stadtlichter, wo die Sonne tiefer als etwa −6° steht
             float dark = 1.0 - smoothstep(-0.12, 0.0, mu0);
@@ -234,7 +270,7 @@
 
             // Dunst der Atmosphäre, zum Rand hin dichter
             float glow = airGlow(airDepthToGround(max(dot(n, v), 0.0))) * uAir;
-            color = color * (1.0 - 0.35 * glow) + AIR_COLOR * glow * airLight(mu0);
+            color = color * (1.0 - 0.35 * glow) + AIR_COLOR * glow * airLight(mu0) * sun;
 
             outColor = vec4(toSrgb(color), 1.0);
         }
@@ -251,12 +287,17 @@
         uniform vec3 uEarthDir;        // vom Mond zur Erde
         uniform float uEarthshine;     // Stärke, schon mit der Erdphase multipliziert
         uniform float uRelief;         // 0 = glatte Kugel, 1 = Normal-Map
+        uniform vec3 uMoonPos;         // Mond, wahrer Ort [Erdradien]
+        uniform float uMoonRadius;     // [Erdradien]
+        uniform float uEarthShadowRadius;  // Erdradius mit Vergrößerung durch die Atmosphäre
+        uniform float uShadows;
         in vec3 vNormal;
         in vec3 vBody;
         in vec3 vPosRel;
         in vec2 vUv;
         out vec4 outColor;
         #include srgb
+        #include shadow
         void main() {
             vec3 ng = normalize(vNormal);                   // Kugelnormale (Welt)
             vec3 v = normalize(-vPosRel);
@@ -275,10 +316,15 @@
             float mu = max(dot(ng, v), 0.0);
             float ls = min(2.0 * mu0 / (mu0 + mu + 1e-4), 1.4);    // Mitte des Vollmonds = 1
             float brightness = mix(mu0, ls, 0.75) * 1.25;
+            // Erdschatten: Sonnenlicht abgeschwächt; im Kernschatten rötliches Licht, das die Erdatmosphäre
+            // bricht (am Rand des Kernschattens heller als in der Mitte)
+            float dist;
+            float sun = uShadows > 0.5 ? shadowAt(uMoonPos + ng * uMoonRadius, vec3(0.0), uEarthShadowRadius, dist) : 1.0;
+            vec3 red = vec3(1.0, 0.32, 0.12) * 0.2 * (1.0 - sun) * mix(0.45, 1.0, clamp(dist, 0.0, 1.0));
             // Erdschein: Lambert zur Erde, leicht bläulich
             vec3 earthshine = vec3(0.8, 0.9, 1.0) * uEarthshine * max(dot(n, uEarthDir), 0.0);
             vec3 albedo = texture(uColor, vUv).rgb;
-            outColor = vec4(toSrgb(albedo * (brightness + earthshine)), 1.0);
+            outColor = vec4(toSrgb(albedo * (brightness * (sun + red) + earthshine)), 1.0);
         }
     </script>
 
@@ -349,6 +395,40 @@
                 a += strength * lineMask(d, px) * smoothstep(0.08, 0.2, r);
             }
             outColor = vec4(uColor * a, 1.0);
+        }
+    </script>
+
+    <!-- Schattenkegel: Kegelstumpf aus (cos θ, sin θ, t); Radius läuft linear von uR0 nach uR1 (negativ = hinter
+         der Spitze weiter, z. B. Gegenschatten des Mondes). Additiv, zum Rand hin kräftiger -->
+    <script type="x-shader/x-vertex" id="coneVertex">#version 300 es
+        layout(location = 0) in vec3 aPosition;
+        uniform mat4 uViewProj;
+        uniform vec3 uOrigin;          // Anfang der Achse, relativ zum Auge
+        uniform vec3 uAxis, uU, uV;    // Achse und zwei Querrichtungen (Einheitsvektoren)
+        uniform float uLength, uR0, uR1;
+        out vec3 vNormal;
+        out vec3 vPosRel;
+        void main() {
+            vec3 radial = uU * aPosition.x + uV * aPosition.y;
+            vec3 p = uOrigin + uAxis * (aPosition.z * uLength) + radial * mix(uR0, uR1, aPosition.z);
+            vNormal = normalize(radial - uAxis * (uR1 - uR0) / uLength);
+            vPosRel = p;
+            gl_Position = uViewProj * vec4(p, 1.0);
+        }
+    </script>
+    <script type="x-shader/x-fragment" id="coneFragment">#version 300 es
+        precision highp float;
+        uniform vec3 uColor;
+        uniform float uFill, uRim;
+        uniform float uFadeNear;       // Abstand, ab dem der Kegel eingeblendet wird
+        in vec3 vNormal;
+        in vec3 vPosRel;
+        out vec4 outColor;
+        void main() {
+            float f = 1.0 - abs(dot(normalize(vNormal), normalize(-vPosRel)));
+            // nahe der Kamera ausblenden (z. B. „Erde → Mond“: Kamera liegt im Kegel)
+            float near = smoothstep(uFadeNear, 4.0 * uFadeNear, length(vPosRel));
+            outColor = vec4(uColor * (uFill + uRim * f * f * f) * near, 1.0);
         }
     </script>
 
@@ -441,6 +521,7 @@
         const AIR_SHELL = 1.08;            // Radius der Atmosphärenschale [Erdradien]
         const EARTHSHINE = 0.035;          // Erdschein bei voller Erde (etwa 300-fach verstärkt, sonst unsichtbar)
         const PIN_LENGTH = 0.45;           // Standort-Nadel über der Oberfläche [Erdradien der Darstellung]
+        const ECLIPSE_SEASON = 17 * DEG2RAD;   // Sonne näher an der Knotenlinie → Finsternis möglich
 
         const COLORS = {
             ecliptic: [0.95, 0.75, 0.3],
@@ -454,6 +535,8 @@
             axis: [0.82, 0.82, 0.82, 1],
             dayTick: [0.6, 0.8, 1.0, 0.9],
             location: [1.0, 0.35, 0.55, 1],
+            umbra: [0.75, 0.16, 0.12],
+            penumbra: [0.45, 0.45, 0.52],
         };
 
         let gl = null, canvas = null;
@@ -471,6 +554,8 @@
         let labels = [];                   // { el, pos, body } für die Beschriftungen
         let pinTip = [0, 0, 0];            // Spitze der Standort-Nadel
         let viewLock = null;               // Ansicht, deren Blickrichtung beim Mitführen nachgeführt wird
+        let eclipse = null;                // Schattengeometrie zum Zeitpunkt (eclipseGeometry)
+        let eclipseCache = null;           // { from, lunar, solar } nächste Finsternisse ab from
 
     /////////////////////////////////////////////////////////////////
     //                      Berechnung                             //
@@ -498,6 +583,12 @@
             return (Math.sin(a) + (Math.PI - a) * Math.cos(a)) / Math.PI;
         }
 
+        /** Winkel zwischen Sonne und Knotenlinie (0°–90°): klein → Finsternis-Saison */
+        function sunNodeAngle() {
+            const a = Math.abs(normalizeAngleSigned(scene.sun.longitude - scene.meanNode));
+            return a > Math.PI / 2 ? Math.PI - a : a;
+        }
+
         function currentJd() {
             return julianDayFromDate(datetime);
         }
@@ -520,6 +611,12 @@
                 nextFull: nextMoonPhase(jd, Math.PI),
                 orbit: meanMoonOrbit(jd),
             };
+            eclipse = eclipseGeometry(scene.sun.position, scene.moon.position);
+            // Nächste Finsternisse nur neu suchen, wenn der Zeitpunkt aus dem gültigen Bereich läuft
+            const c = eclipseCache;
+            if (!c || jd < c.from || jd >= Math.min(c.lunar.time, c.solar.time)) {
+                eclipseCache = { from: jd, lunar: findEclipse(jd, 'lunar'), solar: findEclipse(jd, 'solar') };
+            }
             // Wahre Bahn nur neu, wenn sich der Zeitpunkt um mehr als 30 min geändert hat
             if (!pathCache || Math.abs(pathCache.jd - jd) > 1 / 48) {
                 pathCache = { jd, points: moonPath(jd - PATH_DAYS, jd + PATH_DAYS, 1) };
@@ -684,7 +781,8 @@
         function shaderSource(id) {
             const chunk = name => document.getElementById(name + 'Chunk').textContent;
             return document.getElementById(id).textContent.trim()
-                .replace('#include srgb', chunk('srgb')).replace('#include air', chunk('air'));
+                .replace('#include srgb', chunk('srgb')).replace('#include air', chunk('air'))
+                .replace('#include shadow', chunk('shadow'));
         }
 
         function initGL() {
@@ -697,6 +795,7 @@
             programs.earth = gl3d.createProgram(gl, shaderSource('bodyVertex'), shaderSource('earthFragment'), 'Erde');
             programs.moon = gl3d.createProgram(gl, shaderSource('bodyVertex'), shaderSource('moonFragment'), 'Mond');
             programs.air = gl3d.createProgram(gl, shaderSource('bodyVertex'), shaderSource('atmosphereFragment'), 'Atmosphäre');
+            programs.cone = gl3d.createProgram(gl, shaderSource('coneVertex'), shaderSource('coneFragment'), 'Kegel');
             programs.plane = gl3d.createProgram(gl, shaderSource('planeVertex'), shaderSource('planeFragment'), 'Ebene');
             programs.line = gl3d.createProgram(gl, shaderSource('lineVertex'), shaderSource('lineFragment'), 'Linie');
             programs.point = gl3d.createProgram(gl, shaderSource('pointVertex'), shaderSource('pointFragment'), 'Marke');
@@ -704,6 +803,7 @@
             const sphere = gl3d.sphereGeometry(128, 256);
             meshes.sphere = gl3d.createMesh(gl, { position: { data: sphere.positions, size: 3 },
                                                   uv: { data: sphere.uvs, size: 2 } }, sphere.indices);
+            meshes.cone = coneMesh(96);
             const disc = gl3d.discGeometry(0, 256);
             meshes.disc = gl3d.createMesh(gl, { position: { data: disc.positions, size: 3 } }, disc.indices);
             for (const name of ['path', 'meanOrbit', 'nodeLine', 'apsisLine', 'sunLine', 'earthAxis', 'moonAxis', 'pin']) {
@@ -724,6 +824,41 @@
             load('moon', 'lroc_color_2k.jpg', { srgb: true, placeholder: [120, 120, 120, 255] });
             load('moonNormal', 'textures/moon_normal_2k.jpg', { placeholder: [128, 128, 255, 255] });
             return true;
+        }
+
+        /** Mantel eines Kegelstumpfs: Ecken (cos θ, sin θ, t) mit t = 0 am Anfang und 1 am Ende */
+        function coneMesh(n) {
+            const position = new Float32Array((n + 1) * 2 * 3), indices = [];
+            for (let i = 0; i <= n; i++) {
+                const a = 2 * Math.PI * i / n;
+                position.set([Math.cos(a), Math.sin(a), 0, Math.cos(a), Math.sin(a), 1], i * 6);
+                if (i < n) indices.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+            }
+            return gl3d.createMesh(gl, { position: { data: position, size: 3 } }, new Uint32Array(indices));
+        }
+
+        /**
+         * Kern- und Halbschattenkegel von Erde und Mond in wahrer Größe (wie die Abstände mit distScale
+         * gestaucht, nicht vergrößert wie die Körper). Radien linear längs der Achse (kleine Winkel).
+         * @return [{ origin, axis, length, r0, r1, umbra }]
+         */
+        function shadowCones() {
+            const rs = SUN_RADIUS_ER, re = SHADOW_ENLARGEMENT, rm = MOON_RADIUS_ER;
+            const S = scene.sun.position, M = scene.moon.position;
+            const ds = gl3d.vec3.length(S);
+            const cones = [];
+            // Erde: bis etwas hinter die Mondbahn
+            const le = Math.max(gl3d.vec3.length(M), 60) * 1.2;
+            const axisE = gl3d.vec3.scale(S, -1 / ds);
+            cones.push({ origin: [0, 0, 0], axis: axisE, length: le, r0: re, r1: re * (1 - le * (rs - 1) / ds), umbra: true });
+            cones.push({ origin: [0, 0, 0], axis: axisE, length: le, r0: re, r1: re * (1 + le * (rs + 1) / ds), umbra: false });
+            // Mond: bis etwas hinter die Erdmitte
+            const sm = gl3d.vec3.sub(M, S), dms = gl3d.vec3.length(sm);
+            const axisM = gl3d.vec3.scale(sm, 1 / dms);
+            const lm = Math.max(0, -gl3d.vec3.dot(M, axisM)) + 2;
+            cones.push({ origin: M, axis: axisM, length: lm, r0: rm, r1: rm - lm * (rs - rm) / dms, umbra: true });
+            cones.push({ origin: M, axis: axisM, length: lm, r0: rm, r1: rm + lm * (rs + rm) / dms, umbra: false });
+            return cones;
         }
 
         function bindTexture(unit, key) {
@@ -768,6 +903,9 @@
                 .set('uRotation', mat3FromRotation(scene.earth.rotation))
                 .set('uSunDir', sunDir)
                 .set('uAir', layers.air ? 1 : 0)
+                .set('uSunPos', scene.sun.position).set('uSunRadius', SUN_RADIUS_ER)
+                .set('uMoonPos', scene.moon.position).set('uMoonRadius', MOON_RADIUS_ER)
+                .set('uShadows', layers.shadows ? 1 : 0)
                 .set('uDay', 0).set('uNight', 1).set('uWater', 2);
             bindTexture(0, 'earthDay'); bindTexture(1, 'earthNight'); bindTexture(2, 'earthWater');
             meshes.sphere.draw();
@@ -782,6 +920,10 @@
                 .set('uEarthDir', earthDir)
                 .set('uEarthshine', layers.earthshine ? EARTHSHINE * earthBrightness() : 0)
                 .set('uRelief', 1)
+                .set('uSunPos', scene.sun.position).set('uSunRadius', SUN_RADIUS_ER)
+                .set('uMoonPos', scene.moon.position).set('uMoonRadius', MOON_RADIUS_ER)
+                .set('uEarthShadowRadius', SHADOW_ENLARGEMENT)
+                .set('uShadows', layers.shadows ? 1 : 0)
                 .set('uColor', 0).set('uNormal', 1);
             bindTexture(0, 'moon'); bindTexture(1, 'moonNormal');
             meshes.sphere.draw();
@@ -817,6 +959,19 @@
                     .set('uSunDir', sunDir);
                 meshes.sphere.draw();
             }
+            if (layers.cones) {
+                programs.cone.use().set('uViewProj', viewProj).set('uFadeNear', 6 * distScale);
+                for (const c of shadowCones()) {
+                    const u = gl3d.vec3.normalize(gl3d.vec3.cross(c.axis, Math.abs(c.axis[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]));
+                    const v = gl3d.vec3.cross(c.axis, u);
+                    programs.cone
+                        .set('uOrigin', rel(toDisplay(c.origin))).set('uAxis', c.axis).set('uU', u).set('uV', v)
+                        .set('uLength', c.length * distScale).set('uR0', c.r0 * distScale).set('uR1', c.r1 * distScale)
+                        .set('uColor', c.umbra ? COLORS.umbra : COLORS.penumbra)
+                        .set('uFill', c.umbra ? 0.04 : 0.015).set('uRim', c.umbra ? 0.25 : 0.1);
+                    meshes.cone.draw();
+                }
+            }
 
             // 3. Linien
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -831,7 +986,7 @@
             };
             line('path', 2, 'path');
             line('meanOrbit', 1.2, 'meanOrbit');
-            line('nodeLine', 1.5, 'nodes');
+            line('nodeLine', sunNodeAngle() < ECLIPSE_SEASON ? 3 : 1.5, 'nodes');
             line('apsisLine', 1.5, 'apsides');
             line('sunLine', 2, 'sun');
             line('earthAxis', 1.5, 'axes');
@@ -968,6 +1123,8 @@
                 case 'descending': return pick(moonNodePassages(from).descending);
                 case 'perigee': return pick(moonApsides(from).perigee);
                 case 'apogee': return pick(moonApsides(from).apogee);
+                case 'lunarEclipse': return findEclipse(from, 'lunar', backward).time;
+                case 'solarEclipse': return findEclipse(from, 'solar', backward).time;
             }
         }
 
@@ -1018,13 +1175,41 @@
     //                      Infotabelle                            //
     /////////////////////////////////////////////////////////////////
 
+        const eclipseTypes = {
+            lunar: { penumbral: 'Halbschatten-Mondfinsternis', partial: 'partielle Mondfinsternis', total: 'totale Mondfinsternis' },
+            solar: { partial: 'partielle Sonnenfinsternis', annular: 'ringförmige Sonnenfinsternis', total: 'totale Sonnenfinsternis' },
+        };
+        const formatNumber = (x, digits) => x.toFixed(digits).replace('.', ',');
+
+        /** Finsternis, die gerade stattfindet (Text), sonst leer */
+        function currentEclipseText() {
+            const parts = [];
+            if (eclipse.lunar.type !== 'none') {
+                const mag = eclipse.lunar.type === 'penumbral' ? eclipse.lunar.penumbralMagnitude : eclipse.lunar.umbralMagnitude;
+                parts.push(`${eclipseTypes.lunar[eclipse.lunar.type]} (Größe ${formatNumber(mag, 2)})`);
+            }
+            if (eclipse.solar.type !== 'none') parts.push(eclipseTypes.solar[eclipse.solar.type]);
+            return parts.join(', ');
+        }
+
+        /** Gefundene Finsternis als Text mit Datum und Abstand */
+        function eclipseText(e, jd) {
+            if (!e) return '–';
+            const p = dateParts(e.time);
+            const date = `${pad(p.d)}.${pad(p.mo)}.${p.y} ${pad(p.h)}:${pad(p.mi)}`;
+            const days = e.time - jd;
+            const wait = days < 60 ? formatDays(days) : `in ${formatNumber(days / 30.44, 1)} Monaten`;
+            const detail = e.kind === 'lunar'
+                ? `Größe ${formatNumber(e.type === 'penumbral' ? e.penumbralMagnitude : e.umbralMagnitude, 2)}`
+                : `γ ${formatNumber(e.gamma, 2)}`;
+            return `${eclipseTypes[e.kind][e.type]} ${date}, ${detail} (${wait})`;
+        }
+
         function updateTable() {
             const jd = scene.jd;
             const m = scene.moon;
             const tz = timeZoneLabel();
-            // Winkel zwischen Sonne und Knotenlinie (0°–90°): klein → Finsternis möglich
-            let sunNode = Math.abs(normalizeAngleSigned(scene.sun.longitude - scene.meanNode));
-            if (sunNode > Math.PI / 2) sunNode = Math.PI - sunNode;
+            const sunNode = sunNodeAngle();
             const subSolar = subPoint(scene.earth.rotation, scene.sun.direction);
             const subEarth = subPoint(m.rotation, m.position.map(x => -x));
             const lonString = r => formatDeg(Math.abs(r)) + (r >= 0 ? ' O' : ' W');
@@ -1040,7 +1225,11 @@
                 { type: 'row', key: 'Libration Länge / Breite', value: `${formatDeg(m.libration.longitude, 2)} / ${formatDeg(m.libration.latitude, 2)}` },
                 { type: 'category', text: 'Mondbahn' },
                 { type: 'row', key: 'Mittlerer aufsteigender Knoten Ω', value: formatDeg(scene.meanNode) },
-                { type: 'row', key: 'Winkel Sonne – Knotenlinie', value: formatDeg(sunNode) + (sunNode < 17 * DEG2RAD ? ' (Finsternis-Saison)' : '') },
+                { type: 'row', key: 'Winkel Sonne – Knotenlinie', value: formatDeg(sunNode) + (sunNode < ECLIPSE_SEASON ? ' (Finsternis-Saison)' : '') },
+                { type: 'category', text: 'Finsternisse' },
+                { type: 'row', key: 'Jetzt', value: currentEclipseText() || 'keine' },
+                { type: 'row', key: 'Nächste Mondfinsternis', value: eclipseText(eclipseCache.lunar, jd) },
+                { type: 'row', key: 'Nächste Sonnenfinsternis', value: eclipseText(eclipseCache.solar, jd) },
                 { type: 'row', key: 'Nächster Knoten', value: `${events.nextNode.ascending ? '☊' : '☋'} ${shortDate(events.nextNode.time)} (${formatDays(events.nextNode.time - jd)})` },
                 { type: 'row', key: 'Nächstes Perigäum', value: `${shortDate(events.nextPerigee.time)}, ${formatKm(events.nextPerigee.distance)}` },
                 { type: 'row', key: 'Nächstes Apogäum', value: `${shortDate(events.nextApogee.time)}, ${formatKm(events.nextApogee.distance)}` },
@@ -1055,8 +1244,11 @@
             ];
             renderOutputTable('outputTable', rows);
 
-            document.getElementById('overlayDate').innerHTML =
-                `${longDate(jd)} ${tz}<br><small>${phaseName(m.phaseAngle)}, ${(m.illuminatedFraction * 100).toFixed(0)} % beleuchtet</small>`;
+            const notes = [`${phaseName(m.phaseAngle)}, ${(m.illuminatedFraction * 100).toFixed(0)} % beleuchtet`];
+            if (sunNode < ECLIPSE_SEASON) notes.push('Finsternis-Saison');
+            const now = currentEclipseText();
+            if (now) notes.push(`<b>${now}</b>`);
+            document.getElementById('overlayDate').innerHTML = `${longDate(jd)} ${tz}<br><small>${notes.join(' · ')}</small>`;
         }
 
     /////////////////////////////////////////////////////////////////
@@ -1269,6 +1461,8 @@
                 <option value="descending">☋ absteigender Knoten</option>
                 <option value="perigee">Perigäum</option>
                 <option value="apogee">Apogäum</option>
+                <option value="lunarEclipse">Mondfinsternis</option>
+                <option value="solarEclipse">Sonnenfinsternis</option>
             </select>
             <button id="jumpNext" title="nächstes Ereignis">▶</button>
         </div>
@@ -1290,6 +1484,8 @@
             <label><input type="checkbox" data-layer="location" checked> Standort</label>
             <label><input type="checkbox" data-layer="air" checked> Atmosphäre</label>
             <label><input type="checkbox" data-layer="earthshine" checked> Erdschein</label>
+            <label><input type="checkbox" data-layer="shadows" checked> Schatten</label>
+            <label><input type="checkbox" data-layer="cones" checked> Schattenkegel</label>
             <label><input type="checkbox" data-layer="labels" checked> Namen</label>
         </div>
     </div>
@@ -1303,11 +1499,16 @@
         <span style="--c:#73e699">Apsidenlinie</span>
         <span style="--c:#ffdb59">Sonnenrichtung</span>
         <span style="--c:#ff598c">Standort (Beobachtungsort)</span>
+        <span class="area" style="--c:#bf291f">Kernschatten</span>
+        <span class="area" style="--c:#737385">Halbschatten</span>
     </div>
     <p class="hint">
         Punkte auf der Bahn: Ort des Mondes in ganzen Tagen vor und nach dem Zeitpunkt.
         Erde und Mond sind in der Grundeinstellung 4-fach vergrößert, das Größenverhältnis bleibt richtig.
         Die Atmosphäre ist dicker gezeichnet und der Erdschein heller, als sie wirklich sind.
+        Die Schattenkegel haben ihre wahre Größe, Erde und Mond sind dagegen vergrößert. Deshalb berührt ein Kegel
+        den gezeichneten Körper öfter, als es eine Finsternis gibt; mit <b>maßstäblich</b> passt es genau. Die Schatten
+        auf Erde und Mond sind immer aus den wahren Orten berechnet.
     </p>
 
     <div class="columns">
@@ -1348,6 +1549,10 @@
             59 % der Mondoberfläche, nicht nur die Hälfte.</td></tr>
         <tr><td>Erdschein</td><td>Sonnenlicht, das die Erde auf die Nachtseite des Mondes wirft. Kurz vor und nach Neumond ist
             er am hellsten, weil man dann vom Mond aus eine fast volle Erde sieht.</td></tr>
+        <tr><td>Kern- und Halbschatten</td><td>Im Kernschatten ist die Sonne ganz verdeckt, im Halbschatten nur zum Teil.
+            Der Kernschatten der Erde reicht weit über die Mondbahn hinaus. Im Kernschatten leuchtet der Mond rötlich, weil
+            die Erdatmosphäre etwas rotes Sonnenlicht hineinlenkt. Der Kernschatten des Mondes reicht gerade bis zur Erde;
+            ist der Mond weit weg, endet er vorher und die Sonnenfinsternis wird ringförmig.</td></tr>
         <tr><td>Finsternis-Saison</td><td>Zeitraum von gut einem Monat, in dem die Sonne nahe der Knotenlinie steht (Winkel
             unter etwa 17°). Nur dann stehen Neu- oder Vollmond nahe genug an der Ekliptik für eine Sonnen- oder
             Mondfinsternis. Das kommt etwa zweimal im Jahr vor.</td></tr>

@@ -1,10 +1,15 @@
 # Konzept: Interaktives 3D-Modell von Erde und Mond
 
-Stand: 28.10.2026, Konzept abgestimmt, Stufe 1 und 2 umgesetzt (`ErdeMond3D.html`, `orbit3d.js`, `gl3d.js`,
+Stand: 28.10.2026, Konzept abgestimmt, Stufe 1 bis 3 umgesetzt (`ErdeMond3D.html`, `orbit3d.js`, `gl3d.js`,
 `testOrbit3d.js`, `prepareTextures3d.py`, `textures/`). Abweichungen in Stufe 2: Die Mond-Normal-Map ist ein JPG
 (1,2 MB statt 3,8 MB als PNG), der Atmosphärensaum ist immer an (abschaltbar) und 9-fach überhöht, der Erdschein
 etwa 300-fach verstärkt und nach der Phasenkurve einer Lambert-Kugel gewichtet. Zusätzlich: Sprünge zu den
 Vierteln und zum absteigenden Knoten, Ansicht „Kante“ von der sonnenbeschienenen Seite.
+Stufe 3: Schatten im Shader und Finsternis-Rechnung in `orbit3d.js` (`eclipseGeometry`, `findEclipse`, getestet
+gegen die NASA-Tabellen: γ auf ±0,001, Zeiten auf 1,5 min); Schattenkegel in wahrer Größe (wie die Abstände
+gestaucht, nicht vergrößert), Hinweis dazu auf der Seite; Finsternis-Saison als Hinweis im Bild und kräftigere
+Knotenlinie; Tabelle mit laufender und nächster Mond-/Sonnenfinsternis; Sprünge zur vorigen/nächsten
+Finsternis. Die optionalen Punkte (Blue Marble je Monat, Relief-Überhöhung) sind nicht umgesetzt.
 
 ## Ziel
 

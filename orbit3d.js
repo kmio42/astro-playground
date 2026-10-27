@@ -24,6 +24,10 @@
     const MOON_RADIUS_ER = MOON_RADIUS / EARTH_RADIUS;
     // Mittlere Länge des synodischen Monats [d]
     const SYNODIC_MONTH = 29.530588861;
+    // Sonnenradius in Erdradien
+    const SUN_RADIUS_ER = 696000 / EARTH_RADIUS;
+    // Vergrößerung des Erdschattens durch die Atmosphäre (Chauvenet, 1/50)
+    const SHADOW_ENLARGEMENT = 1.02;
 
     // ---------------------------------------------------------------
     //  Vektoren und Matrizen
@@ -353,14 +357,128 @@
     }
 
     // ---------------------------------------------------------------
+    //  Finsternisse
+    // ---------------------------------------------------------------
+
+    /**
+     * Sichtbarer Anteil der Sonnenscheibe, wenn ein Körper davor steht (Überdeckung zweier Kreisscheiben).
+     * Gleiche Rechnung wie im Shader von ErdeMond3D.html.
+     * @param rs Winkelradius der Sonne, ro Winkelradius des verdeckenden Körpers, d Winkelabstand der Mitten
+     * @return 1 = ganz sichtbar, 0 = ganz verdeckt
+     */
+    function sunVisibleFraction(rs, ro, d) {
+        if (d >= rs + ro) return 1;
+        if (d <= Math.abs(rs - ro)) return ro >= rs ? 0 : 1 - (ro * ro) / (rs * rs);
+        const clamp = x => Math.max(-1, Math.min(1, x));
+        const area = rs * rs * Math.acos(clamp((d * d + rs * rs - ro * ro) / (2 * d * rs)))
+                   + ro * ro * Math.acos(clamp((d * d + ro * ro - rs * rs) / (2 * d * ro)))
+                   - 0.5 * Math.sqrt(Math.max(0, (-d + rs + ro) * (d + rs - ro) * (d - rs + ro) * (d + rs + ro)));
+        return 1 - area / (Math.PI * rs * rs);
+    }
+
+    /**
+     * Schattengeometrie zu gegebenen Orten von Sonne und Mond [Erdradien].
+     * Mondfinsternis: Abstand des Mondes von der Achse des Erdschattens, Radien von Kern- und Halbschatten
+     * an dieser Stelle (um SHADOW_ENLARGEMENT vergrößert), Größen wie in den Finsternis-Tabellen
+     * (Anteil des Monddurchmessers im Schatten).
+     * Sonnenfinsternis: Abstand gamma der Achse des Mondschattens von der Erdmitte (ohne Vorzeichen),
+     * Radien von Halb- und Kernschatten an der Erde (Kernschatten negativ = Gegenschatten, ringförmig).
+     * @return { lunar: { type, axisDistance, umbraRadius, penumbraRadius, umbralMagnitude,
+     *                     penumbralMagnitude },
+     *           solar: { type, gamma, umbraRadius, penumbraRadius } }
+     *         type: 'none', 'penumbral' (nur Mond), 'partial', 'total', 'annular' (nur Sonne)
+     */
+    function eclipseGeometry(sunPos, moonPos) {
+        const rm = MOON_RADIUS_ER, rs = SUN_RADIUS_ER;
+        const ds = Math.hypot(sunPos[0], sunPos[1], sunPos[2]);
+
+        // Mond im Erdschatten: Achse von der Erde weg von der Sonne
+        const axis = scale(sunPos, -1 / ds);
+        const x = dot(moonPos, axis);
+        const axisDistance = Math.hypot(...sub(moonPos, scale(axis, x)));
+        const umbra = SHADOW_ENLARGEMENT * (1 - x * (rs - 1) / ds);
+        const penumbra = SHADOW_ENLARGEMENT * (1 + x * (rs + 1) / ds);
+        const lunar = { axisDistance, umbraRadius: umbra, penumbraRadius: penumbra,
+                        umbralMagnitude: (umbra + rm - axisDistance) / (2 * rm),
+                        penumbralMagnitude: (penumbra + rm - axisDistance) / (2 * rm) };
+        lunar.type = x <= 0 || lunar.penumbralMagnitude <= 0 ? 'none'
+                   : lunar.umbralMagnitude >= 1 ? 'total'
+                   : lunar.umbralMagnitude > 0 ? 'partial' : 'penumbral';
+
+        // Erde im Mondschatten: Achse vom Mond weg von der Sonne
+        const sm = sub(moonPos, sunPos);
+        const dms = Math.hypot(sm[0], sm[1], sm[2]);
+        const b = scale(sm, 1 / dms);
+        const xe = -dot(moonPos, b);                                 // Mond → Erdmitte entlang der Achse
+        const gamma = Math.hypot(...add(moonPos, scale(b, xe)));     // Erdmitte – Achse
+        const penumbraE = rm + xe * (rs + rm) / dms;
+        // Kernschatten dort, wo die Achse die Erde trifft (sonst an der Erdmitte)
+        const hit = xe - Math.sqrt(Math.max(0, 1 - gamma * gamma));
+        const umbraE = rm - hit * (rs - rm) / dms;
+        const solar = { gamma, umbraRadius: umbraE, penumbraRadius: penumbraE };
+        solar.type = xe <= 0 || gamma >= 1 + penumbraE ? 'none'
+                   : gamma < 1 + Math.abs(umbraE) ? (umbraE > 0 ? 'total' : 'annular') : 'partial';
+        return { lunar, solar };
+    }
+
+    /** Orte von Sonne und Mond [Erdradien] zu einem Zeitpunkt */
+    function sunMoonPositions(jd) {
+        const sun = astro.calculateSunPosition(jd);
+        return { sun: sphericalToVector(sun.longitude, sun.latitude, sun.distance / EARTH_RADIUS),
+                 moon: moonVector(astro.calculateMoonPosition(jd)) };
+    }
+
+    /** Schattengeometrie zu einem Zeitpunkt (siehe eclipseGeometry) */
+    function eclipseAt(jd) {
+        const p = sunMoonPositions(jd);
+        return eclipseGeometry(p.sun, p.moon);
+    }
+
+    /**
+     * Größte Phase einer möglichen Finsternis nahe einer Syzygie: kleinster Abstand Mond – Erdschattenachse
+     * (Mondfinsternis) bzw. Mondschattenachse – Erdmitte (Sonnenfinsternis), Suche mit dem Goldenen Schnitt.
+     * @param kind 'lunar' oder 'solar'
+     * @return { time, kind, type, ...Werte aus eclipseGeometry für diese Art }
+     */
+    function greatestEclipse(jdSyzygy, kind) {
+        const f = t => { const e = eclipseAt(t); return kind === 'lunar' ? e.lunar.axisDistance : e.solar.gamma; };
+        const g = (Math.sqrt(5) - 1) / 2;
+        let a = jdSyzygy - 0.3, b = jdSyzygy + 0.3;
+        let c = b - g * (b - a), d = a + g * (b - a), fc = f(c), fd = f(d);
+        while (b - a > 1e-5) {                                       // etwa 1 s
+            if (fc < fd) { b = d; d = c; fd = fc; c = b - g * (b - a); fc = f(c); }
+            else { a = c; c = d; fc = fd; d = a + g * (b - a); fd = f(d); }
+        }
+        const time = (a + b) / 2;
+        return Object.assign({ time, kind }, eclipseAt(time)[kind]);
+    }
+
+    /**
+     * Nächste (oder vorige) Finsternis einer Art nach dem Zeitpunkt jd.
+     * @param kind 'lunar' oder 'solar'
+     * @return Ergebnis von greatestEclipse, null wenn in 40 Lunationen keine gefunden wird
+     */
+    function findEclipse(jd, kind, backward) {
+        const phase = kind === 'lunar' ? Math.PI : 0;
+        let t = jd;
+        for (let n = 0; n < 40; n++) {
+            t = nextMoonPhase(t, phase, backward);
+            const e = greatestEclipse(t, kind);
+            if (e.type !== 'none' && (backward ? e.time < jd : e.time > jd)) return e;
+        }
+        return null;
+    }
+
+    // ---------------------------------------------------------------
     //  Export
     // ---------------------------------------------------------------
 
     const api = {
-        MOON_INCLINATION, MOON_ECCENTRICITY, MOON_RADIUS_ER, SYNODIC_MONTH,
+        MOON_INCLINATION, MOON_ECCENTRICITY, MOON_RADIUS_ER, SYNODIC_MONTH, SUN_RADIUS_ER, SHADOW_ENLARGEMENT,
         sphericalToVector, vectorToSpherical, applyRotation, applyRotationInverse, subPoint,
         earthRotation, moonRotation, sceneState, moonPath, meanMoonOrbit, ellipsePoint, ellipsePoints,
         moonNodePassages, moonApsides, nearestEvent, nextMoonPhase,
+        sunVisibleFraction, eclipseGeometry, eclipseAt, greatestEclipse, findEclipse,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else Object.assign(global, api);

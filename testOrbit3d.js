@@ -228,5 +228,59 @@ console.log('7. gl3d: Matrizen, Strahl, Geometrie');
     check(angleBetween(r.dir, vec3.sub([1, 2, 3], cam.eye())) < 1e-6, 'Kamera: Strahl durch die Bildmitte trifft das Ziel');
 }
 
+// ---------------------------------------------------------------
+console.log('8. Finsternisse: Überdeckung der Sonnenscheibe');
+{
+    const rs = 0.00465;
+    check(orb.sunVisibleFraction(rs, rs, 2.01 * rs) === 1, 'getrennte Scheiben: ganz sichtbar');
+    check(orb.sunVisibleFraction(rs, 1.05 * rs, 0.02 * rs) === 0, 'größerer Körper mittig davor: ganz verdeckt');
+    check(Math.abs(orb.sunVisibleFraction(rs, 0.5 * rs, 0.1 * rs) - 0.75) < 1e-12, 'halb so großer Körper innen: 3/4 sichtbar');
+    // Vergleich mit Abzählen auf einem Raster
+    let maxErr = 0;
+    for (const [ro, d] of [[1, 1], [0.97, 0.5], [1.3, 1.6], [3.5, 3.2]]) {
+        let inside = 0, covered = 0;
+        const n = 600;
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+            const x = (i + 0.5) / n * 2 - 1, y = (j + 0.5) / n * 2 - 1;
+            if (x * x + y * y > 1) continue;
+            inside++;
+            if ((x - d) * (x - d) + y * y < ro * ro) covered++;
+        }
+        maxErr = Math.max(maxErr, Math.abs(orb.sunVisibleFraction(rs, ro * rs, d * rs) - (1 - covered / inside)));
+    }
+    check(maxErr < 2e-3, `Teilüberdeckung wie abgezählt (Abweichung ${maxErr.toExponential(1)})`);
+}
+
+// ---------------------------------------------------------------
+console.log('9. Finsternisse: Vergleich mit den NASA-Tabellen (F. Espenak), größte Phase in UT');
+{
+    // [Art, gesuchte Zeit ab, erwartete Zeit, Typ, Wert (Kernschattengröße bzw. gamma), Toleranz]
+    const cases = [
+        ['lunar', utc(2025, 8, 1, 0, 0), utc(2025, 9, 7, 18, 12), 'total', 1.3619, 0.015],
+        ['lunar', utc(2026, 1, 1, 0, 0), utc(2026, 3, 3, 11, 34), 'total', 1.1508, 0.015],
+        ['lunar', utc(2026, 4, 1, 0, 0), utc(2026, 8, 28, 4, 13), 'partial', 0.9299, 0.015],
+        ['lunar', utc(2026, 9, 1, 0, 0), utc(2027, 2, 20, 23, 13), 'penumbral', -0.0577, 0.015],
+        ['solar', utc(2025, 9, 1, 0, 0), utc(2025, 9, 21, 19, 42), 'partial', 1.0651, 0.003],
+        ['solar', utc(2026, 1, 1, 0, 0), utc(2026, 2, 17, 12, 12), 'annular', 0.9743, 0.003],
+        ['solar', utc(2026, 3, 1, 0, 0), utc(2026, 8, 12, 17, 46), 'total', 0.8977, 0.003],
+        ['solar', utc(2026, 9, 1, 0, 0), utc(2027, 2, 6, 16, 1), 'annular', 0.2952, 0.003],
+        ['solar', utc(2027, 3, 1, 0, 0), utc(2027, 8, 2, 10, 8), 'total', 0.1421, 0.003],
+    ];
+    for (const [kind, from, expected, type, value, tol] of cases) {
+        const e = orb.findEclipse(from, kind);
+        const v = kind === 'lunar' ? e.umbralMagnitude : e.gamma;
+        const date = astro.julianDayToDate(expected).toISOString().slice(0, 10);
+        check(Math.abs(e.time - expected) < 3 / 1440 && e.type === type && Math.abs(v - value) < tol,
+              `${kind === 'lunar' ? 'Mond' : 'Sonne'} ${date}: ${e.type}, ${fmtMin(e.time - expected)}, `
+              + `${kind === 'lunar' ? 'Größe' : 'gamma'} ${v.toFixed(4)} (Tabelle ${value})`);
+    }
+    // rückwärts: vor dem 1.1.2027 liegt die Mondfinsternis vom 28.8.2026
+    const back = orb.findEclipse(utc(2027, 1, 1, 0, 0), 'lunar', true);
+    check(Math.abs(back.time - utc(2026, 8, 28, 4, 13)) < 3 / 1440, 'rückwärts: vorige Mondfinsternis 28.08.2026');
+    // Vollmond 26.10.2026 liegt weit vom Knoten: keine Finsternis
+    const full = orb.greatestEclipse(orb.nextMoonPhase(utc(2026, 10, 20, 0, 0), Math.PI), 'lunar');
+    check(full.type === 'none', `Vollmond 26.10.2026: keine Finsternis (Abstand von der Schattenachse ${full.axisDistance.toFixed(1)} Erdradien)`);
+}
+
 console.log(failures ? `\n${failures} Fehler` : '\nAlle Tests bestanden');
 process.exit(failures ? 1 : 0);
