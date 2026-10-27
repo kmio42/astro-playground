@@ -162,6 +162,9 @@
         #map { height: 420px; border-radius: 6px; margin-bottom: 6px; background: var(--surface-2); }
         .empty { color: var(--muted); font-style: italic; }
         .value { color: var(--text-2); font-variant-numeric: tabular-nums; }
+        .popup > * { margin: 4px 0; }
+        .popup input[type="number"] { width: 5em; }
+        .popup .value { color: #555; font-size: 0.92em; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="astro.js"></script>
@@ -178,6 +181,10 @@
             moonListMonths: 3, moonMinDuration: 10, moonMinIllumination: 0, moonOnlyDark: false,
             showMonthPaths: true, showHourLines: true, showMoon: true,
         };
+        const DEFAULT_ENVIRONMENT = {
+            buildingRadius: 400, terrainRadius: 50000, useBuildings: true, useTerrain: true, showShadows: false,
+            ownBuilding: null, heightOverrides: {}, buildings: null, terrain: null, groundElevation: null,
+        };
         const ALT_MIN = -5, ALT_MAX = 90;           // Höhenbereich des Horizontdiagramms [°]
         const YEAR_STEP = 2;                        // Raster der Jahres-Heatmap [min]
         const MONTH_NAMES = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -187,6 +194,8 @@
 
         let state = loadState();
         let compiledVps = [];       // vorbereitete Standpunkte (compileViewpoint)
+        let compiledFor = null;     // Ort, für den compiledVps gilt
+        let envProfiles = [];       // je Standpunkt { buildings, terrain, combined } oder null
         let maskVersion = 0;        // zählt Änderungen an den Masken (für Zwischenspeicher)
         let ready = false;          // update() erst nach der Initialisierung
 
@@ -207,10 +216,38 @@
                     .filter(o => o && !isNaN(new Date(o.time).getTime()))
                     .map(o => ({ time: String(o.time), body: o.body === 'moon' ? 'moon' : 'sun',
                                  event: o.event === 'appear' ? 'appear' : 'disappear' })),
+                floor: Number.isFinite(num(v.floor)) ? num(v.floor) : 0,
+                floorHeight: num(v.floorHeight) > 0 ? num(v.floorHeight) : 3,
+                eyeHeight: Number.isFinite(num(v.eyeHeight)) ? num(v.eyeHeight) : 1.6,
             }));
             const selected = Number.isInteger(s.selected) && s.selected >= -1 && s.selected < viewpoints.length
                 ? s.selected : 0;
-            return { viewpoints, selected, settings: { ...DEFAULT_SETTINGS, ...(s.settings || {}) } };
+            return { viewpoints, selected, settings: { ...DEFAULT_SETTINGS, ...(s.settings || {}) },
+                     environment: normalizeEnvironment(s.environment || {}) };
+        }
+
+        // Umgebung (Gebäude, Gelände) prüfen; ungültige Teile werden verworfen
+        function normalizeEnvironment(e) {
+            const d = DEFAULT_ENVIRONMENT;
+            const nonNegative = (v, def) => Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : def;
+            const validOrigin = o => o && Number.isFinite(o.latitude) && Number.isFinite(o.longitude);
+            const buildings = e.buildings && validOrigin(e.buildings.origin) && Array.isArray(e.buildings.items)
+                ? { ...e.buildings, items: e.buildings.items.filter(b => b && typeof b.id === 'string' && Array.isArray(b.rings)) }
+                : null;
+            const terrain = e.terrain && validOrigin(e.terrain.origin) && Array.isArray(e.terrain.hulls)
+                && e.terrain.hulls.length === HORIZON_BINS ? e.terrain : null;
+            const heightOverrides = {};
+            for (const [id, h] of Object.entries(e.heightOverrides || {})) {
+                if (Number.isFinite(Number(h))) heightOverrides[id] = Number(h);
+            }
+            return {
+                buildingRadius: nonNegative(e.buildingRadius, d.buildingRadius),
+                terrainRadius: nonNegative(e.terrainRadius, d.terrainRadius),
+                useBuildings: e.useBuildings !== false, useTerrain: e.useTerrain !== false, showShadows: !!e.showShadows,
+                ownBuilding: typeof e.ownBuilding === 'string' ? e.ownBuilding : null,
+                heightOverrides, buildings, terrain,
+                groundElevation: Number.isFinite(e.groundElevation) ? e.groundElevation : null,
+            };
         }
 
         function loadState() {
@@ -221,12 +258,21 @@
             return normalizeState({});
         }
 
+        // Speichern; false, wenn der Browser es ablehnt (gesperrt oder zu groß)
         function saveState() {
-            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* Speicher gesperrt */ }
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                return true;
+            } catch (e) {
+                return false;
+            }
         }
 
+        // Standpunkte mit berechneter Horizontlinie (Gebäude, Gelände) vorbereiten
         function recompile() {
-            compiledVps = state.viewpoints.map(compileViewpoint);
+            envProfiles = state.viewpoints.map(environmentProfile);
+            compiledVps = state.viewpoints.map((vp, i) => compileViewpoint(vp, envProfiles[i] && envProfiles[i].combined));
+            compiledFor = latitude + '|' + longitude;
             maskVersion++;
         }
 
@@ -573,6 +619,20 @@
                 ctx.globalAlpha = 1;
             }
 
+            // Berechnete Horizontlinie (Gebäude, Gelände)
+            ctx.strokeStyle = css('--text-2');
+            ctx.lineWidth = 1;
+            for (const vp of vps) {
+                if (!vp.profile) continue;
+                ctx.beginPath();
+                for (let k = 0; k <= HORIZON_BINS; k++) {
+                    const a = k * HORIZON_STEP;
+                    const y = altToY(vp.profile[k % HORIZON_BINS]);
+                    if (k === 0) ctx.moveTo(azToX(a), y); else ctx.lineTo(azToX(a), y);
+                }
+                ctx.stroke();
+            }
+
             // Sichtbereiche und Horizontlinien der aktiven Standpunkte
             const accent = css('--accent');
             vps.forEach(vp => {
@@ -584,11 +644,12 @@
                         ctx.strokeRect(azToX(a0), altToY(h1), azToX(a1) - azToX(a0), altToY(h0) - altToY(h1));
                     }
                 }
-                // Horizontlinie in 0,5°-Schritten (geschlossen über Nord)
+                // Hand-Horizontlinie in 0,5°-Schritten (geschlossen über Nord)
                 if (vp.horizon.length) {
+                    const hand = compileViewpoint({ horizon: vp.horizon });
                     ctx.beginPath();
                     for (let a = 0; a <= 360; a += 0.5) {
-                        const y = altToY(horizonAltitude(vp, a));
+                        const y = altToY(horizonAltitude(hand, a));
                         if (a === 0) ctx.moveTo(azToX(a), y); else ctx.lineTo(azToX(a), y);
                     }
                     ctx.stroke();
@@ -689,6 +750,21 @@
             ctx.strokeRect(left + 0.5, top + 0.5, pw - 1, ph - 1);
         }
 
+        // Was verdeckt die Richtung? Gebäude oder Gelände des ersten aktiven Standpunkts mit Umgebung
+        function obstacleText(A, h) {
+            const p = activeIndices().map(i => envProfiles[i]).find(Boolean);
+            if (!p) return '';
+            const k = Math.round(normalizeDegrees(A) / HORIZON_STEP) % HORIZON_BINS;
+            const b = p.buildings;
+            if (b && b.building[k] >= 0 && h <= b.altitude[k] + 0.2) {
+                const bd = buildingList[b.building[k]];
+                const est = bd.source === 'levels' || bd.source === 'default' ? ', geschätzt' : '';
+                return ` · ${buildingTitle(bd)} (${fmtNum(bd.height)} m${est}) in ${fmtNum(b.distance[k], 0)} m`;
+            }
+            if (p.terrain && h <= p.terrain[k] + 0.2) return ` · Gelände (${fmtNum(p.terrain[k], 2)}°)`;
+            return '';
+        }
+
         // Nächster Horizontpunkt des bearbeitbaren Standpunkts unter der Maus (Index oder −1)
         function hitHorizonPoint(x, y) {
             const vp = editableViewpoint();
@@ -765,7 +841,8 @@
                     return;
                 }
                 const free = activeCompiled().some(vp => isDirectionVisible(vp, A, h));
-                showTooltip(tip, x, y, `Azimut ${fmtNum(A)}° (${compass(A)}) · Höhe ${fmtNum(h)}° · ${free ? 'frei' : 'verdeckt'}`);
+                showTooltip(tip, x, y, `Azimut ${fmtNum(A)}° (${compass(A)}) · Höhe ${fmtNum(h)}° · ${free ? 'frei' : 'verdeckt'}`
+                                       + (free ? '' : obstacleText(A, h)));
             });
             const finish = () => {
                 const drag = hzDrag;
@@ -875,7 +952,9 @@
                     el('td', {}, [deleteButton(() => { vp.horizon.splice(i, 1); maskChanged(); })]),
                 ]));
             });
-            if (!vp.horizon.length) hTable.append(el('tr', {}, [el('td', { colSpan: 3, className: 'empty', textContent: 'keine – Horizont 0°' })]));
+            const computed = envProfiles[state.selected];
+            if (!vp.horizon.length) hTable.append(el('tr', {}, [el('td', { colSpan: 3, className: 'empty',
+                textContent: computed ? 'keine – berechnete Linie' : 'keine – Horizont 0°' })]));
             horizonBox.replaceChildren(hTable);
 
             // Beobachtungen
@@ -952,6 +1031,7 @@
             select.replaceChildren(...options);
             select.value = String(state.selected);
             const editable = state.selected >= 0;
+            renderEyeControls();
             document.getElementById('renameViewpoint').disabled = !editable;
             document.getElementById('deleteViewpoint').disabled = !editable || state.viewpoints.length < 2;
             for (const r of document.querySelectorAll('input[name="hzMode"]')) r.disabled = !editable && r.value !== 'view';
@@ -972,7 +1052,9 @@
         function newViewpoint() {
             const name = prompt('Name des neuen Standpunkts:', 'Fenster');
             if (!name) return;
-            state.viewpoints.push({ name, sectors: [], horizon: [], observations: [] });
+            const like = editableViewpoint() || state.viewpoints[0];
+            state.viewpoints.push({ name, sectors: [], horizon: [], observations: [],
+                                    floor: like.floor, floorHeight: like.floorHeight, eyeHeight: like.eyeHeight });
             recompile();
             selectViewpoint(state.viewpoints.length - 1);
         }
@@ -1008,13 +1090,17 @@
                 try {
                     const data = JSON.parse(reader.result);
                     state = normalizeState(data);
+                    rebuildBuildingList();
                     recompile();
-                    saveState();
+                    storageFull = !saveState();
                     if (data.location && Number.isFinite(data.location.latitude) && Number.isFinite(data.location.longitude)) {
                         setLocation(data.location.latitude, data.location.longitude);
                     }
                     renderViewpointSelect();
                     renderTables();
+                    fillEnvironmentControls();
+                    drawBuildings();
+                    renderEnvironmentStatus();
                     redrawAll();
                 } catch (e) {
                     alert('Datei konnte nicht gelesen werden: ' + e.message);
@@ -1035,11 +1121,424 @@
         }
 
     /////////////////////////////////////////////////////////////////
+    //                  Umgebung: Gebäude und Gelände              //
+    /////////////////////////////////////////////////////////////////
+
+        const OVERPASS_SERVERS = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+        ];
+        // Geländekacheln im Terrarium-Format. Mapterhorn: Bodenmodell (in Deutschland DGM1 der Länder), 512 px;
+        // AWS Terrain Tiles: Ersatz, Oberflächenmodell (EU-DEM, Dächer teils enthalten), 256 px
+        const TERRAIN_SOURCES = {
+            mapterhorn: {
+                name: 'Mapterhorn', url: 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp', surfaceModel: false,
+                attribution: 'Gelände: <a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
+            },
+            aws: {
+                name: 'AWS Terrain Tiles', url: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png', surfaceModel: true,
+                attribution: 'Gelände: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Terrain Tiles</a>',
+            },
+        };
+        const KEEP_TAGS = ['building', 'height', 'building:levels', 'roof:levels', 'name', 'addr:street', 'addr:housenumber'];
+        const ENV_MAX_SHIFT = 100;      // weiter verschobener Standort: Umgebung neu laden [m]
+
+        let envVersion = 0;             // zählt Änderungen an Gebäuden, Höhen, eigenem Gebäude
+        let buildingList = [];          // Gebäude mit wirksamer Höhe (OSM, geschätzt oder eigene Angabe)
+        let envLoading = null;          // Fortschritt beim Laden { buildings, terrain } (Text) oder null
+        let envErrors = [];
+        let storageFull = false;
+        const profileCache = new Map();
+        const tileCache = new Map();    // 'z/x/y' → Promise<Float32Array | null>
+
+        function buildingTitle(b) {
+            const t = b.tags || {};
+            if (t.name) return t.name;
+            if (t['addr:street']) return t['addr:street'] + (t['addr:housenumber'] ? ' ' + t['addr:housenumber'] : '');
+            return 'Gebäude';
+        }
+
+        // Wirksame Höhe aus OSM-Tags und eigenen Korrekturen
+        function rebuildBuildingList() {
+            const env = state.environment;
+            buildingList = (env.buildings ? env.buildings.items : []).map(b => {
+                const auto = buildingHeight(b.tags);
+                const override = env.heightOverrides[b.id];
+                return { ...b, autoHeight: auto.height, autoSource: auto.source,
+                         height: override ?? auto.height, source: override !== undefined ? 'override' : auto.source };
+            });
+            envVersion++;
+        }
+
+        // Entfernung des Standorts zum Ort, für den die Daten geladen wurden [m]
+        function envShift(origin) {
+            const [x, y] = localProjection({ latitude, longitude })(origin.latitude, origin.longitude);
+            return Math.hypot(x, y);
+        }
+        const buildingsUsable = () => state.environment.buildings && envShift(state.environment.buildings.origin) <= ENV_MAX_SHIFT;
+        const terrainUsable = () => state.environment.terrain && envShift(state.environment.terrain.origin) <= ENV_MAX_SHIFT;
+
+        // Augenhöhe eines Standpunkts über dem Boden und über NN [m]. Die Bodenhöhe stammt aus demselben Datensatz
+        // wie die Hindernisse (Gebäude bzw. Gelände), sonst aus dem letzten Ladevorgang.
+        function eyeHeights(vp, data) {
+            const above = vp.floor * vp.floorHeight + vp.eyeHeight;
+            const env = state.environment;
+            const own = data === 'buildings' ? env.buildings && env.buildings.ground
+                      : data === 'terrain' ? env.terrain && env.terrain.groundElevation : null;
+            const ground = own ?? env.groundElevation ?? 0;
+            return { above, ground, elevation: ground + above };
+        }
+
+        // Berechnete Horizontlinie eines Standpunkts (zwischengespeichert)
+        function environmentProfile(vp) {
+            const env = state.environment;
+            const useB = env.useBuildings && buildingsUsable() && buildingList.length > 0;
+            const useT = env.useTerrain && terrainUsable();
+            if (!useB && !useT) return null;
+            const eyeB = eyeHeights(vp, 'buildings').elevation, eyeT = eyeHeights(vp, 'terrain').elevation;
+            const key = [envVersion, useB, useT, latitude, longitude, eyeB, eyeT].join('|');
+            if (profileCache.has(key)) return profileCache.get(key);
+            const buildings = useB ? horizonFromBuildings(buildingList, { latitude, longitude }, eyeB,
+                                                          env.ownBuilding ? [env.ownBuilding] : []) : null;
+            const terrain = useT ? horizonFromTerrain(env.terrain, eyeT) : null;
+            const result = { buildings, terrain, combined: combineProfiles(buildings && buildings.altitude, terrain) };
+            if (profileCache.size > 30) profileCache.clear();
+            profileCache.set(key, result);
+            return result;
+        }
+
+        // Umgebung geändert (Laden, Höhe, eigenes Gebäude, Schalter): speichern und alles neu
+        function environmentChanged() {
+            rebuildBuildingList();
+            storageFull = !saveState();
+            recompile();
+            drawBuildings();
+            renderEnvironmentStatus();
+            renderEyeControls();
+            renderTables();
+            redrawAll();
+        }
+        let envTimer = null;
+        function environmentChangedSoon() {
+            clearTimeout(envTimer);
+            envTimer = setTimeout(environmentChanged, 400);
+        }
+
+        // Overpass-Abfrage, bei Fehlern der nächste Server
+        async function fetchOverpass(query) {
+            const errors = [];
+            for (const url of OVERPASS_SERVERS) {
+                const abort = new AbortController();
+                const timer = setTimeout(() => abort.abort(), 45000);
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST', signal: abort.signal, body: 'data=' + encodeURIComponent(query),
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    });
+                    if (res.ok) return await res.json();
+                    errors.push(new URL(url).host + ': ' + res.status);
+                } catch (e) {
+                    errors.push(new URL(url).host + ': ' + (e.name === 'AbortError' ? 'Zeitüberschreitung' : 'nicht erreichbar'));
+                } finally {
+                    clearTimeout(timer);
+                }
+            }
+            throw new Error('Overpass-API ' + errors.join(', '));
+        }
+
+        // Geländekachel laden und dekodieren; null bei Fehler (Mapterhorn: 404 außerhalb der feinen Zoomstufen)
+        function loadTile(source, { z, x, y }) {
+            const key = source + '/' + z + '/' + x + '/' + y;
+            if (!tileCache.has(key)) {
+                tileCache.set(key, (async () => {
+                    try {
+                        const url = TERRAIN_SOURCES[source].url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+                        const res = await fetch(url);
+                        if (!res.ok) return null;
+                        const bitmap = await createImageBitmap(await res.blob());
+                        const size = bitmap.width;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = canvas.height = size;
+                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                        ctx.drawImage(bitmap, 0, 0);
+                        return decodeTerrarium(ctx.getImageData(0, 0, size, size).data);
+                    } catch (e) {
+                        return null;
+                    }
+                })());
+            }
+            return tileCache.get(key);
+        }
+
+        // Quelle für diesen Ladevorgang: Mapterhorn, wenn die Kachel am Standort (Zoom 12, gibt es weltweit)
+        // kommt, sonst AWS. Alle Kacheln eines Ladevorgangs stammen aus derselben Quelle – die Modelle
+        // unterscheiden sich in Städten um über 10 m, gemischt entstünden Kanten.
+        async function chooseTerrainSource(here) {
+            const [cx, cy] = [(here.longitude + 180) / 360 * 4096,
+                (1 - Math.log(Math.tan(here.latitude * DEG2RAD) + 1 / Math.cos(here.latitude * DEG2RAD)) / Math.PI) / 2 * 4096];
+            return await loadTile('mapterhorn', { z: 12, x: Math.floor(cx), y: Math.floor(cy) }) ? 'mapterhorn' : 'aws';
+        }
+
+        // Mehrere Kacheln parallel laden → Map 'z/x/y' → Höhen
+        async function loadTiles(source, list, onProgress) {
+            const tiles = new Map();
+            let next = 0, done = 0, failed = 0;
+            const worker = async () => {
+                while (next < list.length) {
+                    const t = list[next++];
+                    const data = await loadTile(source, t);
+                    if (data) tiles.set(t.z + '/' + t.x + '/' + t.y, data); else failed++;
+                    onProgress(++done, list.length);
+                }
+            };
+            await Promise.all(Array.from({ length: 8 }, worker));
+            if (list.length && failed === list.length) throw new Error('Geländekacheln nicht erreichbar');
+            return tiles;
+        }
+
+        // Bodenhöhe an points[0]. Bei einem Oberflächenmodell (AWS) stattdessen der kleinste Wert aller Punkte:
+        // es enthält in Städten teils die Gebäude selbst, das Minimum liegt näher am Boden.
+        function groundAt(sample, points, source) {
+            const use = TERRAIN_SOURCES[source].surfaceModel ? points : points.slice(0, 1);
+            const values = use.map(([lat, lon]) => sample(lat, lon, 0)).filter(Number.isFinite);
+            return values.length ? round1(Math.min(...values)) : null;
+        }
+        function groundAround(sample, lat, lon, source) {
+            const pts = [[lat, lon]];
+            for (let a = 0; a < 360; a += 45) {
+                const p = destinationPoint({ latitude: lat, longitude: lon }, a, 20);
+                pts.push([p.latitude, p.longitude]);
+            }
+            return groundAt(sample, pts, source);
+        }
+
+        // Overpass-Antwort → [{ id, tags, rings }] (Ringe als [lat, lon], auf 1 cm gerundet)
+        function parseBuildings(data) {
+            const r7 = x => Math.round(x * 1e7) / 1e7;
+            const ring = geometry => geometry.filter(Boolean).map(p => [r7(p.lat), r7(p.lon)]);
+            const items = [];
+            for (const e of data.elements || []) {
+                let rings = [];
+                if (e.type === 'way' && e.geometry) rings = [ring(e.geometry)];
+                if (e.type === 'relation' && e.members) {
+                    // Außenringe zuerst, Innenhöfe danach (Leaflet zeichnet sie als Löcher)
+                    rings = e.members.filter(m => m.type === 'way' && m.geometry)
+                        .sort((a, b) => (a.role === 'inner') - (b.role === 'inner')).map(m => ring(m.geometry));
+                }
+                rings = rings.filter(r => r.length >= 2);
+                if (!rings.length) continue;
+                const tags = {};
+                for (const k of KEEP_TAGS) if (e.tags && e.tags[k] !== undefined) tags[k] = e.tags[k];
+                items.push({ id: e.type + '/' + e.id, tags, rings });
+            }
+            return items;
+        }
+
+        async function loadBuildings(here, radius, source) {
+            envLoading.buildings = 'Gebäude werden geladen …';
+            renderEnvironmentStatus();
+            const q = `around:${radius},${here.latitude},${here.longitude}`;
+            const data = await fetchOverpass(`[out:json][timeout:25];(way["building"](${q});relation["building"](${q}););out body geom;`);
+            const items = parseBuildings(data);
+            // Fußpunkthöhen der Gebäude aus Zoomstufe 14, Zoomstufe 12 als Rückfall (Mapterhorn außerhalb
+            // hochaufgelöster Gebiete)
+            let tiles = new Map();
+            const list = terrainTileList(here, radius + 100, 14).concat(terrainTileList(here, radius + 100, 12));
+            try {
+                tiles = await loadTiles(source, list, (done, total) => {
+                    envLoading.buildings = `${items.length} Gebäude, Fußpunkthöhen ${done}/${total} Kacheln …`;
+                    renderEnvironmentStatus();
+                });
+            } catch (e) {
+                envErrors.push('Fußpunkthöhen: ' + e.message);
+            }
+            const sample = createTerrainSampler(tiles);
+            const ground = groundAround(sample, here.latitude, here.longitude, source);
+            for (const b of items) {
+                const pts = b.rings.flat();
+                const step = Math.max(1, Math.floor(pts.length / 12));
+                const centroid = [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+                // Ohne Wert die Bodenhöhe am Standort, damit Dach und Auge zusammenpassen
+                b.ground = groundAt(sample, [centroid, ...pts.filter((_, i) => i % step === 0)], source) ?? ground ?? 0;
+            }
+            return { items, ground };
+        }
+
+        async function loadTerrain(here, radius, source) {
+            const list = terrainTileList(here, radius);
+            const tiles = await loadTiles(source, list, (done, total) => {
+                envLoading.terrain = `Gelände ${done}/${total} Kacheln …`;
+                renderEnvironmentStatus();
+            });
+            envLoading.terrain = 'Geländeprofil wird berechnet …';
+            renderEnvironmentStatus();
+            await new Promise(r => setTimeout(r, 30));      // Status anzeigen, bevor die Rechnung blockiert
+            const sample = createTerrainSampler(tiles);
+            const ground = groundAround(sample, here.latitude, here.longitude, source);
+            const profile = terrainProfile(sample, here, { radius, eyeRange: [(ground ?? 0) - 5, (ground ?? 0) + 300] });
+            return { radius, ground, hulls: profile.hulls };
+        }
+
+        // „Umgebung laden“: Gebäude (Overpass) und Gelände (Terrarium) parallel; eigene Korrekturen bleiben
+        async function loadEnvironment() {
+            if (envLoading) return;
+            let env = state.environment;
+            const here = { latitude, longitude };
+            envLoading = { buildings: null, terrain: null };
+            envErrors = [];
+            document.getElementById('envLoad').disabled = true;
+            const loaded = new Date().toISOString();
+            envLoading.buildings = 'Höhendaten werden geprüft …';
+            renderEnvironmentStatus();
+            const source = await chooseTerrainSource(here);
+            const [b, t] = await Promise.allSettled([
+                env.buildingRadius > 0 ? loadBuildings(here, env.buildingRadius, source) : Promise.resolve(null),
+                env.terrainRadius > 0 ? loadTerrain(here, env.terrainRadius, source) : Promise.resolve(null),
+            ]);
+            env = state.environment;
+            if (b.status === 'fulfilled' && b.value) {
+                const items = b.value.items;
+                env.buildings = { origin: here, radius: env.buildingRadius, loaded, items, ground: b.value.ground, terrainSource: source };
+                if (b.value.ground !== null) env.groundElevation = b.value.ground;
+                // Eigenes Gebäude: das bisherige, sonst das, in dem der Standort liegt
+                if (!items.some(x => x.id === env.ownBuilding)) {
+                    const own = items.find(x => pointInBuilding(x.rings, latitude, longitude));
+                    env.ownBuilding = own ? own.id : null;
+                }
+            } else if (b.status === 'rejected') {
+                envErrors.push('Gebäude: ' + b.reason.message);
+            } else {
+                env.buildings = null;       // Umkreis 0: keine Gebäude
+            }
+            if (t.status === 'fulfilled' && t.value) {
+                env.terrain = { origin: here, loaded, radius: t.value.radius, groundElevation: t.value.ground, hulls: t.value.hulls, source };
+                if (t.value.ground !== null) env.groundElevation = t.value.ground;
+            } else if (t.status === 'rejected') {
+                envErrors.push('Gelände: ' + t.reason.message);
+            } else {
+                env.terrain = null;
+            }
+            envLoading = null;
+            document.getElementById('envLoad').disabled = false;
+            environmentChanged();
+        }
+
+        function renderEnvironmentStatus() {
+            const env = state.environment;
+            const parts = [];
+            const date = iso => new Date(iso).toLocaleDateString('de-DE');
+            if (envLoading) {
+                parts.push([envLoading.buildings, envLoading.terrain].filter(Boolean).join(' · ') || 'Lädt …');
+            } else if (!env.buildings && !env.terrain) {
+                parts.push('Noch nicht geladen. „Umgebung laden“ holt die Gebäude aus OpenStreetMap und die Geländehöhen ' +
+                           'für den Standort; beides wird gespeichert.');
+            }
+            if (!envLoading && env.buildings) {
+                const n = { height: 0, levels: 0, default: 0, override: 0 };
+                for (const b of buildingList) n[b.source]++;
+                const own = buildingList.find(b => b.id === env.ownBuilding);
+                parts.push(`${buildingList.length} Gebäude im Umkreis von ${env.buildings.radius} m (geladen ${date(env.buildings.loaded)}): ` +
+                           `${n.height} mit Höhe aus OSM, ${n.levels} aus der Geschosszahl geschätzt, ${n.default} ohne Angabe (10 m)` +
+                           (n.override ? `, ${n.override} eigene Höhen` : '') + '. ' +
+                           (own ? `Eigenes Gebäude: ${buildingTitle(own)}.` : 'Kein eigenes Gebäude gewählt.'));
+            }
+            const sources = new Set([env.buildings && env.buildings.terrainSource, env.terrain && env.terrain.source].filter(Boolean));
+            if (!envLoading && sources.size) {
+                parts.push('Höhendaten: ' + [...sources].map(x => TERRAIN_SOURCES[x].name).join(' und ') +
+                           (sources.has('aws') ? ' (Ersatzquelle, Oberflächenmodell)' : '') + '.');
+            }
+            if (!envLoading && env.terrain) {
+                const vp = editableViewpoint() || state.viewpoints[0];
+                const hz = horizonFromTerrain(env.terrain, eyeHeights(vp, 'terrain').elevation);
+                let k = 0;
+                hz.forEach((v, i) => { if (v > hz[k]) k = i; });
+                parts.push(`Gelände bis ${fmtNum(env.terrain.radius / 1000, 0)} km: Boden am Standort ${fmtNum(env.terrain.groundElevation ?? 0, 0)} m ü. NN, ` +
+                           `höchster Geländehorizont ${fmtNum(hz[k])}° bei ${fmtNum(k * HORIZON_STEP, 0)}° (${compass(k * HORIZON_STEP)}).`);
+            }
+            for (const [data, what] of [[env.buildings, 'Gebäude'], [env.terrain, 'Gelände']]) {
+                if (data && envShift(data.origin) > ENV_MAX_SHIFT) {
+                    parts.push(`⚠ ${what}: für einen ${fmtNum(envShift(data.origin), 0)} m entfernten Ort geladen, wird nicht verwendet – bitte neu laden.`);
+                }
+            }
+            if (envErrors.length) parts.push('⚠ ' + envErrors.join(' · '));
+            if (storageFull) parts.push('⚠ Zu groß für den Browser-Speicher – die Umgebung gilt nur bis zum Neuladen der Seite (Export nutzen).');
+            document.getElementById('envStatus').textContent = parts.join(' ');
+            document.getElementById('envLoad').textContent = env.buildings || env.terrain ? 'Neu laden' : 'Umgebung laden';
+        }
+
+        const ENV_SWITCHES = [['envUseBuildings', 'useBuildings'], ['envUseTerrain', 'useTerrain'], ['envShowShadows', 'showShadows']];
+
+        // Eingabefelder der Umgebung aus dem Zustand füllen (Start, Import)
+        function fillEnvironmentControls() {
+            const env = state.environment;
+            document.getElementById('envBuildingRadius').value = String(env.buildingRadius);
+            document.getElementById('envTerrainRadius').value = String(env.terrainRadius / 1000);
+            for (const [id, key] of ENV_SWITCHES) document.getElementById(id).checked = env[key];
+        }
+
+        function setupEnvironmentControls() {
+            const radius = document.getElementById('envBuildingRadius');
+            const terrain = document.getElementById('envTerrainRadius');
+            radius.addEventListener('change', () => {
+                const v = parseFloat(radius.value);
+                if (Number.isFinite(v) && v >= 0) { state.environment.buildingRadius = Math.min(1500, v); saveState(); }
+            });
+            terrain.addEventListener('change', () => {
+                const v = parseFloat(terrain.value);
+                if (Number.isFinite(v) && v >= 0) { state.environment.terrainRadius = Math.min(200, v) * 1000; saveState(); }
+            });
+            for (const [id, key] of ENV_SWITCHES) {
+                const box = document.getElementById(id);
+                box.addEventListener('change', () => {
+                    state.environment[key] = box.checked;
+                    if (key === 'showShadows') { saveState(); drawMap(); } else environmentChanged();
+                });
+            }
+            fillEnvironmentControls();
+        }
+
+        // Stockwerk, Geschosshöhe, Augenhöhe des gewählten Standpunkts
+        function renderEyeControls() {
+            const vp = editableViewpoint();
+            for (const id of ['vpFloor', 'vpFloorHeight', 'vpEyeHeight']) document.getElementById(id).disabled = !vp;
+            const show = vp || state.viewpoints[0];
+            document.getElementById('vpFloor').value = String(show.floor);
+            document.getElementById('vpFloorHeight').value = String(show.floorHeight);
+            document.getElementById('vpEyeHeight').value = String(show.eyeHeight);
+            const e = eyeHeights(show);
+            document.getElementById('vpEyeInfo').textContent = vp
+                ? `Auge ${fmtNum(e.above)} m über dem Boden` + (state.environment.groundElevation !== null ? `, ${fmtNum(e.elevation)} m ü. NN` : '')
+                : 'Zum Ändern einen einzelnen Standpunkt wählen.';
+        }
+
+        function setupEyeControls() {
+            for (const [id, key] of [['vpFloor', 'floor'], ['vpFloorHeight', 'floorHeight'], ['vpEyeHeight', 'eyeHeight']]) {
+                const input = document.getElementById(id);
+                input.addEventListener('input', () => {
+                    const vp = editableViewpoint();
+                    const v = parseFloat(input.value);
+                    if (!vp || !Number.isFinite(v) || (key === 'floorHeight' && v <= 0)) return;
+                    vp[key] = v;
+                    const e = eyeHeights(vp);
+                    document.getElementById('vpEyeInfo').textContent = `Auge ${fmtNum(e.above)} m über dem Boden` +
+                        (state.environment.groundElevation !== null ? `, ${fmtNum(e.elevation)} m ü. NN` : '');
+                    maskChangedSoon();
+                });
+            }
+        }
+
+    /////////////////////////////////////////////////////////////////
     //                  Karte                                      //
     /////////////////////////////////////////////////////////////////
 
-        let leafletMap = null, locationMarker = null, overlayLayer = null;
+        let leafletMap = null, locationMarker = null;
+        let overlayLayer = null, directionLayer = null, buildingLayer = null, shadowLayer = null, edgeLayer = null;
+        let terrainAttributions = new Set();     // in der Karte angezeigte Geländequellen
         const VP_COLORS = ['--accent', '--moon', '--sun', '--text-2'];
+        // Gebäudehöhe 0–6, 6–12, … ≥ 36 m (Grüntöne, heben sich von Sichtbereich, Sonne und Mond ab)
+        const HEIGHT_COLORS = ['#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45', '#006d2c'];
+        const heightColor = h => HEIGHT_COLORS[Math.min(HEIGHT_COLORS.length - 1, Math.max(0, Math.floor(h / 6)))];
 
         // Punkt in Entfernung dist [m] und Azimut az [°] vom Standort (ebene Näherung)
         function destination(lat, lon, az, dist) {
@@ -1061,12 +1560,143 @@
                 maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende',
             }).addTo(leafletMap);
+            // Ebenen von unten nach oben: Schatten, Sichtbereiche, Gebäude, Richtungslinien
+            for (const [name, z] of [['shadows', 380], ['buildings', 420], ['directions', 440]]) {
+                leafletMap.createPane(name).style.zIndex = z;
+            }
+            leafletMap.getPane('shadows').style.pointerEvents = 'none';
+            shadowLayer = L.layerGroup().addTo(leafletMap);
             overlayLayer = L.layerGroup().addTo(leafletMap);
+            buildingLayer = L.layerGroup().addTo(leafletMap);
+            directionLayer = L.layerGroup().addTo(leafletMap);
+            edgeLayer = L.layerGroup().addTo(leafletMap);
+            leafletMap.on('popupclose', () => edgeLayer.clearLayers());
             locationMarker = L.marker([latitude, longitude], { draggable: true, title: 'Standort (ziehen zum Verschieben)' }).addTo(leafletMap);
             locationMarker.on('dragend', () => {
                 const p = locationMarker.getLatLng();
                 setLocation(p.lat, p.lng);
             });
+            drawBuildings();
+        }
+
+        // Gebäude nach Höhe eingefärbt; geschätzte Höhen gestrichelt, eigenes Gebäude grau
+        function drawBuildings() {
+            if (!leafletMap) return;
+            buildingLayer.clearLayers();
+            const env = state.environment;
+            // Namensnennung der Höhendaten, die gerade verwendet werden (ältere Speicherstände: AWS)
+            const used = new Set();
+            if (env.terrain) used.add(env.terrain.source || 'aws');
+            if (env.buildings) used.add(env.buildings.terrainSource || 'aws');
+            for (const src of Object.keys(TERRAIN_SOURCES)) {
+                if (used.has(src) !== terrainAttributions.has(src)) {
+                    leafletMap.attributionControl[used.has(src) ? 'addAttribution' : 'removeAttribution'](TERRAIN_SOURCES[src].attribution);
+                }
+            }
+            terrainAttributions = used;
+            for (const b of buildingList) {
+                const own = b.id === env.ownBuilding;
+                const estimated = b.source === 'levels' || b.source === 'default';
+                const style = own
+                    ? { color: '#6b6a64', weight: 1.5, fillColor: '#9a9993', fillOpacity: 0.25 }
+                    : { color: '#2f5f3a', weight: estimated ? 1 : 1.5, dashArray: estimated ? '4 3' : null,
+                        fillColor: heightColor(b.height), fillOpacity: 0.6 };
+                L.polygon(b.rings, { ...style, pane: 'buildings' })
+                    .on('click', ev => openBuildingPopup(b, ev.latlng))
+                    .bindTooltip(`${buildingTitle(b)}: ${fmtNum(b.height)} m${estimated ? ' (geschätzt)' : ''}${own ? ' – eigenes Gebäude' : ''}`, { sticky: true })
+                    .addTo(buildingLayer);
+            }
+        }
+
+        // Popup zu einem Gebäude: Höhe ändern, eigenes Gebäude, Fassade an der Klickstelle als Sichtbereich
+        function openBuildingPopup(b, latlng) {
+            const env = state.environment;
+            const sourceText = {
+                height: `aus OSM (height = ${b.tags.height})`,
+                levels: `geschätzt aus ${b.tags['building:levels']} Geschossen` + (b.tags['roof:levels'] ? ` + ${b.tags['roof:levels']} im Dach` : ''),
+                default: 'geschätzt, keine Angabe in OSM',
+            };
+            const info = b.source === 'override'
+                ? `eigene Angabe (sonst ${fmtNum(b.autoHeight)} m, ${sourceText[b.autoSource]})` : sourceText[b.source];
+
+            const height = numberInput(b.height, v => {
+                if (v < 0) return;
+                env.heightOverrides[b.id] = v;
+                environmentChangedSoon();
+            });
+            const reset = el('button', { textContent: 'OSM-Wert', title: 'Eigene Höhe verwerfen' });
+            reset.style.display = b.source === 'override' ? '' : 'none';
+            reset.addEventListener('click', () => {
+                delete env.heightOverrides[b.id];
+                leafletMap.closePopup();
+                environmentChanged();
+            });
+            const ownBox = el('input', { type: 'checkbox', checked: b.id === env.ownBuilding });
+            ownBox.addEventListener('change', () => {
+                env.ownBuilding = ownBox.checked ? b.id : null;
+                environmentChanged();
+            });
+
+            const children = [
+                el('b', { textContent: buildingTitle(b) + ' ' }),
+                el('a', { href: 'https://www.openstreetmap.org/' + b.id, target: '_blank', textContent: b.id }),
+                el('div', {}, ['Höhe ', height, ' m ', reset]),
+                el('div', { className: 'value', textContent: info }),
+                el('label', {}, [ownBox, ' eigenes Gebäude (kein Hindernis)']),
+            ];
+
+            // Fassade: Kante, die der Klickstelle am nächsten liegt
+            const edge = nearestEdge(b.rings, latlng.lat, latlng.lng);
+            if (edge) {
+                const az = facadeAzimuth(b.rings, edge.ring, edge.edge);
+                const vp = editableViewpoint();
+                const take = el('button', { textContent: 'Als Sichtbereich', disabled: !vp,
+                                            title: vp ? `Halbraum vor der Fassade für „${vp.name}“` : 'Erst einen einzelnen Standpunkt wählen' });
+                take.addEventListener('click', () => {
+                    vp.sectors.push({ azimuthFrom: round1(normalizeDegrees(az - 90)), azimuthTo: round1(normalizeDegrees(az + 90)),
+                                      altitudeFrom: ALT_MIN, altitudeTo: ALT_MAX });
+                    leafletMap.closePopup();
+                    maskChanged();
+                });
+                children.push(el('div', {}, [`Fassade (markiert): ${fmtNum(az)}° ${compass(az)} `, take]));
+                const ring = b.rings[edge.ring];
+                edgeLayer.clearLayers();
+                L.polyline([ring[edge.edge], ring[edge.edge + 1]], { color: css('--accent'), weight: 5, pane: 'directions' }).addTo(edgeLayer);
+            }
+            const box = el('div', { className: 'popup' }, children);
+            L.popup({ maxWidth: 340 }).setLatLng(latlng).setContent(box).openOn(leafletMap);
+        }
+
+        // Konvexe Hülle von Punkten [lat, lon] (für den Schatten eines Gebäudes)
+        function convexHull(points) {
+            const p = points.slice().sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+            const cross = (o, a, b) => (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+            const half = list => {
+                const h = [];
+                for (const q of list) {
+                    while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop();
+                    h.push(q);
+                }
+                h.pop();
+                return h;
+            };
+            return half(p).concat(half(p.reverse()));
+        }
+
+        // Schattenwurf zur gewählten Zeit: Grundriss um H / tan h von der Sonne weg verschoben
+        function drawShadows(sun) {
+            shadowLayer.clearLayers();
+            if (!state.environment.showShadows || !buildingList.length || sun.trueAltitude < 1) return;
+            const len = 1 / Math.tan(sun.altitude * DEG2RAD);
+            const away = sun.azimuth + 180;
+            for (const b of buildingList) {
+                const d = Math.min(b.height * len, 1000);
+                const pts = b.rings.flat();
+                const [dLat, dLon] = destination(pts[0][0], pts[0][1], away, d).map((v, i) => v - pts[0][i]);
+                const hull = convexHull(pts.concat(pts.map(([lat, lon]) => [lat + dLat, lon + dLon])));
+                L.polygon(hull, { stroke: false, fillColor: '#000', fillOpacity: 0.2, pane: 'shadows', interactive: false })
+                    .addTo(shadowLayer);
+            }
         }
 
         function drawMap() {
@@ -1075,7 +1705,9 @@
             locationMarker.setLatLng(here);
             if (!leafletMap.getBounds().pad(-0.1).contains(here)) leafletMap.panTo(here);
             overlayLayer.clearLayers();
+            directionLayer.clearLayers();
             const loc = getLocation();
+            const onTop = { pane: 'directions' };
 
             // Sonnenwenden: Auf- und Untergangsrichtung
             const year = selectedYear();
@@ -1087,8 +1719,8 @@
                     if (!has) continue;
                     const az = sunDirection(midnight + hours / 24, loc).azimuth;
                     L.polyline([here, destination(latitude, longitude, az, 140)],
-                               { color: css('--muted'), weight: 1.5, dashArray: '4 4' })
-                        .bindTooltip(`${what} ${label}: ${fmtNum(az, 0)}° ${compass(az)}`).addTo(overlayLayer);
+                               { ...onTop, color: css('--muted'), weight: 1.5, dashArray: '4 4' })
+                        .bindTooltip(`${what} ${label}: ${fmtNum(az, 0)}° ${compass(az)}`).addTo(directionLayer);
                 }
             }
 
@@ -1105,22 +1737,24 @@
                         .addTo(overlayLayer);
                 }
                 for (const [a, h] of vp.horizon) {
-                    L.polyline([here, destination(latitude, longitude, a, 70)], { color, weight: 1, opacity: 0.8 })
-                        .bindTooltip(`${vp.name}: Horizont ${fmtNum(a, 0)}° ${compass(a)}, ${fmtNum(h)}°`).addTo(overlayLayer);
+                    L.polyline([here, destination(latitude, longitude, a, 70)], { ...onTop, color, weight: 1, opacity: 0.8 })
+                        .bindTooltip(`${vp.name}: Horizont ${fmtNum(a, 0)}° ${compass(a)}, ${fmtNum(h)}°`).addTo(directionLayer);
                 }
             });
 
             // Sonne und Mond zum gewählten Zeitpunkt
             const jd = currentJd();
             const vps = activeCompiled();
-            for (const [dir, colorName, name] of [[sunDirection(jd, loc), '--sun', 'Sonne'], [moonDirection(jd, loc), '--moon', 'Mond']]) {
+            const sun = sunDirection(jd, loc);
+            for (const [dir, colorName, name] of [[sun, '--sun', 'Sonne'], [moonDirection(jd, loc), '--moon', 'Mond']]) {
                 const level = Math.max(...vps.map(vp => visibilityLevel(dir, vp)));
                 const visible = level >= VisibilityLevel.Partial;
                 const below = level === VisibilityLevel.Below;
                 L.polyline([here, destination(latitude, longitude, dir.azimuth, 170)], {
-                    color: css(colorName), weight: visible ? 4 : 2.5, dashArray: visible ? null : '6 6', opacity: below ? 0.45 : 0.95,
-                }).bindTooltip(`${name}: ${fmtDirection(dir)} – ${LEVEL_TEXT[level]}`).addTo(overlayLayer);
+                    ...onTop, color: css(colorName), weight: visible ? 4 : 2.5, dashArray: visible ? null : '6 6', opacity: below ? 0.45 : 0.95,
+                }).bindTooltip(`${name}: ${fmtDirection(dir)} – ${LEVEL_TEXT[level]}`).addTo(directionLayer);
             }
+            drawShadows(sun);
         }
 
     /////////////////////////////////////////////////////////////////
@@ -1513,6 +2147,10 @@
         // Von ui.js bei jeder Änderung von Zeit oder Ort aufgerufen
         function update() {
             if (!ready) return;
+            if (compiledFor !== latitude + '|' + longitude) {
+                recompile();
+                renderEnvironmentStatus();
+            }
             redrawAll();
         }
 
@@ -1535,9 +2173,13 @@
                 { label: '1 Tag', step: 86400000 }, { label: '7 Tage', step: 7 * 86400000 },
             ]);
 
+            rebuildBuildingList();
             recompile();
             renderViewpointSelect();
             renderTables();
+            setupEyeControls();
+            setupEnvironmentControls();
+            renderEnvironmentStatus();
             setupHorizonInteraction();
             setupYearInteraction();
             setupMoonControls();
@@ -1573,8 +2215,9 @@
     <h1>Sonne und Mond vom Balkon</h1>
     <p>Wann ist die Sonne auf dem Balkon, wann sieht man den Mond vom Fenster aus? Für jeden Standpunkt beschreibt eine
         <b>Sichtmaske</b>, welche Richtungen am Himmel frei sind: ein oder mehrere Sichtbereiche (Azimut und Höhe von–bis)
-        und eine Horizontlinie für Hindernisse wie Nachbarhäuser oder Bäume. Daraus berechnet die Seite, wann Sonne und
-        Mond in einem freien Bereich stehen. Grundlage ist das <a href="Konzept-Sichtbarkeit.md">Konzept</a> (Stufe 1).</p>
+        und eine Horizontlinie für Hindernisse wie Nachbarhäuser oder Bäume. Die Horizontlinie lässt sich von Hand zeichnen
+        oder aus den Gebäuden in OpenStreetMap und den Geländehöhen berechnen. Daraus ermittelt die Seite, wann Sonne und
+        Mond in einem freien Bereich stehen. Grundlage ist das <a href="Konzept-Sichtbarkeit.md">Konzept</a> (Stufen 1 und 2).</p>
 
     <div id="locationControls"></div>
     <div id="timeControls"></div>
@@ -1589,6 +2232,12 @@
         <button onclick="exportJson()">Exportieren</button>
         <label><button onclick="document.getElementById('importFile').click()">Importieren</button>
             <input type="file" id="importFile" accept="application/json,.json" style="display:none"></label>
+    </div>
+    <div class="controls">
+        <label>Stockwerk <input type="number" id="vpFloor" step="1" min="-1"></label>
+        <label>Geschosshöhe <input type="number" id="vpFloorHeight" step="0.1" min="2"> m</label>
+        <label>Augenhöhe <input type="number" id="vpEyeHeight" step="0.1" min="0"> m</label>
+        <span class="value" id="vpEyeInfo"></span>
     </div>
 
     <h2>Horizontdiagramm</h2>
@@ -1605,6 +2254,7 @@
     <div class="legend">
         <span class="swatch" style="--c: var(--mask)">verdeckt</span>
         <span style="--c: var(--accent)">Sichtbereich, Horizontlinie</span>
+        <span style="--c: var(--text-2)">Gebäude und Gelände</span>
         <span style="--c: var(--sun)">Sonne heute</span>
         <span style="--c: var(--moon)">Mond heute</span>
         <span style="--c: color-mix(in srgb, var(--sun) 45%, transparent)">Sonnenbahn am 21. jedes Monats</span>
@@ -1639,10 +2289,20 @@
         </div>
     </div>
 
-    <h2>Karte</h2>
+    <h2>Karte und Umgebung</h2>
     <p id="mapFileHint" class="hint" style="display:none">Die Seite ist als Datei geöffnet. OpenStreetMap liefert dann
         keine Kartenkacheln („Access blocked“), weil die Nutzungsregeln einen Referer verlangen. Abhilfe: im Ordner
         <code>python3 -m http.server 8000</code> starten und <code>http://localhost:8000/Sichtbarkeit.html</code> öffnen.</p>
+    <div class="controls">
+        <label>Gebäude im Umkreis <input type="number" id="envBuildingRadius" min="0" max="1500" step="50"> m</label>
+        <label>Gelände bis <input type="number" id="envTerrainRadius" min="0" max="200" step="10"> km</label>
+        <button id="envLoad" onclick="loadEnvironment()">Umgebung laden</button>
+        <span style="flex:1"></span>
+        <label><input type="checkbox" id="envUseBuildings"> Gebäude</label>
+        <label><input type="checkbox" id="envUseTerrain"> Gelände</label>
+        <label><input type="checkbox" id="envShowShadows"> Schatten</label>
+    </div>
+    <p class="hint" id="envStatus"></p>
     <div id="map"></div>
     <div class="legend">
         <span style="--c: var(--accent)">Sichtbereich, Horizontpunkte</span>
@@ -1650,8 +2310,28 @@
         <span style="--c: var(--moon)">Mond</span>
         <span class="dashed" style="--c: var(--muted)">Sonnenauf-/-untergang am 21.6. und 21.12.</span>
     </div>
+    <div class="legend">
+        <span style="--c: transparent">Gebäudehöhe:</span>
+        <span class="swatch" style="--c: #c7e9c0">bis 12 m</span>
+        <span class="swatch" style="--c: #74c476">18–24 m</span>
+        <span class="swatch" style="--c: #238b45">30–36 m</span>
+        <span class="swatch" style="--c: #006d2c">ab 36 m</span>
+        <span class="dashed" style="--c: #2f5f3a">Höhe geschätzt</span>
+        <span class="swatch" style="--c: #9a9993">eigenes Gebäude</span>
+    </div>
     <p class="hint">Den Standort-Marker an die eigene Position ziehen. Richtung zu Sonne und Mond zum eingestellten
-        Zeitpunkt: durchgezogen = sichtbar, gestrichelt = verdeckt, blass = unter dem Horizont.</p>
+        Zeitpunkt: durchgezogen = sichtbar, gestrichelt = verdeckt, blass = unter dem Horizont.
+        Klick auf ein Gebäude: Höhe ändern, als eigenes Gebäude ausschließen oder die angeklickte Fassade als
+        Sichtbereich übernehmen (Halbraum vor der Wand). „Schatten“ zeigt den Schattenwurf zur eingestellten Zeit –
+        passt er zu einem Luftbild, stimmen die Höhen ungefähr.</p>
+    <p class="hint">Die berechnete Horizontlinie ist für jede Richtung der höchste Winkel zu einer Dachkante bzw. zum
+        Gelände, gesehen aus der Augenhöhe des Standpunkts. Das Gelände wird bis zur eingestellten Entfernung abgetastet
+        (ab 100 m, mit Erdkrümmung). Bäume, Dachformen und Balkone fehlen; dafür die Horizontlinie von Hand ergänzen.
+        Daten: Gebäude © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende (ODbL) über
+        die Overpass-API; Geländehöhen von <a href="https://mapterhorn.com/attribution">Mapterhorn</a> (in Berlin ATKIS-DGM,
+        dl-de/zero-2-0; in Brandenburg © GeoBasis-DE/LGB, dl-de/by-2-0; sonst u. a. Copernicus GLO-30 © DLR, Airbus,
+        EU/ESA), ersatzweise aus den <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a>
+        (Mapzen, AWS Open Data; u. a. SRTM, EU-DEM © Copernicus).</p>
 
     <h2>Jahresübersicht Sonne</h2>
     <div class="legend">

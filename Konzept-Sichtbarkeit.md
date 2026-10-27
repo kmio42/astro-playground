@@ -1,6 +1,6 @@
 # Konzept: Wann sind Sonne und Mond von Wohnung/Balkon aus sichtbar?
 
-Stand: 27.10.2026, Konzept abgestimmt, Stufe 1 umgesetzt (`Sichtbarkeit.html`, `visibility.js`,
+Stand: 27.10.2026, Konzept abgestimmt, Stufen 1 und 2 umgesetzt (`Sichtbarkeit.html`, `visibility.js`,
 `testVisibility.js`).
 
 ## Ziel
@@ -188,13 +188,18 @@ Node-Skript `testVisibility.js` ohne Testframework (wie `renderMoon.js`):
 
 ### Gebäude
 
-1. Gebäude im Umkreis von **400 m** (einstellbar) über die Overpass-API laden:
+1. Gebäude im Umkreis von **400 m** (einstellbar) über die Overpass-API laden, auch Multipolygon-Relationen
+   (große Blöcke mit Innenhöfen, z. B. das Rote Rathaus):
 
    ```
    [out:json][timeout:25];
-   way["building"](around:400,{lat},{lon});
-   out geom tags;
+   (way["building"](around:400,{lat},{lon}); relation["building"](around:400,{lat},{lon}););
+   out body geom;
    ```
+
+   `out geom tags` reicht nicht: Relationen kommen dann ohne Mitglieder. Die öffentlichen Overpass-Server sind
+   oft überlastet (502/504); die Seite versucht nacheinander overpass-api.de, overpass.kumi.systems und
+   maps.mail.ru. `building:part` wird nicht ausgewertet (würde doppelt zählen).
 
 2. Höhe: `height` → sonst `building:levels` × 3 m + `roof:levels` × 1,5 m → sonst 10 m. Geschätzte Höhen
    werden in der Karte farblich markiert und sind per Klick änderbar.
@@ -205,16 +210,32 @@ Node-Skript `testVisibility.js` ohne Testframework (wie `renderMoon.js`):
 
 ### Gelände
 
-Quelle sind die **Terrarium-Kacheln** von [Terrain Tiles auf AWS](https://registry.opendata.aws/terrain-tiles)
-(frei, CORS erlaubt, Namensnennung nötig). Dekodiert werden sie im Browser per Canvas:
+Quelle sind Kacheln im **Terrarium-Format**, dekodiert im Browser per Canvas:
+
+- **[Mapterhorn](https://mapterhorn.com)** (`tiles.mapterhorn.com/{z}/{x}/{y}.webp`, 512 px, CORS erlaubt): ein
+  **Bodenmodell** aus 151 offenen Quellen, in Deutschland das DGM1 der Länder (Berlin: ATKIS-DGM 1 m,
+  dl-de/zero-2-0; Brandenburg: DGM1, dl-de/by-2-0 „© GeoBasis-DE/LGB“), sonst u. a. Copernicus GLO-30. Zoomstufen
+  bis 16 in Gebieten mit feinen Daten, sonst bis 12; über dem Meer 0 m. Keine eigene Datenlizenz (es gelten die
+  der Quellen), keine veröffentlichten Nutzungsgrenzen. Namensnennung „© Mapterhorn“ mit Link auf
+  mapterhorn.com/attribution.
+- **Ersatz: [Terrain Tiles auf AWS](https://registry.opendata.aws/terrain-tiles)** (`…/terrarium/{z}/{x}/{y}.png`,
+  256 px), in Europa EU-DEM, ein **Oberflächenmodell** (Dächer teils enthalten).
+
+Beim Laden wird per Probekachel (Zoom 12 am Standort) entschieden; alle Kacheln eines Ladevorgangs kommen aus
+derselben Quelle, weil die Modelle in Städten über 10 m auseinanderliegen und gemischt Kanten erzeugen würden.
+Gebäude und Gelände speichern ihre Quelle und ihre eigene Bodenhöhe am Standort; das Auge bezieht sich jeweils
+auf dieselbe Quelle wie die Hindernisse.
 
 ```
 Höhe [m] = R · 256 + G + B / 256 − 32768
 ```
 
-Die Auflösung liegt im Flachland vermutlich bei etwa 30 m (bei der Umsetzung prüfen). Die
-[Open-Meteo Elevation API](https://open-meteo.com/en/docs/elevation-api) (Copernicus GLO-90, CORS erlaubt)
-dient nur als Gegenprobe für einzelne Punkte im Test.
+Geprüft in Berlin-Mitte (52,52° N, 13,405° O): Mapterhorn 35,5 m, Open-Meteo (Copernicus GLO-90) 37 m, AWS
+48 m. Die AWS-Kacheln der Zoomstufe 14 sind aus gröberen Daten interpoliert (effektiv 30–90 m); Fußpunkthöhen
+benachbarter Gebäude streuen damit zwischen 31 und 49 m, mit Mapterhorn zwischen 34 und 37 m. Bei AWS gilt
+deshalb als Bodenhöhe das **Minimum** mehrerer Punkte (Standort: Mitte und 8 Punkte in 20 m; Gebäude:
+Mittelpunkt und bis zu 12 Ecken), bei Mapterhorn der Wert am Punkt selbst. Für die Fußpunkte werden Zoom 14 und
+als Rückfall Zoom 12 geladen.
 
 **Nahbereich (Fußpunkthöhen):**
 
@@ -226,26 +247,41 @@ z_Auge  = Gelände(Standpunkt) + Stockwerk × Geschosshöhe + Augenhöhe
 **Fernbereich (Hügel und Berge):**
 
 - Standardradius **50 km**, einstellbar bis 200 km.
-- Abtastung pro 0,25° Azimut entlang des Strahls: bis 2 km alle 25 m aus Zoomstufe 14, darüber Zoomstufe 11
-  mit Schritten von 1 % der Entfernung.
+- Abtastung pro 0,25° Azimut entlang des Strahls: bis 2 km alle 25 m, darüber in Schritten von 1 % der
+  Entfernung. Zoomstufe nach Entfernung: bis 2 km 14, bis 10 km 12, bis 40 km 10, darüber 8 (Pixel etwa ein
+  Drittel des Abtastschritts). Das sind 61 Kacheln für 50 km und 87 für 200 km (mit Zoomstufe 11 durchgehend
+  wären es ≈ 100 bzw. über 1000).
+- Meer statt Meeresboden: Höhen unter 0 m zählen als 0 m (die Kacheln enthalten Bathymetrie).
 - Die ersten ~100 m um den Standpunkt bleiben unberücksichtigt, sonst erzeugt die grobe Auflösung
   Phantom-Hindernisse direkt vor dem Haus.
 - Absenkung durch Erdkrümmung mit Refraktion: Δz = d² / (2R) · (1 − k), k ≈ 0,13
-  (10 km ≈ 6,8 m, 50 km ≈ 170 m).
+  (10 km ≈ 6,8 m, 50 km ≈ 170 m). Test: Ebene aus 100 m Höhe ergibt die Kimmtiefe −0,299°.
+- **Gespeichert wird je Azimut die obere konvexe Hülle** der Punkte (Entfernung, Höhe). Der höchste
+  Höhenwinkel von einem Auge in Höhe z liegt immer auf einer Ecke dieser Hülle; Ecken, die für Augenhöhen
+  zwischen Boden − 5 m und Boden + 300 m nicht in Frage kommen, entfallen. In Berlin bleiben ≈ 8 Ecken je
+  Richtung (≈ 120 KB). So lassen sich Stockwerk und Augenhöhe ändern, ohne neu zu laden.
 
 ### Zwischenspeichern
 
-Overpass-Gebäude, Geländekacheln-Auszug und Höhenkorrekturen werden einmal geladen und im gespeicherten
-Zustand abgelegt (localStorage + JSON-Export). Neu geladen wird nur auf Knopfdruck; eigene Korrekturen
-bleiben erhalten. Nur die Kartenkacheln brauchen dann noch Internet.
+Overpass-Gebäude (Umriss, wenige Tags, Fußpunkthöhe), Geländeprofil (Hüllen) und Höhenkorrekturen werden
+einmal geladen und im gespeicherten Zustand abgelegt (localStorage + JSON-Export). Neu geladen wird nur auf
+Knopfdruck („Umgebung laden“ holt beides parallel); eigene Korrekturen bleiben erhalten. Nur die
+Kartenkacheln brauchen dann noch Internet. Liegt der Standort mehr als 100 m vom Ladeort entfernt, werden die
+Daten nicht verwendet und die Seite bittet um Neuladen. Das eigene Gebäude wird beim Laden vorgewählt, wenn der
+Standort in einem Grundriss liegt.
 
 ### Karte in Stufe 2
 
-- Gebäude nach Höhe eingefärbt, geschätzte Höhen markiert, Klick öffnet Höhe zum Bearbeiten.
-- **Fassade per Klick übernehmen:** Klick auf eine Gebäudekante → Kantenrichtung ± 90° ergibt den
-  Fassaden-Azimut (genauer als Kompass).
-- Optional: Schattenwurf der Gebäude zur gewählten Zeit (Grundriss um H / tan h entgegen der
-  Sonnenrichtung verschoben) als Plausibilitätskontrolle der Höhen.
+- Gebäude nach Höhe eingefärbt (6-m-Stufen), geschätzte Höhen gestrichelt, eigenes Gebäude grau. Klick öffnet
+  ein Popup: Höhe ändern (zurück zum OSM-Wert per Knopf), „eigenes Gebäude“.
+- **Fassade per Klick übernehmen:** Die Kante, die der Klickstelle am nächsten liegt, wird markiert; ihre
+  Normale nach außen ist der Fassaden-Azimut (genauer als Kompass). „Als Sichtbereich“ legt den Halbraum vor
+  der Wand an (Fassade ± 90°, Höhe −5°…90°).
+- Schattenwurf der Gebäude zur gewählten Zeit (konvexe Hülle aus Grundriss und um H / tan h entgegen der
+  Sonnenrichtung verschobenem Grundriss) als Plausibilitätskontrolle der Höhen.
+- Im Horizontdiagramm erscheint die berechnete Linie grau; der Tooltip nennt das Hindernis („Nikolaikirche
+  (84,4 m) in 135 m“ bzw. „Gelände“). Kirchtürme und Türme gelten über den ganzen Grundriss als so hoch wie
+  die Spitze – solche Höhen von Hand senken.
 
 ## Stufe 3: Wohnung als Quader (B) und Balkon (C)
 
@@ -296,7 +332,7 @@ Gespeichert in `localStorage` wie die übrigen Einstellungen in `ui.js`; zusätz
   "location": { "latitude": 52.52, "longitude": 13.40 },
   "viewpoints": [
     {
-      "name": "Balkon", "floor": 3, "floorHeight": 3.0, "eyeHeight": 1.6,
+      "name": "Balkon", "floor": 3, "floorHeight": 3.0, "eyeHeight": 1.6,     // floor 0 = Erdgeschoss
       "sectors": [ { "azimuthFrom": 120, "azimuthTo": 250, "altitudeFrom": 5, "altitudeTo": 60 } ],
       "horizon": [ [100, 12.0], [140, 8.5], [230, 15.0] ],
       "observations": [ { "time": "2026-10-12T15:42:00+02:00", "body": "sun", "event": "disappear" } ],
@@ -305,9 +341,14 @@ Gespeichert in `localStorage` wie die übrigen Einstellungen in `ui.js`; zusätz
   ],
   "environment": {
     "buildingRadius": 400, "terrainRadius": 50000,
-    "ownBuilding": 123456789,
-    "buildings": [ "… zwischengespeicherte Overpass-Daten …" ],
-    "heightOverrides": { "987654321": 18.0 }
+    "useBuildings": true, "useTerrain": true, "showShadows": false,
+    "ownBuilding": "way/123456789",
+    "groundElevation": 41.4,
+    "buildings": { "origin": { "latitude": 52.52, "longitude": 13.40 }, "radius": 400, "loaded": "2026-10-27T…",
+                   "items": [ { "id": "relation/23745", "tags": { "building:levels": "4" }, "rings": [ [[52.51, 13.41], …] ], "ground": 41.6 } ] },
+    "terrain": { "origin": { … }, "radius": 50000, "loaded": "…", "groundElevation": 41.4,
+                 "hulls": [ [ 2350, 78.6, 9351, 56.6 ], … ] },          // je 0,25° Azimut: Entfernung, Höhe, …
+    "heightOverrides": { "way/987654321": 18.0 }
   },
   "settings": { "moonMinDuration": 10, "moonMinIllumination": 0, "moonOnlyDark": false, "moonListMonths": 3 }
 }
@@ -333,8 +374,8 @@ aus.
 1. **Stufe 1 (umgesetzt):** `calculateRefraction()` (JS + C++), `visibility.js` mit Standpunkten,
    Rechtecken, Horizontlinie, Beobachtungen und Zeitsuche; `Sichtbarkeit.html` mit Horizontdiagramm,
    Jahres-Heatmap, Mondliste, Tagesdetail und Karte; `testVisibility.js`.
-2. **Stufe 2:** OSM-Gebäude, Gelände (Nah- und Fernbereich), Zwischenspeichern, Fassade per Klick,
-   Höhen bearbeiten, optional Schattenwurf.
+2. **Stufe 2 (umgesetzt):** OSM-Gebäude (auch Relationen), Gelände (Nah- und Fernbereich), Zwischenspeichern,
+   Fassade per Klick, Höhen bearbeiten, Schattenwurf; Stockwerk/Geschosshöhe/Augenhöhe je Standpunkt.
 3. **Stufe 3:** Modell B/C mit Strahltest und Raster-Maske; optional Sonnenfleck.
 
 Später und optional:
@@ -368,9 +409,17 @@ computeLevelSeries(body, jdStart, jdEnd, stepMinutes, location, viewpoints) // T
 observationDirection(observation, location)         // Kalibrierung
 ```
 
-Geplant für Stufe 2 (Horizontlinie als Maximum aus Hand-Punkten, Gebäuden und Gelände):
+Umgesetzt in Stufe 2 (Orte als { latitude, longitude } in Grad, Höhen in m ü. NN; Profile mit
+HORIZON_BINS = 1440 Werten für 0°, 0,25°, …):
 
 ```js
-horizonFromBuildings(buildings, origin, eyeElevation, excludeIds)   // Höhenwinkel pro 0,25° Azimut
-horizonFromTerrain(sampleElevation, origin, eyeElevation, radius)
+compileViewpoint(viewpoint, profile)                // Maximum aus Hand-Horizontlinie und Profil
+buildingHeight(tags)                                // { height, source: 'height' | 'levels' | 'default' }
+horizonFromBuildings(buildings, origin, eyeElevation, excludeIds)   // { altitude, building, distance }
+terrainTileList(origin, radius, zoom?)              // benötigte Terrarium-Kacheln
+decodeTerrarium(rgba), createTerrainSampler(tiles)  // Kacheln → sampleElevation(lat, lon, distance)
+terrainProfile(sampleElevation, origin, options)    // obere Hülle je Azimut (wird gespeichert)
+horizonFromTerrain(profile, eyeElevation)           // Profil für eine Augenhöhe
+combineProfiles(...profiles)                        // Maximum
+pointInBuilding, nearestEdge, facadeAzimuth         // Karte: eigenes Gebäude, Fassade per Klick
 ```

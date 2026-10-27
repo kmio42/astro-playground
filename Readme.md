@@ -41,7 +41,7 @@ All pages run directly in a browser without a build step.
 |------|-------------|
 | `Erdposition.html` | Solar position, rise/set times, equation of time, solstices/equinoxes, sidereal time, 2D Earth orbit visualization |
 | `Mond.html` | moon orbit around Earth, 3D moon phase rendering with pixel-by-pixel surface mapping |
-| `Sichtbarkeit.html` | When are sun and moon visible from a balcony or window: visibility mask per viewpoint, horizon diagram, OSM map, yearly sun overview, moon visibility dates (uses `visibility.js`) |
+| `Sichtbarkeit.html` | When are sun and moon visible from a balcony or window: visibility mask per viewpoint, horizon line computed from OSM buildings and terrain, horizon diagram, OSM map, yearly sun overview, moon visibility dates (uses `visibility.js`) |
 ---
 
 ## CLI Interface for nodejs
