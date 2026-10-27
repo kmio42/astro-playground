@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tageslänge im Jahr</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --muted: #8a8984;
+            --grid: #e6e5e1;
+            --axis: #b9b8b2;
+            --length: #2a78d6;
+            --rise: #eb6834;
+            --set: #1baf7a;
+            --day: rgba(237, 161, 0, 0.13);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --muted: #8f8e86;
+                --grid: #2f2f2d;
+                --axis: #55544f;
+                --length: #3987e5;
+                --rise: #d95926;
+                --set: #199e70;
+                --day: rgba(201, 133, 0, 0.16);
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --muted: #8f8e86;
+            --grid: #2f2f2d;
+            --axis: #55544f;
+            --length: #3987e5;
+            --rise: #d95926;
+            --set: #199e70;
+            --day: rgba(201, 133, 0, 0.16);
+        }
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            touch-action: none;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 24px;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls input[type="number"] { width: 6em; }
+        .controls input[type="text"] { width: 9em; }
+        .controls input.invalid { border-color: red; }
+        .feedback { color: var(--text-2); font-size: 0.9em; }
+        .figure { position: relative; margin-bottom: 8px; }
+        .chart { height: 320px; cursor: crosshair; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            font-size: 0.9em;
+            color: var(--text-2);
+            margin: 4px 0 6px;
+        }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before {
+            background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px);
+        }
+        .legend .area::before {
+            height: 10px;
+            border-radius: 2px;
+        }
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--axis);
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 0.85em;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            display: none;
+            z-index: 2;
+        }
+        .tooltip b { font-weight: 600; }
+        .tooltip .sw {
+            display: inline-block;
+            width: 10px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 16px; }
+        #outputTable table { border-collapse: collapse; }
+        #outputTable td { padding: 1px 8px 1px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+        h2 { margin-top: 28px; }
+        button { padding: 3px 10px; }
+    </style>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script>
+
+    /////////////////////////////////////////////////////////////////
+    //                      Berechnung                             //
+    /////////////////////////////////////////////////////////////////
+
+        let yearData = null;      // Ergebnis von computeYear()
+        let timeMode = 'local';   // 'local' (Browser mit Sommerzeit), 'standard' (Zonenzeit ohne Sommerzeit), 'utc'
+        let hoverIndex = null;    // Tag unter dem Mauszeiger (Index im Jahr)
+        let selectedIndex = 0;    // Tag für die Kennzahlen
+
+        /**
+         * Abstand der Anzeigezeit zu UT [h] für einen Kalendertag (Monat 0-basiert, Tag darf überlaufen)
+         */
+        function utcOffsetForDay(year, month, day) {
+            if (timeMode === 'utc') return 0;
+            if (timeMode === 'standard') {
+                // Zonenzeit ohne Sommerzeit: der kleinere Abstand von Januar und Juli
+                const jan = new Date(year, 0, 1).getTimezoneOffset();
+                const jul = new Date(year, 6, 1).getTimezoneOffset();
+                return -Math.max(jan, jul) / 60;
+            }
+            return -new Date(year, month, day, 12).getTimezoneOffset() / 60;
+        }
+
+        /**
+         * Auf-/Untergang für alle Tage eines Jahres und die Zunahme gegenüber dem Vortag.
+         * Wie in NOAA_Solar_Calculations_year.ods (Spalten AM–AO):
+         *   Zunahme Sonnenaufgang  = um so viel früher geht die Sonne auf als am Vortag
+         *   Zunahme Sonnenuntergang = um so viel später geht die Sonne unter
+         *   Zunahme Tageslänge = Summe aus beiden
+         * Die Zunahme wird aus den Zeitpunkten in UT berechnet und ist deshalb unabhängig von der Sommerzeit.
+         */
+        function computeYear(year, location) {
+            const n = (new Date(Date.UTC(year, 1, 29)).getUTCMonth() === 1) ? 366 : 365;
+            const days = [];
+            // Index 0 ist der 31.12. des Vorjahres, nur für die Zunahme am 1.1.
+            for (let i = -1; i < n; i++) {
+                const offset = utcOffsetForDay(year, 0, 1 + i);
+                const midnightUT = Date.UTC(year, 0, 1 + i) / 86400000 + 2440587.5;
+                const start = midnightUT - offset / 24;              // 0 Uhr Anzeigezeit als JD
+                const r = calculateSunRiseSet(start + 0.5, location, offset);
+                const rise = r.hasRise ? r.rise : NaN;
+                const set = r.hasSet ? r.set : NaN;
+                let length;
+                if (r.hasRise && r.hasSet) length = ((set - rise) % 24 + 24) % 24;
+                else if (r.hasRise) length = 24 - rise;
+                else if (r.hasSet) length = set;
+                else length = (r.maxAltitude > 0) ? 24 : 0;          // Polartag oder Polarnacht
+                days.push({
+                    start, offset, rise, set, length,
+                    transit: r.hasTransit ? r.transit : NaN,
+                    jdRise: start + rise / 24,
+                    jdSet: start + set / 24,
+                });
+            }
+            // Differenz in Minuten auf ±12 h bringen (Untergang wandert in hohen Breiten über Mitternacht)
+            const wrap = m => ((m + 720) % 1440 + 1440) % 1440 - 720;
+            const d = { year, n, start: [], offset: [], rise: [], set: [], transit: [], length: [],
+                        gainRise: [], gainSet: [], gainLength: [] };
+            for (let i = 1; i <= n; i++) {
+                const a = days[i - 1], b = days[i];
+                d.start.push(b.start);
+                d.offset.push(b.offset);
+                d.rise.push(b.rise);
+                d.set.push(b.set);
+                d.transit.push(b.transit);
+                d.length.push(b.length);
+                const gainRise = wrap((a.jdRise + 1 - b.jdRise) * 1440);
+                const gainSet = wrap((b.jdSet - a.jdSet - 1) * 1440);
+                d.gainRise.push(gainRise);
+                d.gainSet.push(gainSet);
+                // Tageslänge nur, wenn an beiden Tagen Auf- und Untergang stattfinden (sonst Polartag/-nacht)
+                d.gainLength.push(gainRise + gainSet);
+            }
+            d.end = days[n].start + 1;
+            return d;
+        }
+
+        /**
+         * Aktueller Zeitpunkt als Position im Jahr (Tagesindex + Tagesbruchteil) und Uhrzeit [h],
+         * null wenn er nicht im angezeigten Jahr liegt
+         */
+        function nowPosition() {
+            const jd = julianDayFromDate(new Date());
+            const d = yearData;
+            if (jd < d.start[0] || jd >= d.end) return null;
+            let i = d.n - 1;
+            while (i > 0 && d.start[i] > jd) i--;
+            const hours = (jd - d.start[i]) * 24;
+            return { index: i, pos: i + hours / 24, hours };
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Formatierung                           //
+    /////////////////////////////////////////////////////////////////
+
+        const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+        function dayToString(i) {
+            const date = new Date(Date.UTC(yearData.year, 0, 1 + i));
+            return weekdays[date.getUTCDay()] + ' ' + date.getUTCDate().toString().padStart(2, '0') + '.'
+                + (date.getUTCMonth() + 1).toString().padStart(2, '0') + '.' + date.getUTCFullYear();
+        }
+
+        /** Uhrzeit in Stunden → "HH:MM" (auf Minuten gerundet) */
+        function clockString(hours) {
+            if (!Number.isFinite(hours)) return '–';
+            const m = Math.round(hours * 60);
+            return Math.floor(m / 60).toString().padStart(2, '0') + ':' + (m % 60).toString().padStart(2, '0');
+        }
+
+        /** Dauer in Stunden → "12 h 34 min" */
+        function durationString(hours) {
+            const m = Math.round(hours * 60);
+            return Math.floor(m / 60) + ' h ' + (m % 60).toString().padStart(2, '0') + ' min';
+        }
+
+        /** Zunahme in Minuten → "+2 min 13 s" */
+        function gainString(minutes) {
+            if (!Number.isFinite(minutes)) return '–';
+            const s = Math.round(Math.abs(minutes) * 60);
+            const sign = (minutes < 0 && s > 0) ? '−' : '+';
+            const min = Math.floor(s / 60);
+            return sign + (min > 0 ? min + ' min ' : '') + (s % 60) + ' s';
+        }
+
+        function offsetString(offset) {
+            if (offset === 0) return 'UTC';
+            return 'UTC' + (offset > 0 ? '+' : '−') + Math.abs(offset);
+        }
+
+        function zoneDescription() {
+            if (timeMode === 'utc') return 'UTC';
+            if (timeMode === 'standard') return offsetString(yearData.offset[0]) + ' (ohne Sommerzeit)';
+            const list = [...new Set(yearData.offset)].map(offsetString);
+            return 'Lokalzeit ' + list.join(' / ');
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                       Diagramme                             //
+    /////////////////////////////////////////////////////////////////
+
+        function cssColor(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        function colors() {
+            return {
+                surface: cssColor('--surface'), text: cssColor('--text'), text2: cssColor('--text-2'),
+                muted: cssColor('--muted'), grid: cssColor('--grid'), axis: cssColor('--axis'),
+                length: cssColor('--length'), rise: cssColor('--rise'), set: cssColor('--set'),
+                day: cssColor('--day'),
+            };
+        }
+
+        function prepareCanvas(canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.clientWidth, h = canvas.clientHeight;
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            return { ctx, w, h };
+        }
+
+        /** "Runde" Achsenteilung */
+        function niceTicks(min, max, count, steps = [1, 2, 2.5, 5, 10]) {
+            const raw = (max - min) / count;
+            const magnitude = 10 ** Math.floor(Math.log10(raw));
+            const step = steps.map(f => f * magnitude).find(s => s >= raw);
+            const ticks = [];
+            for (let t = Math.ceil(min / step) * step; t <= max + step * 1e-9; t += step) ticks.push(t);
+            return { ticks, step };
+        }
+
+        function rangeOf(arrays) {
+            let lo = Infinity, hi = -Infinity;
+            for (const arr of arrays) {
+                for (const x of arr) {
+                    if (Number.isFinite(x)) { lo = Math.min(lo, x); hi = Math.max(hi, x); }
+                }
+            }
+            if (!Number.isFinite(lo)) return [0, 1];
+            if (hi - lo < 1e-6) { lo -= 1; hi += 1; }
+            return [lo, hi];
+        }
+
+        const charts = {
+            gain: {
+                canvasId: 'gainChart',
+                tooltipId: 'gainTooltip',
+                series: () => [
+                    { name: 'Tageslänge', values: yearData.gainLength, color: 'length', width: 2.5 },
+                    { name: 'Sonnenaufgang', values: yearData.gainRise, color: 'rise', width: 2 },
+                    { name: 'Sonnenuntergang', values: yearData.gainSet, color: 'set', width: 2 },
+                ],
+                range: () => {
+                    const [lo, hi] = rangeOf([yearData.gainLength, yearData.gainRise, yearData.gainSet]);
+                    const pad = (hi - lo) * 0.06;
+                    return [lo - pad, hi + pad];
+                },
+                ticks: (lo, hi) => niceTicks(lo, hi, 6),
+                tickFormat: t => (t > 0 ? '+' : '') + t.toLocaleString('de-DE'),
+                unit: 'min/Tag',
+                format: gainString,
+                zeroLine: true,
+                directLabels: true,
+            },
+            times: {
+                canvasId: 'timesChart',
+                tooltipId: 'timesTooltip',
+                series: () => [
+                    { name: 'Sonnenaufgang', values: yearData.rise, color: 'rise', width: 2 },
+                    { name: 'Sonnenuntergang', values: yearData.set, color: 'set', width: 2 },
+                    { name: 'Höchststand (Mittag)', values: yearData.transit, color: 'muted', width: 1.5, dash: [5, 4], label: 'Mittag' },
+                ],
+                range: () => {
+                    const [lo, hi] = rangeOf([yearData.rise, yearData.set, yearData.transit]);
+                    return [Math.max(0, Math.floor(lo) - 0.5), Math.min(24, Math.ceil(hi) + 0.5)];
+                },
+                ticks: (lo, hi) => niceTicks(lo, hi, 8, [1, 2, 3, 6, 12]),
+                tickFormat: t => clockString(t),
+                unit: '',
+                format: clockString,
+                extraTooltip: i => `<br>Tageslänge: ${durationString(yearData.length[i])}`,
+                dayBand: true,
+                nowClock: true,
+                directLabels: true,
+                breakOnJump: true,   // z. B. Untergang nach Mitternacht in hohen Breiten
+            },
+        };
+
+        function chartLayout(chart, w, h) {
+            // Gleicher rechter Rand in beiden Diagrammen, damit die Tage übereinander stehen
+            const right = (w > 560) ? 110 : 12;
+            const left = 56, top = 18, bottom = 24;
+            const n = yearData.n;
+            return { left, right, top, bottom, w, h,
+                     x: pos => left + (w - left - right) * pos / n,
+                     pos: px => (px - left) / (w - left - right) * n };
+        }
+
+        function drawChart(chart) {
+            const canvas = document.getElementById(chart.canvasId);
+            const { ctx, w, h } = prepareCanvas(canvas);
+            const c = colors();
+            const d = yearData;
+            const L = chartLayout(chart, w, h);
+            const [lo, hi] = chart.range();
+            const y = val => L.top + (h - L.top - L.bottom) * (hi - val) / (hi - lo);
+            const xDay = i => L.x(i + 0.5);   // Tageswerte in der Tagesmitte
+            const bottomY = h - L.bottom;
+
+            ctx.font = '11px Arial, sans-serif';
+
+            // Tageslicht zwischen Auf- und Untergang; Rechtecke mit ganzzahligen Pixelkanten, damit keine Streifen entstehen
+            if (chart.dayBand) {
+                ctx.fillStyle = c.day;
+                const fill = (i, a, b) => {
+                    const x0 = Math.round(L.x(i)), x1 = Math.round(L.x(i + 1));
+                    const top = y(Math.min(b, hi)), bot = y(Math.max(a, lo));
+                    if (bot > top) ctx.fillRect(x0, top, x1 - x0, bot - top);
+                };
+                for (let i = 0; i < d.n; i++) {
+                    const r = d.rise[i], s = d.set[i];
+                    const hasR = Number.isFinite(r), hasS = Number.isFinite(s);
+                    if (hasR && hasS && s > r) fill(i, r, s);
+                    else if (hasR && hasS) { fill(i, 0, s); fill(i, r, 24); }   // Untergang nach Mitternacht
+                    else if (hasR) fill(i, r, 24);
+                    else if (hasS) fill(i, 0, s);
+                    else if (d.length[i] >= 24) fill(i, 0, 24);
+                }
+            }
+
+            // Gitter: Monate senkrecht, Werte waagrecht
+            ctx.lineWidth = 1;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let m = 0; m < 12; m++) {
+                const idx = Math.round((Date.UTC(d.year, m, 1) - Date.UTC(d.year, 0, 1)) / 86400000);
+                const next = Math.round((Date.UTC(d.year, m + 1, 1) - Date.UTC(d.year, 0, 1)) / 86400000);
+                const x = Math.round(L.x(idx)) + 0.5;
+                ctx.strokeStyle = c.grid;
+                ctx.beginPath();
+                ctx.moveTo(x, L.top);
+                ctx.lineTo(x, bottomY);
+                ctx.stroke();
+                ctx.fillStyle = c.muted;
+                ctx.fillText(monthNames[m], (L.x(idx) + L.x(next)) / 2, bottomY + 6);
+            }
+            const { ticks, step } = chart.ticks(lo, hi);
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (const t of ticks) {
+                const isZero = chart.zeroLine && Math.abs(t) < step * 1e-6;
+                const yy = Math.round(y(t)) + 0.5;
+                ctx.strokeStyle = isZero ? c.axis : c.grid;
+                ctx.lineWidth = isZero ? 1.5 : 1;
+                ctx.beginPath();
+                ctx.moveTo(L.left, yy);
+                ctx.lineTo(w - L.right, yy);
+                ctx.stroke();
+                ctx.fillStyle = c.muted;
+                ctx.fillText(chart.tickFormat(t, step), L.left - 6, yy);
+            }
+            if (chart.unit) {
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(chart.unit, 4, 2);
+            }
+
+            // Datenreihen; Lücken bei fehlenden Werten und bei Sprüngen (Sommerzeit, Polartag)
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(L.left, L.top, w - L.left - L.right, bottomY - L.top);
+            ctx.clip();
+            const series = chart.series();
+            const jumpLimit = (hi - lo) * 0.25;
+            for (const s of series) {
+                ctx.strokeStyle = c[s.color];
+                ctx.lineWidth = s.width;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.setLineDash(s.dash || []);
+                ctx.beginPath();
+                let open = false;
+                for (let i = 0; i < d.n; i++) {
+                    const v = s.values[i];
+                    if (!Number.isFinite(v)) { open = false; continue; }
+                    const jump = chart.breakOnJump && open && Math.abs(v - s.values[i - 1]) > jumpLimit;
+                    if (!open || jump) ctx.moveTo(xDay(i), y(v));
+                    else ctx.lineTo(xDay(i), y(v));
+                    open = true;
+                }
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            ctx.restore();
+
+            // Direkte Beschriftung am rechten Rand, gegen Überlappung auseinandergeschoben
+            if (chart.directLabels && L.right > 50) {
+                const labels = series.map(s => {
+                    let i = d.n - 1;
+                    while (i > 0 && !Number.isFinite(s.values[i])) i--;
+                    return { s, y: y(s.values[i]) };
+                }).filter(l => Number.isFinite(l.y)).sort((a, b) => a.y - b.y);
+                for (let k = 1; k < labels.length; k++) {
+                    labels[k].y = Math.max(labels[k].y, labels[k - 1].y + 14);
+                }
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                for (const l of labels) {
+                    ctx.fillStyle = c[l.s.color];
+                    ctx.fillRect(w - L.right + 6, l.y - 1.5, 8, 3);
+                    ctx.fillStyle = c.text2;
+                    ctx.fillText(l.s.label || l.s.name, w - L.right + 18, l.y);
+                }
+            }
+
+            // Ausgewählter Tag (gestrichelt), sofern nicht heute
+            const now = nowPosition();
+            if (!now || now.index !== selectedIndex) {
+                const x = Math.round(xDay(selectedIndex)) + 0.5;
+                ctx.strokeStyle = c.text2;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.moveTo(x, L.top);
+                ctx.lineTo(x, bottomY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Aktuelle Zeit
+            if (now) {
+                const x = Math.round(L.x(now.pos)) + 0.5;
+                ctx.strokeStyle = c.text;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, L.top);
+                ctx.lineTo(x, bottomY);
+                ctx.stroke();
+                ctx.fillStyle = c.text;
+                ctx.font = 'bold 11px Arial, sans-serif';
+                ctx.textBaseline = 'bottom';
+                ctx.textAlign = (x > w - L.right - 40) ? 'right' : 'left';
+                const label = 'jetzt ' + clockString(now.hours);
+                ctx.fillText(label, x + (ctx.textAlign === 'left' ? 4 : -4), L.top - 3);
+                ctx.font = '11px Arial, sans-serif';
+                // Werte des heutigen Tages
+                for (const s of series) {
+                    const v = s.values[now.index];
+                    if (!Number.isFinite(v)) continue;
+                    drawDot(ctx, xDay(now.index), y(v), c[s.color], c.surface, 4.5);
+                }
+                // Uhrzeit von jetzt im Diagramm der Auf- und Untergänge
+                if (chart.nowClock && now.hours >= lo && now.hours <= hi) {
+                    const yy = y(now.hours);
+                    ctx.beginPath();
+                    ctx.arc(x, yy, 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = c.surface;
+                    ctx.fill();
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeStyle = c.text;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(x, yy, 2, 0, 2 * Math.PI);
+                    ctx.fillStyle = c.text;
+                    ctx.fill();
+                }
+            }
+
+            // Fadenkreuz
+            if (hoverIndex !== null) {
+                const x = Math.round(xDay(hoverIndex)) + 0.5;
+                ctx.strokeStyle = c.axis;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x, L.top);
+                ctx.lineTo(x, bottomY);
+                ctx.stroke();
+                for (const s of series) {
+                    const v = s.values[hoverIndex];
+                    if (!Number.isFinite(v)) continue;
+                    const yy = y(v);
+                    if (yy < L.top || yy > bottomY) continue;
+                    drawDot(ctx, x, yy, c[s.color], c.surface, 4);
+                }
+            }
+        }
+
+        function drawDot(ctx, x, y, fill, ring, r) {
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, 2 * Math.PI);
+            ctx.fillStyle = fill;
+            ctx.strokeStyle = ring;
+            ctx.lineWidth = 2;
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawCharts() {
+            if (!yearData) return;
+            drawChart(charts.gain);
+            drawChart(charts.times);
+        }
+
+        function placeTooltip(tooltip, canvas, mx, my) {
+            tooltip.style.display = 'block';
+            const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+            let left = canvas.offsetLeft + mx + 14;
+            if (left + tw > canvas.offsetLeft + canvas.clientWidth) left = canvas.offsetLeft + mx - tw - 14;
+            let top = canvas.offsetTop + my + 14;
+            if (top + th > canvas.offsetTop + canvas.clientHeight) top = canvas.offsetTop + my - th - 14;
+            tooltip.style.left = Math.max(0, left) + 'px';
+            tooltip.style.top = Math.max(0, top) + 'px';
+        }
+
+        function setupChartInteraction(chart) {
+            const canvas = document.getElementById(chart.canvasId);
+            const tooltip = document.getElementById(chart.tooltipId);
+            function indexFromEvent(ev) {
+                const rect = canvas.getBoundingClientRect();
+                const L = chartLayout(chart, canvas.clientWidth, canvas.clientHeight);
+                const i = Math.floor(L.pos(ev.clientX - rect.left));
+                return Math.min(Math.max(i, 0), yearData.n - 1);
+            }
+            canvas.addEventListener('pointermove', ev => {
+                hoverIndex = indexFromEvent(ev);
+                drawCharts();
+                const c = colors();
+                let html = `<b>${dayToString(hoverIndex)}</b>`;
+                for (const s of chart.series()) {
+                    html += `<br><span class="sw" style="background:${c[s.color]}"></span>${s.name}: ${chart.format(s.values[hoverIndex])}`;
+                }
+                if (chart.extraTooltip) html += chart.extraTooltip(hoverIndex);
+                tooltip.innerHTML = html;
+                const rect = canvas.getBoundingClientRect();
+                placeTooltip(tooltip, canvas, ev.clientX - rect.left, ev.clientY - rect.top);
+            });
+            canvas.addEventListener('pointerleave', () => {
+                hoverIndex = null;
+                tooltip.style.display = 'none';
+                drawCharts();
+            });
+            canvas.addEventListener('click', ev => {
+                selectedIndex = indexFromEvent(ev);
+                updateTable();
+                drawCharts();
+            });
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                   Ausgabe und Steuerung                     //
+    /////////////////////////////////////////////////////////////////
+
+        function argMinMax(arr) {
+            let iMin = -1, iMax = -1;
+            for (let i = 0; i < arr.length; i++) {
+                if (!Number.isFinite(arr[i])) continue;
+                if (iMin < 0 || arr[i] < arr[iMin]) iMin = i;
+                if (iMax < 0 || arr[i] > arr[iMax]) iMax = i;
+            }
+            return [iMin, iMax];
+        }
+
+        function extremeRow(key, arr, idx, format) {
+            return { type: 'row', key, value: (idx < 0) ? '–' : `${format(arr[idx])} am ${dayToString(idx)}` };
+        }
+
+        function updateTable() {
+            const d = yearData;
+            const i = selectedIndex;
+            const now = nowPosition();
+            const isToday = now && now.index === i;
+            const rows = [
+                { type: 'category', text: `<b>${isToday ? 'Heute, ' : ''}${dayToString(i)}</b> (${offsetString(d.offset[i])})` },
+                { type: 'row', key: 'Sonnenaufgang', value: clockString(d.rise[i]) },
+                { type: 'row', key: 'Höchststand (Mittag)', value: clockString(d.transit[i]) },
+                { type: 'row', key: 'Sonnenuntergang', value: clockString(d.set[i]) },
+                { type: 'row', key: 'Tageslänge', value: durationString(d.length[i]) },
+                { type: 'row', key: 'Zunahme am Morgen (Aufgang früher)', value: gainString(d.gainRise[i]) },
+                { type: 'row', key: 'Zunahme am Abend (Untergang später)', value: gainString(d.gainSet[i]) },
+                { type: 'row', key: 'Zunahme Tageslänge', value: gainString(d.gainLength[i]) },
+            ];
+            const [lMin, lMax] = argMinMax(d.length);
+            const [rMin, rMax] = argMinMax(d.rise);
+            const [sMin, sMax] = argMinMax(d.set);
+            const [gMin, gMax] = argMinMax(d.gainLength);
+            rows.push({ type: 'category', text: `<b>Jahr ${d.year}</b> (${zoneDescription()})` });
+            rows.push(extremeRow('Kürzester Tag', d.length, lMin, durationString));
+            rows.push(extremeRow('Längster Tag', d.length, lMax, durationString));
+            rows.push(extremeRow('Frühester Sonnenaufgang', d.rise, rMin, clockString));
+            rows.push(extremeRow('Spätester Sonnenaufgang', d.rise, rMax, clockString));
+            rows.push(extremeRow('Frühester Sonnenuntergang', d.set, sMin, clockString));
+            rows.push(extremeRow('Spätester Sonnenuntergang', d.set, sMax, clockString));
+            rows.push(extremeRow('Stärkste Zunahme', d.gainLength, gMax, gainString));
+            rows.push(extremeRow('Stärkste Abnahme', d.gainLength, gMin, gainString));
+            renderOutputTable('outputTable', rows);
+        }
+
+        /** Breite/Länge: Dezimalgrad oder 48°51'22"N (dmsToDecimal aus ui.js) */
+        function parseCoordinate(text) {
+            const s = text.trim().replace(',', '.');
+            if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+            try { return dmsToDecimal(s); } catch (e) { return NaN; }
+        }
+
+        function readInputs() {
+            const latInput = document.getElementById('lat');
+            const lonInput = document.getElementById('lon');
+            const lat = parseCoordinate(latInput.value);
+            const lon = parseCoordinate(lonInput.value);
+            const latOk = Number.isFinite(lat) && Math.abs(lat) <= 90;
+            const lonOk = Number.isFinite(lon) && Math.abs(lon) <= 180;
+            latInput.classList.toggle('invalid', !latOk);
+            lonInput.classList.toggle('invalid', !lonOk);
+            const year = parseInt(document.getElementById('year').value, 10);
+            if (!latOk || !lonOk || !Number.isFinite(year)) return null;
+            return { year, location: { latitude: lat * DEG2RAD, longitude: lon * DEG2RAD, elevation: 0 } };
+        }
+
+        function recompute(keepSelection) {
+            const input = readInputs();
+            if (!input) return;
+            timeMode = document.getElementById('timeMode').value;
+            const oldYear = yearData ? yearData.year : null;
+            yearData = computeYear(input.year, input.location);
+            if (!keepSelection || oldYear !== input.year) {
+                const now = nowPosition();
+                selectedIndex = now ? now.index : 0;
+            }
+            selectedIndex = Math.min(selectedIndex, yearData.n - 1);
+            document.getElementById('zoneText').textContent = zoneDescription();
+            updateTable();
+            drawCharts();
+        }
+
+        function showToday() {
+            document.getElementById('year').value = new Date().getFullYear();
+            recompute(false);
+        }
+
+        function saveLocation() {
+            localStorage.setItem('latitude', document.getElementById('lat').value.trim());
+            localStorage.setItem('longitude', document.getElementById('lon').value.trim());
+            document.getElementById('locationFeedback').textContent = 'Ort gespeichert';
+        }
+
+        function useGps() {
+            const feedback = document.getElementById('locationFeedback');
+            if (!navigator.geolocation) {
+                feedback.textContent = 'Geolokalisierung wird nicht unterstützt';
+                return;
+            }
+            feedback.textContent = 'Position wird ermittelt …';
+            navigator.geolocation.getCurrentPosition(pos => {
+                document.getElementById('lat').value = pos.coords.latitude.toFixed(4);
+                document.getElementById('lon').value = pos.coords.longitude.toFixed(4);
+                feedback.textContent = 'Position übernommen';
+                recompute(true);
+            }, err => {
+                feedback.textContent = 'Position nicht ermittelt: ' + err.message;
+            });
+        }
+
+        window.onload = function () {
+            // Ort wie auf den anderen Seiten aus localStorage, sonst wie in der NOAA-Tabelle (50° N, 8° O)
+            document.getElementById('lat').value = localStorage.getItem('latitude') || '50';
+            document.getElementById('lon').value = localStorage.getItem('longitude') || '8';
+            document.getElementById('year').value = new Date().getFullYear();
+
+            for (const id of ['lat', 'lon', 'year']) {
+                document.getElementById(id).addEventListener('input', () => recompute(true));
+            }
+            document.getElementById('timeMode').addEventListener('change', () => recompute(true));
+
+            setupChartInteraction(charts.gain);
+            setupChartInteraction(charts.times);
+            new ResizeObserver(drawCharts).observe(document.body);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawCharts);
+
+            recompute(false);
+
+            // Markierung der aktuellen Zeit jede Minute nachführen; Tageswechsel wählt den neuen Tag
+            setInterval(() => {
+                const before = selectedIndex;
+                const now = nowPosition();
+                if (now && now.index === before + 1) { selectedIndex = now.index; updateTable(); }
+                drawCharts();
+            }, 60000);
+        };
+    </script>
+</head>
+<body>
+    <h1>Tageslänge im Jahr</h1>
+    <p>Wie viele Minuten Tageslicht kommen jeden Tag hinzu – und wie verteilen sie sich auf den Morgen und den Abend? Die <b>Zunahme</b> ist die Änderung gegenüber dem Vortag: Am Morgen zählt, um wie viel früher die Sonne aufgeht, am Abend, um wie viel später sie untergeht. Beide zusammen ergeben die Zunahme der Tageslänge, negative Werte sind eine Abnahme.</p>
+    <p>Morgen und Abend tragen nicht gleich viel bei, weil sich auch der Mittag (der Höchststand der Sonne) im Lauf des Jahres verschiebt (<a href="https://de.wikipedia.org/wiki/Zeitgleichung">Zeitgleichung</a>). Deshalb liegt der früheste Sonnenuntergang schon Mitte Dezember und der späteste Sonnenaufgang erst Anfang Januar, obwohl der kürzeste Tag am 21. Dezember ist.</p>
+
+    <div class="controls">
+        <label>Breite <input type="text" id="lat"></label>
+        <label>Länge (Ost +) <input type="text" id="lon"></label>
+        <button onclick="useGps()">GPS-Position</button>
+        <button onclick="saveLocation()">Ort merken</button>
+        <span class="feedback" id="locationFeedback"></span>
+    </div>
+    <div class="controls">
+        <label>Jahr <input type="number" id="year" step="1"></label>
+        <label>Zeit
+            <select id="timeMode">
+                <option value="local">Lokalzeit mit Sommerzeit</option>
+                <option value="standard">Zonenzeit ohne Sommerzeit</option>
+                <option value="utc">UTC</option>
+            </select>
+        </label>
+        <span class="feedback" id="zoneText"></span>
+        <button onclick="showToday()">Heute</button>
+    </div>
+
+    <h2>Zunahme pro Tag</h2>
+    <div class="legend">
+        <span style="--c: var(--length)">Tageslänge</span>
+        <span style="--c: var(--rise)">am Morgen (Sonnenaufgang früher)</span>
+        <span style="--c: var(--set)">am Abend (Sonnenuntergang später)</span>
+    </div>
+    <div class="figure">
+        <canvas id="gainChart" class="chart"></canvas>
+        <div class="tooltip" id="gainTooltip"></div>
+    </div>
+    <p class="hint">Minuten pro Tag. Die Zunahme ist am größten um die Tagundnachtgleichen (März, September) und null an den Sonnenwenden. Die Sommerzeit ändert sie nicht.</p>
+    <p class="hint"><b>Warum liegt die stärkste Zunahme nicht genau auf der Tagundnachtgleiche?</b> Die Zunahme hängt von zwei Dingen ab: wie schnell sich der Sonnenstand ändert (am schnellsten an der Tagundnachtgleiche) und wie stark die Tageslänge darauf reagiert (dort am schwächsten). Beides gleicht sich fast aus, das Maximum ist deshalb sehr flach – bei 50° N ändert sich die Zunahme eine Woche lang nur um Bruchteile einer Sekunde. So verschieben schon kleine Effekte das Datum um einige Tage: die elliptische Erdbahn (die Erde läuft im März langsamer werdend, im September schneller werdend um die Sonne) und die Lichtbrechung am Horizont (Tag und Nacht sind schon einige Tage vor der Tagundnachtgleiche gleich lang). Ab etwa 61° Breite wächst die Zunahme sogar bis kurz vor Polartag bzw. Polarnacht.</p>
+
+    <h2>Sonnenaufgang und Sonnenuntergang</h2>
+    <div class="legend">
+        <span style="--c: var(--rise)">Sonnenaufgang</span>
+        <span style="--c: var(--set)">Sonnenuntergang</span>
+        <span class="dashed" style="--c: var(--muted)">Höchststand (Mittag)</span>
+        <span class="area" style="--c: var(--day)">Tageslicht</span>
+    </div>
+    <div class="figure">
+        <canvas id="timesChart" class="chart"></canvas>
+        <div class="tooltip" id="timesTooltip"></div>
+    </div>
+    <p class="hint">Uhrzeit in der gewählten Zeit, der Kreis markiert die aktuelle Uhrzeit. Mit Sommerzeit springen die Kurven Ende März und Ende Oktober um eine Stunde. Klick ins Diagramm wählt einen Tag für die Kennzahlen.</p>
+
+    <h2>Kennzahlen</h2>
+    <div id="outputTable"></div>
+
+    <p class="hint">Berechnung mit <code>calculateSunRiseSet()</code> aus <code>astro.js</code> (Meeus, Kap. 15, Standardhöhe −0°50′). Die Lokalzeit ist die Zeitzone des Browsers, auch wenn der Ort woanders liegt.</p>
+</body>
+</html>
