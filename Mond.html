@@ -698,20 +698,21 @@
         </tr> -->
         <tr>
             <td valign="top" id="Ekliptik"><b>Ekliptikale Koordinaten</b></td>
-            <td>Die ekliptikalen Koordinaten bezeichnen ein polares Koordinatensystem, das auf der Ebene basiert, in der die Erde um die Sonne kreist (Ekliptik). Die <i>Länge</i> bezeichnet den Winkel innerhalb der Ekliptik von einem Referenzpunkt (dem Frühlingspunkt) aus, die <i>Breite</i> gibt den Winkel senkrecht zur Ekliptik an ("oberhalb" oder "unterhalb" der Ebene).</td>
+            <td>Die ekliptikalen Koordinaten bezeichnen ein sphärisches Koordinatensystem, das auf der Ebene basiert, in der die Erde um die Sonne kreist (Ekliptik). Die <i>Länge</i> bezeichnet den Winkel innerhalb der Ekliptik von einem Referenzpunkt (dem Frühlingspunkt) aus, die <i>Breite</i> gibt den Winkel senkrecht zur Ekliptik an ("oberhalb" oder "unterhalb" der Ebene).</td>
         </tr>
         <tr>
             <td valign="top" id="desc_equatorial"><b>Äquatoriale Koordinaten (RA/DEK)</b></td>
-            <td>Die äquatorialen Koordinaten bezeichnen ein polares Koordinatensystem, das auf der Ebene des Äquators basiert. Es ist vergleichbar mit dem geografischen Koordinatensystem auf der Erde.
-                Die RA (Rektazension) ist der Winkel, gemessen in Stunden, Minuten und Sekunden, von einem Referenzpunkt (dem Frühlingspunkt) entlang des Himmelsäquators.
-                Die DEK (Deklination) ist der Winkel, gemessen in Grad, Minuten und Sekunden, senkrecht zum Himmelsäquator, der angibt, wie weit ein Himmelskörper nördlich oder südlich des Äquators liegt.
-                Die Äquatorialen Koordinaten gelten vom Mittelpunkt der Erde aus.
+            <td>Die äquatorialen Koordinaten bezeichnen ein sphärisches Koordinatensystem, das auf der Ebene des Äquators basiert. Es ist vergleichbar mit dem geografischen Koordinatensystem auf der Erde.
+                Die RA (Rektaszension) ist der Winkel, üblicherweise gemessen in Stunden, Minuten und Sekunden, von einem Referenzpunkt (dem Frühlingspunkt) entlang des Himmelsäquators. In der Tabelle steht sie in Grad (15° entsprechen 1 Stunde).
+                Die DEK (Deklination) ist der Winkel, gemessen in Grad, Minuten und Sekunden, senkrecht zum Himmelsäquator, der angibt, wie weit ein Himmelskörper nördlich oder südlich des Himmelsäquators liegt.
+                Die äquatorialen Koordinaten gelten vom Mittelpunkt der Erde aus.
             </td>
         </tr>
         <tr>
             <td valign="top" id="Parallaxe"><b>Parallaxe und scheinbare Äquatoriale Koordinaten (RA/DEK)</b></td>
             <td>Die scheinbaren äquatorialen Koordinaten berücksichtigen die Position des Beobachters auf der Erde.
-                Der Fehler, der durch die Annahme entsteht, dass der Beobachter sich im Erdmittelpunkt befindet, wird als Parallaxe bezeichnet.
+                Der Unterschied, der durch die Annahme entsteht, dass der Beobachter sich im Erdmittelpunkt befindet, wird als Parallaxe bezeichnet.
+                Beim Mond beträgt er bis zu ca. 1°, also etwa zwei Monddurchmesser.
             </td>
         </tr>
         <tr>
@@ -725,51 +726,27 @@
         <tr>
             <td valign="top"  id="Elongation"><b>Elongation</b></td>
             <td>Die Elongation ist der Winkelabstand des Mondes von der Sonne, von der Erde aus gesehen (0° bis 180°).
-                Bei Neumond ist sie nahezu 0°, bei Halbmond etwa 90°, bei Vollmond nahezu 180°. Der beleuchtete Anteil der Mondscheibe hängt direkt von ihr ab.
+                Bei Neumond ist sie nahezu 0°, bei Halbmond etwa 90°, bei Vollmond nahezu 180°.
                 Steht der Mond östlich der Sonne, ist er zunehmend und am Abendhimmel zu sehen; steht er westlich, ist er abnehmend und am Morgenhimmel zu sehen.
-                Weil die Mondbahn gegen die Ekliptik geneigt ist, wird die Elongation auch bei Neu- und Vollmond meist nicht genau 0° bzw. 180° - nur bei einer Finsternis.
-                Berechnet wird sie aus den geozentrischen ekliptikalen Koordinaten: cos ψ = cos β · cos(λ − λ<sub>Sonne</sub>).
             </td>
         </tr>
         <tr>
             <td valign="top" id="Durchgang"><b>Monddurchgang und höchster Stand (des Tages)</b></td>
-            <td>Der <i>Monddurchgang</i> (Meridiandurchgang) ist der Zeitpunkt, zu dem der Mond den Meridian des Beobachtungsortes überquert:
-                Er steht dann genau im Süden (auf der Südhalbkugel im Norden), sein Stundenwinkel ist 0. Der Durchgang ist also über die Richtung definiert.
-                Der <i>höchste Stand</i> ist der Zeitpunkt, zu dem der Mond seine größte Höhe (an diesem Tag) erreicht.
-                <br>
-                Bei einem Fixstern fallen beide Zeitpunkte zusammen, weil sich seine Deklination nicht ändert.
-                Der Mond dagegen ändert seine Deklination um bis zu ca. 0,3° pro Stunde.
-                <br>
-                Auf der Nordhalbkugel gilt: Bei steigender Deklination ist der höchste Stand kurz nach dem Durchgang, bei sinkender Deklination kurz vor dem Durchgang.
-                Auf der Südhalbkugel ist es umgekehrt. Der Unterschied beträgt in mittleren Breiten nur wenige Minuten (in Berlin bis ca. 6 Minuten), in der Nähe des Äquators etwas mehr, weil die Höhe dort um den Meridian herum nur sehr langsam zu- und abnimmt.
-
-                Liegt der Scheitel kurz vor oder nach dem Tag, ist der höchste Stand des Tages am Anfang oder Ende des Tages (0:00 oder 24:00 Uhr, siehe <a href="#Tageszeiten">Zeitangaben</a>):
-                        Um 0:00 Uhr sinkt der Mond bereits, oder um 24:00 Uhr steigt er noch. Das ist dann kein Scheitel - der liegt am Vor- oder Folgetag.
-                        So ist es an Tagen ohne Durchgang, es kann aber auch an Tagen mit Durchgang passieren: Steigt die Deklination schnell, steht der Mond kurz vor dem nächsten Durchgang um 24 Uhr höher als beim Durchgang am frühen Morgen
-                        (z. B. in Berlin am 2.7.2026, UTC: Durchgang um 0:48 Uhr, höchster Stand um 24:00 Uhr).
-                        In Berlin liegt der höchste Stand an rund 25 Tagen im Jahr am Tagesrand.
+            <td>Der <i>Monddurchgang</i> (Meridiandurchgang) ist der Zeitpunkt, zu dem der Mond genau im Süden steht (auf der Südhalbkugel im Norden).
+                Der <i>höchste Stand</i> ist der Zeitpunkt, zu dem der Mond an diesem Tag seine größte Höhe erreicht.
+                Bei einem Fixstern fallen beide Zeitpunkte zusammen. Der Mond ändert dagegen seine Deklination recht schnell, deshalb liegt der höchste Stand einige Minuten vor oder nach dem Durchgang (in Berlin bis ca. 6 Minuten).
+                Liegt der höchste Punkt der Mondbahn am Vor- oder Folgetag, steht beim höchsten Stand 0:00 oder 24:00 Uhr (siehe <a href="#Tageszeiten">Zeitangaben</a>).
             </td>
         </tr>
         <tr>
             <td valign="top" id="Tageszeiten"><b>Zeitangaben: 0 Uhr und 24 Uhr</b></td>
             <td>Auf- und Untergänge, Durchgänge und der höchste Stand werden für den Kalendertag berechnet, der den eingestellten Zeitpunkt enthält:
-                ohne „Lokalzeit“ für den Tag in Weltzeit (UTC), mit „Lokalzeit“ für den Kalendertag in der Zeitzone des Browsers; die Zeiten werden dann auch in Lokalzeit angegeben (z. B. MEZ oder MESZ).
-                Der Tag reicht von <i>0:00 Uhr</i> (Anfang des Tages) bis <i>24:00 Uhr</i> (Ende des Tages).
-                24:00 Uhr ist derselbe Zeitpunkt wie 0:00 Uhr des Folgetags, wird aber bewusst so angezeigt: So ist erkennbar, dass ein Wert am Ende und nicht am Anfang des angezeigten Tages liegt.
+                ohne „Lokalzeit“ für den Tag in Weltzeit (UTC), mit „Lokalzeit“ für den Kalendertag in der Zeitzone des Browsers.
+                24:00 Uhr ist derselbe Zeitpunkt wie 0:00 Uhr des Folgetags. So ist erkennbar, dass ein Wert am Ende und nicht am Anfang des Tages liegt. Minuten werden abgerundet.
                 <br>
-                Genau 0:00 oder 24:00 Uhr erscheint praktisch nur beim höchsten Stand des Mondes, wenn er am Tagesrand liegt: Um 0:00 Uhr sinkt der Mond bereits, oder um 24:00 Uhr steigt er noch.
-                Das ist dann nicht der Scheitel des Tagesbogens, sondern nur die größte Höhe innerhalb des Tages; der Scheitel liegt am Vor- oder Folgetag (siehe <a href="#Durchgang">höchster Stand</a>).
-                Minuten werden abgerundet, ein Ereignis um 23:59:40 Uhr wird also als 23:59 angezeigt.
-                <br>
-                Ein Ereignis wird nur angezeigt, wenn es in den Tag fällt; sonst steht „-“ in der Tabelle.
-                Die Reihenfolge ist dabei nicht festgelegt: Ein Untergang kann vor dem Aufgang liegen, wenn der Körper beim Tagesbeginn schon über dem Horizont steht.
-                Beim Mond ist das etwa jeden zweiten Tag so, bei der Sonne nur in Weltzeit fern von Greenwich
-                (z. B. Sydney: Untergang gegen 7:00 UTC, Aufgang gegen 21:00 UTC; in Lokalzeit liegt der Aufgang wieder vor dem Untergang).
-                <br>
-                Ohne „Lokalzeit“ ist der Tag gegenüber der Ortszeit verschoben: In Mitteleuropa beginnt der UTC-Tag um 1:00 Uhr (MEZ) bzw. 2:00 Uhr (MESZ).
-                Ein Mondaufgang um 23:30 UTC findet nach Ortszeit also schon am nächsten Kalendertag statt.
-                Mit „Lokalzeit“ gilt der Abstand zur Weltzeit des eingestellten Zeitpunkts für den ganzen Tag.
-                An den Tagen der Zeitumstellung können Ereignisse vor der Umstellung (zwischen 0 und 3 Uhr) deshalb um eine Stunde verschoben angezeigt werden.
+                Fällt ein Ereignis nicht in den Tag, steht „-“ in der Tabelle. Beim Mond kommt das etwa einmal im Monat vor, weil er sich jeden Tag um ca. 50 Minuten verspätet (siehe <a href="#LunarerTag">Lunarer Tag</a>).
+                Auch die Reihenfolge ist nicht festgelegt: Ein Untergang kann vor dem Aufgang liegen.
+                An Tagen der Zeitumstellung können Ereignisse vor der Umstellung um eine Stunde verschoben angezeigt werden.
             </td>
         </tr>
         <tr>
@@ -782,27 +759,27 @@
         <tr>
             <td valign="top" id="PositionswinkelAchse"><b>Positionswinkel der Achse</b></td>
             <td>
-                Winkel der Rotationsachse des Mondes, gesehen von der Erde aus. Er beschreibt die Orientierung der Rotationsachse des Mondes relativ zum Himmel und gibt an, in welche Richtung die Nordpolregion des Mondes zeigt.
+                Winkel der Rotationsachse des Mondes, gesehen von der Erde aus und gemessen von der Himmelsnordrichtung über Osten. Er beschreibt die Orientierung der Rotationsachse des Mondes relativ zum Himmel und gibt an, in welche Richtung die Nordpolregion des Mondes zeigt.
             </td>
         </tr>
         <tr>
             <td valign="top" id="PositionswinkelRand"><b>Positionswinkel des hellen Rands</b></td>
             <td>
-                Der Positionswinkel des hellen Rands des Mondes ist der Winkel zwischen der Richtung zum hellen Rand des Mondes und einem Referenzpunkt, gemessen im Uhrzeigersinn von Norden aus. Er gibt an, in welche Richtung der helle Rand des Mondes zeigt, was besonders bei der Beobachtung von Mondphasen relevant ist.
+                Der Positionswinkel des hellen Rands des Mondes ist der Winkel zwischen der Himmelsnordrichtung und der Richtung zur Mitte des hellen Rands, gemessen über Osten (am Himmel gegen den Uhrzeigersinn). Er gibt an, in welche Richtung der helle Rand des Mondes zeigt - ungefähr zur Sonne hin.
             </td>
         </tr>
         <tr>
             <td valign="top" ><b>Selenographische Koordinaten</b></td>
             <td>
-                Der Mond hat ein eigenes Koordinatensystem (selenographische Koordinaten), mit einem Äquator, sowie Nord- und Südpol.
-                Die selenographische Länge wird von einem Nullmeridian aus gemessen, der durch das Zentrum der sichtbaren Mondscheibe verläuft.
+                Der Mond hat ein eigenes Koordinatensystem (selenographische Koordinaten), mit einem Äquator sowie Nord- und Südpol.
+                Die selenographische Länge wird von einem Nullmeridian aus gemessen, der durch die mittlere Mitte der von der Erde sichtbaren Mondscheibe verläuft.
                 Die selenographische Breite wird senkrecht zum Äquator gemessen, wobei positive Werte nördlich und negative Werte südlich des Äquators liegen.
             </td>
         </tr>
         <tr>
             <td valign="top" id="Libration"><b>Libration</b></td>
             <td>Libration ist die scheinbare Schwankung der Ausrichtung eines Himmelskörpers, insbesondere des Mondes.
-                Aufgrund seiner unregelmäßigen Bewegung um die Erde zeigt der Mond von der Erde aus gesehen nicht immer genau die gleiche Seite - der selenographische Mittelpunkt eiert um den Mittelpunkt der sichtbaren Mondscheibe herum.
+                Durch verschiedene Einflüsse zeigt der Mond von der Erde aus gesehen nicht immer genau die gleiche Seite - der selenographische Mittelpunkt eiert um den Mittelpunkt der sichtbaren Mondscheibe herum.
                 Im Laufe der Zeit ist es so möglich, ca. 59% der Mondoberfläche von der Erde aus zu sehen.
                 Die Libration wird in selenographischen Koordinaten angegeben, wobei die Libration in Länge die scheinbare Bewegung entlang des Mondäquators beschreibt 
                 und die Libration in Breite die scheinbare Bewegung senkrecht dazu beschreibt.
@@ -810,7 +787,7 @@
         </tr>
         <tr>
             <td valign="top" id="ParallaktischerWinkel"><b>Parallaktischer Winkel</b></td>
-            <td>Der parallaktische Winkel ist der Winkel zwischen der Richtung zu einem Himmelskörper und der Richtung zum Zenit, gemessen in der Horizontalebene. Er ist wichtig für die Korrektur von Beobachtungen aufgrund der Erdrotation.</td>
+            <td>Der parallaktische Winkel ist der Winkel am Himmelskörper zwischen der Richtung zum Himmelsnordpol und der Richtung zum Zenit. Er gibt an, wie stark der Mond für den Beobachter gegenüber der Himmelsnordrichtung gedreht erscheint. Deshalb steht die Mondsichel je nach Uhrzeit und Breitengrad unterschiedlich schräg, in den Tropen liegt sie fast waagerecht.</td>
         </tr>
     </table>
 
