@@ -1,4 +1,4 @@
-// testVisibility.js – Tests für visibility.js und calculateRefraction (Konzept-Sichtbarkeit.md, Stufen 1 und 2)
+// testVisibility.js – Tests für visibility.js und calculateRefraction (Konzept-Sichtbarkeit.md, Stufen 1 bis 3)
 //
 //   node testVisibility.js
 //
@@ -363,6 +363,115 @@ console.log('13. Laufzeit Umgebung');
     const size = JSON.stringify(p.hulls).length;
     check(tb < 500 && tt < 3000 && th < 100,
           `1000 Gebäude ${tb} ms, Geländeprofil 50 km ${tt} ms, Horizont daraus ${th} ms, gespeichert ${(size / 1024).toFixed(0)} KB`);
+}
+
+// ---------------------------------------------------------------
+//  Stufe 3: Wohnung und Balkon
+// ---------------------------------------------------------------
+
+// Raum 4 × 5 m nach Süden, Wand 35 cm, Fenster 1–3 m, Brüstung 0,9 m, Sturz 2,3 m; Auge mittig 2 m vor der Wand
+const room = {
+    facade: 180, wall: 0.35,
+    room: { width: 4, depth: 5, height: 2.6, windows: [{ wall: 'front', from: 1, to: 3, sill: 0.9, top: 2.3 }] },
+    eye: { place: 'room', x: 2, y: 2 },
+};
+const atan = x => Math.atan(x) * RAD2DEG;
+
+console.log('14. Fenster mit Laibung (Strahltest)');
+{
+    const cs = vis.compileScene(room, 1.6);
+    const free = (A, h) => vis.sceneDirectionFree(cs, A, h);
+    // Seitlich begrenzt die Außenkante der Laibung: atan(1 / 2,35)
+    const side = atan(1 / 2.35);
+    check(free(180 + side - 0.01, 0) && !free(180 + side + 0.01, 0) && free(180 - side + 0.01, 0) && !free(180 - side - 0.01, 0),
+          `Breite ±${side.toFixed(2)}° (Außenkante der Laibung)`);
+    const up = atan(0.7 / 2.35);
+    check(free(180, up - 0.01) && !free(180, up + 0.01) && free(180, -up + 0.01) && !free(180, -up - 0.01),
+          `Höhe ±${up.toFixed(2)}° geradeaus (Sturz und Brüstung außen)`);
+    // Schräg gesehen ist die Oberkante tiefer: Fensterkanten sind im (A, h)-Raum gekrümmt
+    const slanted = atan(0.7 * Math.cos(20 * DEG2RAD) / 2.35);
+    check(free(200, slanted - 0.01) && !free(200, slanted + 0.01), `bei 20° seitlich nur bis ${slanted.toFixed(2)}° (gekrümmte Kante)`);
+    check(!free(0, 10) && !free(90, 0) && !free(180, 80), 'Rückwand, Seitenwand und Decke verdecken');
+    const names = [[180, 0], [180 + side + 1, 0], [180, 18], [0, 10]].map(([A, h]) => (vis.sceneObstacle(cs, A, h) || { name: 'frei' }).name);
+    check(names.join(', ') === 'frei, Laibung, Sturz, Wand', `Hindernis benannt: ${names.join(', ')}`);
+    const thin = vis.compileScene({ ...room, wall: 0 }, 1.6);
+    check(Math.abs(vis.sceneDirectionFree(thin, 180 + atan(0.5) + 0.01, 0) ? 1 : 0) === 0
+          && vis.sceneDirectionFree(thin, 180 + atan(0.5) - 0.01, 0), `ohne Wandstärke ±${atan(0.5).toFixed(2)}°`);
+}
+
+console.log('15. Raster-Maske gegen exakten Test');
+{
+    const scenes = [
+        ['Raum', room],
+        ['Raum mit Eckfenster und Balkon', { ...room,
+            room: { ...room.room, windows: [...room.room.windows, { wall: 'left', from: 0.5, to: 2, sill: 0.4, top: 2.3 },
+                                            { wall: 'front', from: 3.2, to: 3.8, sill: 0, top: 2.3 }] },
+            balcony: { from: 0.5, to: 4.5, depth: 1.6, ceiling: 2.5, slab: true, parapet: 1, dividerRight: true } }],
+        ['Balkon', { facade: 210, wall: 0.3, balcony: { from: 0, to: 3, depth: 1.5, ceiling: 2.5, slab: true, parapet: 1,
+                                                        dividerLeft: true }, eye: { place: 'balcony', x: 1, y: 0.75 } }],
+    ];
+    let seed = 12345;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (const [name, scene] of scenes) {
+        const t0 = Date.now();
+        const cs = vis.compileScene(scene, 1.6);
+        const ms = Date.now() - t0;
+        let wrong = 0, freeCount = 0;
+        const n = 50000;
+        for (let k = 0; k < n; k++) {
+            const A = rnd() * 360, h = -5 + rnd() * 95;
+            const exact = vis.sceneDirectionFree(cs, A, h);
+            if (exact) freeCount++;
+            if (exact !== vis.sceneVisible(cs, A, h)) wrong++;
+        }
+        check(wrong === 0 && ms < 2000, `${name}: ${wrong} von ${n} Richtungen abweichend, ${(100 * freeCount / n).toFixed(1)} % frei, `
+              + `Raster in ${ms} ms, ${cs.rects.length} Rechtecke`);
+    }
+}
+
+console.log('16. Balkon: Platte, Brüstung, Hauswand, Glas');
+{
+    const balcony = { facade: 180, wall: 0.3, balcony: { from: 0, to: 3, depth: 1.5, ceiling: 2.5, slab: true, parapet: 1 },
+                      eye: { place: 'balcony', x: 1.5, y: 0.75 } };
+    const cs = vis.compileScene(balcony, 1.6);
+    const free = (A, h) => vis.sceneDirectionFree(cs, A, h);
+    const up = atan(0.9 / 0.75), down = atan(0.6 / 0.75);
+    check(free(180, up - 0.01) && !free(180, up + 0.01), `Balkonplatte darüber ab ${up.toFixed(2)}°`);
+    check(free(180, -down + 0.01) && !free(180, -down - 0.01), `Brüstung bis ${(-down).toFixed(2)}°`);
+    check(!free(0, 30) && !free(85, 1) && free(95, 10), 'Hauswand verdeckt alles hinter der Fassade, seitlich über die Brüstung frei');
+    const glass = vis.compileScene({ ...balcony, balcony: { ...balcony.balcony, glass: true } }, 1.6);
+    check(vis.sceneDirectionFree(glass, 180, -down - 1), 'Glasbrüstung ist durchsichtig');
+    const top = vis.compileScene({ ...balcony, balcony: { ...balcony.balcony, slab: false } }, 1.6);
+    check(vis.sceneDirectionFree(top, 180, 85) && top.minAltitude < -5, 'ohne Platte (oberstes Geschoss) frei bis zum Zenit');
+}
+
+console.log('17. Szene in der Maske und Sonnenfleck');
+{
+    const vp = vis.compileViewpoint({ name: 'Zimmer', sectors: [], horizon: [], eyeHeight: 1.6, scene: room });
+    check(vis.isDirectionVisible(vp, 180, 5) && !vis.isDirectionVisible(vp, 180, 25) && !vis.isDirectionVisible(vp, 180, -1)
+          && vp.minAltitude === 0 && vp.scene.minAltitude === -90,
+          'Szene wirkt in isDirectionVisible; ohne Umgebung gilt weiter Horizont 0°');
+    // Hohe Brüstung (1,5 m): tiefste freie Richtung atan(0,1 / 2,35) unter 0°, eine Rasterstufe Sicherheit
+    const high = vis.compileScene({ ...room, room: { ...room.room, windows: [{ ...room.room.windows[0], sill: 1.5 }] } }, 1.6);
+    const lowest = -atan(0.1 / 2.35);
+    check(high.minAltitude <= lowest && high.minAltitude > lowest - 0.5,
+          `Vorprüfung: Fenster ab ${lowest.toFixed(2)}° frei, Schranke ${high.minAltitude.toFixed(2)}°`);
+    // 21. Dezember in Berlin: Sonne mittags ≈ 14° im Süden, durchs Fenster sichtbar
+    const day = astro.julianDayFromCalendar(2026, 12, 21, 0);
+    const free = vis.findVisibilityIntervals('sun', day, day + 1, berlin, [freeSky]).find(i => !i.startsBefore);
+    const win = vis.findVisibilityIntervals('sun', day, day + 1, berlin, [vp]).filter(i => !i.startsBefore);
+    const minutes = win.reduce((s, i) => s + i.duration, 0);
+    check(win.length === 1 && minutes > 60 && minutes < free.duration,
+          `21.12.: Sonne ${minutes.toFixed(0)} min durchs Fenster (frei ${free.duration.toFixed(0)} min)`);
+
+    // Sonne aus Süden in 30° Höhe: Fleck x 1…3 m, Abstand zur Wand 0,9/tan 30° … (2,3/tan 30° − 0,35)
+    const patch = vis.sunPatch(vp.scene, 180, 30, 0.05);
+    const t = Math.tan(30 * DEG2RAD);
+    const expected = 2 * (2.3 / t - 0.35 - 0.9 / t);
+    const ys = patch.room.map(p => -0.35 - p[1]);
+    check(Math.abs(patch.area - expected) < 0.15 && Math.min(...ys) > 0.9 / t - 0.05 && Math.max(...ys) < 2.3 / t - 0.35 + 0.05,
+          `Sonnenfleck ${patch.area.toFixed(2)} m² (erwartet ${expected.toFixed(2)} m²), ${(0.9 / t).toFixed(2)}–${(2.3 / t - 0.35).toFixed(2)} m vor der Wand`);
+    check(vis.sunPatch(vp.scene, 0, 30).area === 0, 'Sonne von Norden: kein Fleck');
 }
 
 console.log(failures ? `\n${failures} Fehler` : '\nAlle Tests bestanden');

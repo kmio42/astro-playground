@@ -1,5 +1,5 @@
 /*
- * Sichtbarkeit von Sonne und Mond von einem Standpunkt aus (Konzept-Sichtbarkeit.md, Stufen 1 und 2).
+ * Sichtbarkeit von Sonne und Mond von einem Standpunkt aus (Konzept-Sichtbarkeit.md, Stufen 1 bis 3).
  * Ohne DOM: im Browser nach astro.js laden (alle Namen global), in Node.js über require('./visibility.js').
  *
  * Konventionen (anders als astro.js in Grad, weil alle Werte aus Eingaben stammen und angezeigt werden):
@@ -7,7 +7,8 @@
  *  - Zeitpunkte als Julianischer Tag in UT, Beobachtungsort als { longitude, latitude, elevation } wie in astro.js.
  *  - Standpunkt (wie gespeichert):
  *      { name, sectors: [{ azimuthFrom, azimuthTo, altitudeFrom, altitudeTo }],
- *        horizon: [[azimuth, altitude], …], observations: [{ time, body, event }] }
+ *        horizon: [[azimuth, altitude], …], observations: [{ time, body, event }],
+ *        eyeHeight, scene (optional, Stufe 3) }
  *    Für die Rechnung wird er mit compileViewpoint() vorbereitet.
  *
  * Sichtbar ist eine Richtung, wenn sie in einem Sichtbereich-Rechteck liegt (oder keine Rechtecke definiert sind)
@@ -17,6 +18,9 @@
  * Stufe 2: Aus OSM-Gebäuden (horizonFromBuildings) und Geländekacheln (terrainProfile, horizonFromTerrain) entsteht
  * eine berechnete Horizontlinie im 0,25°-Raster; compileViewpoint(viewpoint, profile) nimmt das Maximum aus ihr und
  * der Hand-Horizontlinie.
+ *
+ * Stufe 3: Eine Szene (Raum mit Fenstern, Balkon) verdeckt zusätzlich alles, was ein Strahl vom Auge nicht durch
+ * eine Öffnung ins Freie schafft (compileScene, sceneVisible).
  */
 (function (root) {
     'use strict';
@@ -81,7 +85,10 @@
         if (sectors.length) {
             minAltitude = Math.max(minAltitude, Math.min(...sectors.map(s => Math.min(s.altitudeFrom, s.altitudeTo))));
         }
-        return { compiled: true, name: viewpoint.name, horizon, profile: prof, sectors, minAltitude };
+        // Wohnung/Balkon (Stufe 3); bereits vorbereitete Szenen (compileScene) werden übernommen
+        const scene = viewpoint.scene ? compileScene(viewpoint.scene, viewpoint.eyeHeight ?? 1.6) : null;
+        if (scene) minAltitude = Math.max(minAltitude, scene.minAltitude);
+        return { compiled: true, name: viewpoint.name, horizon, profile: prof, sectors, scene, minAltitude };
     }
 
     function compiled(viewpoint) {
@@ -135,10 +142,10 @@
     function isDirectionVisible(viewpoint, azimuth, altitude) {
         const vp = compiled(viewpoint);
         if (altitude <= horizonAltitude(vp, azimuth)) return false;
-        if (vp.sectors.length === 0) return true;
-        return vp.sectors.some(s =>
+        if (vp.sectors.length && !vp.sectors.some(s =>
             altitude >= Math.min(s.altitudeFrom, s.altitudeTo) && altitude <= Math.max(s.altitudeFrom, s.altitudeTo)
-            && azimuthInRange(azimuth, s.azimuthFrom, s.azimuthTo));
+            && azimuthInRange(azimuth, s.azimuthFrom, s.azimuthTo))) return false;
+        return !vp.scene || sceneVisible(vp.scene, azimuth, altitude);
     }
 
     // ---------------------------------------------------------------
@@ -471,6 +478,290 @@
             }
         }
         return out;
+    }
+
+    // ---------------------------------------------------------------
+    //  Wohnung und Balkon (Stufe 3)
+    //  Raum-Koordinaten in m: x entlang der Fassade (nach rechts, Blick nach draußen), y nach außen
+    //  (y = 0 ist die Außenseite der Fensterwand), z nach oben (z = 0 Fußboden).
+    //  Szene: { facade [°, Außennormale der Fensterwand], wall [m, Wandstärke], anchor { latitude, longitude }
+    //           (Punkt x = 0, y = 0 in der Karte, optional),
+    //           room: { width, depth, height, windows: [{ wall: 'front'|'left'|'right'|'back', from, to, sill, top }] },
+    //           balcony: { from, to, depth, ceiling, slab, parapet, glass, dividerLeft, dividerRight },
+    //           eye: { place: 'room'|'balcony', x, y [Abstand zur Wand] } }
+    //  Fensterlage from/to: an Fassade und Rückwand ab der linken Raumecke, an den Seitenwänden ab der Fensterwand.
+    // ---------------------------------------------------------------
+
+    const SCENE_ALT_MIN = -5;           // Raster-Maske von −5° …
+    const SCENE_ALT_MAX = 90;           // … bis 90° Höhe, Knoten alle HORIZON_STEP
+    const SCENE_ROWS = Math.round((SCENE_ALT_MAX - SCENE_ALT_MIN) / HORIZON_STEP) + 1;
+    const SCENE_FAR = 1e4;              // Ausdehnung der Hauswand hinter dem Balkon [m]
+    const SCENE_MARGIN = 0.05;          // Mindestabstand des Auges zu Wänden [m]
+    const SCENE_WALLS = ['front', 'left', 'right', 'back'];
+
+    /**
+     * Szene prüfen und ergänzen: Zahlen begrenzt, Fenster in ihrer Wand, Auge im Raum bzw. auf dem Balkon.
+     * @return bereinigte Kopie oder null (weder Raum noch Balkon)
+     */
+    function normalizeScene(scene) {
+        if (!scene || typeof scene !== 'object') return null;
+        const num = (v, def, min, max) => {
+            const x = Number(v);
+            return Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : def;
+        };
+        const sorted = (a, b) => a <= b ? [a, b] : [b, a];
+        const a = scene.anchor;
+        const out = {
+            facade: wrap360(num(scene.facade, 180, -1e6, 1e6)),
+            wall: num(scene.wall, 0.35, 0, 2),
+            anchor: a && Number.isFinite(a.latitude) && Number.isFinite(a.longitude)
+                ? { latitude: a.latitude, longitude: a.longitude } : null,
+            room: null, balcony: null, eye: null,
+        };
+        if (scene.room) {
+            const r = scene.room;
+            const room = { width: num(r.width, 4, 0.3, 100), depth: num(r.depth, 5, 0.3, 100),
+                           height: num(r.height, 2.6, 0.5, 20), windows: [] };
+            for (const w of Array.isArray(r.windows) ? r.windows : []) {
+                if (!w) continue;
+                const wall = SCENE_WALLS.includes(w.wall) ? w.wall : 'front';
+                const len = wall === 'front' || wall === 'back' ? room.width : room.depth;
+                const [from, to] = sorted(num(w.from, 0, 0, len), num(w.to, len, 0, len));
+                const [sill, top] = sorted(num(w.sill, 0.9, 0, room.height), num(w.top, room.height, 0, room.height));
+                if (to > from && top > sill) room.windows.push({ wall, from, to, sill, top });
+            }
+            out.room = room;
+        }
+        if (scene.balcony) {
+            const b = scene.balcony;
+            const [from, to] = sorted(num(b.from, 0, -100, 200), num(b.to, 3, -100, 200));
+            if (to - from >= 0.3) {
+                out.balcony = {
+                    from, to, depth: num(b.depth, 1.5, 0.3, 20), ceiling: num(b.ceiling, 2.5, 0.5, 20),
+                    slab: b.slab !== false, parapet: num(b.parapet, 1, 0, 3), glass: !!b.glass,
+                    dividerLeft: !!b.dividerLeft, dividerRight: !!b.dividerRight,
+                };
+            }
+        }
+        if (!out.room && !out.balcony) return null;
+
+        // Auge in den freien Raum legen
+        const e = scene.eye || {};
+        const place = (e.place === 'balcony' && out.balcony) || !out.room ? 'balcony' : 'room';
+        const m = SCENE_MARGIN;
+        const [x0, x1, depth] = place === 'room' ? [0, out.room.width, out.room.depth]
+                                                 : [out.balcony.from, out.balcony.to, out.balcony.depth];
+        out.eye = {
+            place,
+            x: num(e.x, (x0 + x1) / 2, x0 + m, x1 - m),
+            y: num(e.y, depth / 2, m, depth - m),
+        };
+        return out;
+    }
+
+    // Undurchsichtiges, achsparalleles Rechteck in der Ebene p[axis] = c; ranges: { Achse: [von, bis] }
+    function sceneRect(axis, c, ranges, name) {
+        const [o1, o2] = Object.keys(ranges).map(Number).sort();
+        return { axis, c, o1, o2, a0: ranges[o1][0], a1: ranges[o1][1], b0: ranges[o2][0], b1: ranges[o2][1], name };
+    }
+
+    // Wandfläche (u: Bereich entlang der Wand, z: 0 … Höhe) ohne die Fensterlöcher, zerlegt in Rechtecke
+    function wallWithHoles(axis, c, uAxis, uRange, zRange, holes) {
+        const rects = [];
+        const us = [...new Set([uRange[0], uRange[1], ...holes.flatMap(h => [h.u0, h.u1])])].sort((p, q) => p - q);
+        for (let k = 0; k + 1 < us.length; k++) {
+            const ua = us[k], ub = us[k + 1];
+            if (ub - ua < 1e-9) continue;
+            // Löcher in diesem Streifen von unten nach oben; dazwischen bleibt Wand
+            const gaps = holes.filter(h => h.u0 <= ua && h.u1 >= ub).map(h => [h.z0, h.z1]).sort((p, q) => p[0] - q[0]);
+            let z = zRange[0];
+            for (const [g0, g1] of [...gaps, [zRange[1], zRange[1]]]) {
+                if (g0 > z + 1e-9) rects.push(sceneRect(axis, c, { [uAxis]: [ua, ub], 2: [z, g0] }, 'Wand'));
+                z = Math.max(z, g1);
+            }
+        }
+        return rects;
+    }
+
+    /**
+     * Rechtecke der Szene für ein Auge im Raum oder auf dem Balkon. Der Raum ist innen geschlossen; jedes
+     * Fenster ist ein Durchgang durch die Wand mit vier Laibungsflächen. Vom Balkon aus wirkt die Hauswand als
+     * große Fläche (durch die Wohnung sieht man nicht hindurch).
+     */
+    function sceneRectangles(sc, place) {
+        const rects = [];
+        const s = sc.wall;
+        if (place === 'room' && sc.room) {
+            const { width: W, depth: D, height: H } = sc.room;
+            const yIn = -s, yBack = -s - D;
+            // Wände: Achse der Normalen, Innen- und Außenebene, Achse entlang der Wand und deren Bereich
+            const walls = {
+                front: { axis: 1, cIn: yIn, cOut: 0, uAxis: 0, range: [0, W], u: (f, t) => [f, t] },
+                back: { axis: 1, cIn: yBack, cOut: yBack - s, uAxis: 0, range: [0, W], u: (f, t) => [f, t] },
+                left: { axis: 0, cIn: 0, cOut: -s, uAxis: 1, range: [yBack, yIn], u: (f, t) => [yIn - t, yIn - f] },
+                right: { axis: 0, cIn: W, cOut: W + s, uAxis: 1, range: [yBack, yIn], u: (f, t) => [yIn - t, yIn - f] },
+            };
+            for (const [name, w] of Object.entries(walls)) {
+                const holes = sc.room.windows.filter(win => win.wall === name).map(win => {
+                    const [u0, u1] = w.u(win.from, win.to);
+                    return { u0, u1, z0: win.sill, z1: win.top };
+                });
+                rects.push(...wallWithHoles(w.axis, w.cIn, w.uAxis, w.range, [0, H], holes));
+                const thick = [Math.min(w.cIn, w.cOut), Math.max(w.cIn, w.cOut)];
+                for (const h of holes) {
+                    rects.push(sceneRect(w.uAxis, h.u0, { [w.axis]: thick, 2: [h.z0, h.z1] }, 'Laibung'));
+                    rects.push(sceneRect(w.uAxis, h.u1, { [w.axis]: thick, 2: [h.z0, h.z1] }, 'Laibung'));
+                    rects.push(sceneRect(2, h.z0, { [w.axis]: thick, [w.uAxis]: [h.u0, h.u1] }, 'Fensterbank'));
+                    rects.push(sceneRect(2, h.z1, { [w.axis]: thick, [w.uAxis]: [h.u0, h.u1] }, 'Sturz'));
+                }
+            }
+            rects.push(sceneRect(2, 0, { 0: [0, W], 1: [yBack, yIn] }, 'Fußboden'));
+            rects.push(sceneRect(2, H, { 0: [0, W], 1: [yBack, yIn] }, 'Decke'));
+        } else {
+            rects.push(sceneRect(1, 0, { 0: [-SCENE_FAR, SCENE_FAR], 2: [-SCENE_FAR, SCENE_FAR] }, 'Hauswand'));
+        }
+        const b = sc.balcony;
+        if (b) {
+            const xs = [b.from, b.to], ys = [0, b.depth];
+            rects.push(sceneRect(2, 0, { 0: xs, 1: ys }, 'Balkonboden'));
+            if (b.slab) rects.push(sceneRect(2, b.ceiling, { 0: xs, 1: ys }, 'Balkonplatte darüber'));
+            if (b.parapet > 0 && !b.glass) {
+                rects.push(sceneRect(1, b.depth, { 0: xs, 2: [0, b.parapet] }, 'Brüstung'));
+                rects.push(sceneRect(0, b.from, { 1: ys, 2: [0, b.parapet] }, 'Brüstung'));
+                rects.push(sceneRect(0, b.to, { 1: ys, 2: [0, b.parapet] }, 'Brüstung'));
+            }
+            if (b.dividerLeft) rects.push(sceneRect(0, b.from, { 1: ys, 2: [0, b.ceiling] }, 'Trennwand links'));
+            if (b.dividerRight) rects.push(sceneRect(0, b.to, { 1: ys, 2: [0, b.ceiling] }, 'Trennwand rechts'));
+        }
+        return rects;
+    }
+
+    // Nächstes Rechteck auf dem Strahl p + t·d (t > 0) oder null
+    function rayHit(rects, p, d) {
+        let best = null, bestT = Infinity;
+        for (const r of rects) {
+            const dn = d[r.axis];
+            if (Math.abs(dn) < 1e-12) continue;
+            const t = (r.c - p[r.axis]) / dn;
+            if (t <= 1e-9 || t >= bestT) continue;
+            const q1 = p[r.o1] + t * d[r.o1], q2 = p[r.o2] + t * d[r.o2];
+            if (q1 >= r.a0 && q1 <= r.a1 && q2 >= r.b0 && q2 <= r.b1) { best = r; bestT = t; }
+        }
+        return best && { name: best.name, distance: bestT };
+    }
+
+    // Trifft der Strahl p + t·d (t > 0) eines der Rechtecke?
+    function rayBlocked(rects, p, d) {
+        for (const r of rects) {
+            const dn = d[r.axis];
+            if (Math.abs(dn) < 1e-12) continue;
+            const t = (r.c - p[r.axis]) / dn;
+            if (t <= 1e-9) continue;
+            const q1 = p[r.o1] + t * d[r.o1];
+            if (q1 < r.a0 || q1 > r.a1) continue;
+            const q2 = p[r.o2] + t * d[r.o2];
+            if (q2 >= r.b0 && q2 <= r.b1) return true;
+        }
+        return false;
+    }
+
+    // Richtung (Azimut, Höhe) [°] in Raum-Koordinaten
+    function sceneVector(facade, azimuth, altitude) {
+        const a = (azimuth - facade) * DEG2RAD, h = altitude * DEG2RAD;
+        return [Math.cos(h) * Math.sin(a), Math.cos(h) * Math.cos(a), Math.sin(h)];
+    }
+
+    /**
+     * Szene für die Rechnung vorbereiten: Rechtecke für die Augenposition und die Raster-Maske
+     * (HORIZON_BINS × SCENE_ROWS Knoten, 1 = frei).
+     * @param eyeHeight Augenhöhe über dem Fußboden [m]
+     * @return { compiledScene: true, scene, eye [x, y, z], rects, grid, minAltitude } oder null
+     */
+    function compileScene(scene, eyeHeight = 1.6) {
+        if (scene && scene.compiledScene) return scene;
+        const sc = normalizeScene(scene);
+        if (!sc) return null;
+        const e = sc.eye;
+        const zMax = e.place === 'room' ? sc.room.height : sc.balcony.slab ? sc.balcony.ceiling : Infinity;
+        const z = Math.min(Math.max(eyeHeight, SCENE_MARGIN), zMax - SCENE_MARGIN);
+        const eye = e.place === 'room' ? [e.x, -sc.wall - e.y, z] : [e.x, e.y, z];
+        const rects = sceneRectangles(sc, e.place);
+
+        const grid = new Uint8Array(HORIZON_BINS * SCENE_ROWS);
+        const sinA = new Float64Array(HORIZON_BINS), cosA = new Float64Array(HORIZON_BINS);
+        for (let i = 0; i < HORIZON_BINS; i++) {
+            const a = (i * HORIZON_STEP - sc.facade) * DEG2RAD;
+            sinA[i] = Math.sin(a);
+            cosA[i] = Math.cos(a);
+        }
+        let minAltitude = SCENE_ALT_MAX;
+        const d = [0, 0, 0];
+        for (let j = SCENE_ROWS - 1; j >= 0; j--) {
+            const alt = SCENE_ALT_MIN + j * HORIZON_STEP;
+            const ch = Math.cos(alt * DEG2RAD);
+            d[2] = Math.sin(alt * DEG2RAD);
+            for (let i = 0; i < HORIZON_BINS; i++) {
+                d[0] = ch * sinA[i];
+                d[1] = ch * cosA[i];
+                if (!rayBlocked(rects, eye, d)) {
+                    grid[j * HORIZON_BINS + i] = 1;
+                    minAltitude = alt;
+                }
+            }
+        }
+        // Zwischen den Knoten kann noch etwas frei sein: eine Rasterstufe Sicherheit; unter dem Raster frei,
+        // wenn die unterste Zeile frei ist
+        minAltitude = minAltitude <= SCENE_ALT_MIN ? -90 : minAltitude - HORIZON_STEP;
+        return { compiledScene: true, scene: sc, eye, rects, grid, minAltitude };
+    }
+
+    /** Exakter Strahltest: Ist die Richtung (Azimut, Höhe) [°] vom Auge aus frei? */
+    function sceneDirectionFree(cs, azimuth, altitude) {
+        return !rayBlocked(cs.rects, cs.eye, sceneVector(cs.scene.facade, azimuth, altitude));
+    }
+
+    /** Was verdeckt die Richtung? { name (z. B. 'Laibung'), distance [m] } oder null, wenn frei */
+    function sceneObstacle(cs, azimuth, altitude) {
+        return rayHit(cs.rects, cs.eye, sceneVector(cs.scene.facade, azimuth, altitude));
+    }
+
+    /** Wie sceneDirectionFree, aber über die Raster-Maske; nur an Übergängen (Knoten verschieden) exakt */
+    function sceneVisible(cs, azimuth, altitude) {
+        const y = (altitude - SCENE_ALT_MIN) / HORIZON_STEP;
+        const j = Math.floor(y);
+        if (j < 0 || j >= SCENE_ROWS - 1) return sceneDirectionFree(cs, azimuth, altitude);
+        const x = wrap360(azimuth) / HORIZON_STEP;
+        const i = Math.min(Math.floor(x), HORIZON_BINS - 1), i1 = (i + 1) % HORIZON_BINS;
+        const g = cs.grid, r0 = j * HORIZON_BINS, r1 = r0 + HORIZON_BINS;
+        const v = g[r0 + i];
+        if (g[r0 + i1] === v && g[r1 + i] === v && g[r1 + i1] === v) return v === 1;
+        return sceneDirectionFree(cs, azimuth, altitude);
+    }
+
+    /**
+     * Sonnenfleck: Bodenstellen (Raum und Balkon), die aus der Richtung (Azimut, Höhe) [°] frei sind, abgetastet
+     * im Raster step [m]. Getestet wird der Strahl vom Boden zur Sonne mit allen Wänden, Laibungen und
+     * Balkonteilen; die Umgebung (Horizontlinie) prüft der Aufrufer.
+     * @return { step, room: [[x, y], …], balcony: [[x, y], …] (Zellmitten), area [m²] }
+     */
+    function sunPatch(cs, azimuth, altitude, step = 0.1) {
+        const sc = cs.scene;
+        const d = sceneVector(sc.facade, azimuth, altitude);
+        const result = { step, room: [], balcony: [], area: 0 };
+        if (d[2] <= 0) return result;
+        const scan = (place, x0, x1, y0, y1) => {
+            const rects = sceneRectangles(sc, place);
+            const list = result[place];
+            for (let x = x0 + step / 2; x < x1; x += step) {
+                for (let y = y0 + step / 2; y < y1; y += step) {
+                    if (!rayBlocked(rects, [x, y, 1e-6], d)) list.push([x, y]);
+                }
+            }
+            result.area += list.length * step * step;
+        };
+        if (sc.room) scan('room', 0, sc.room.width, -sc.wall - sc.room.depth, -sc.wall);
+        if (sc.balcony) scan('balcony', sc.balcony.from, sc.balcony.to, 0, sc.balcony.depth);
+        return result;
     }
 
     // ---------------------------------------------------------------
@@ -814,6 +1105,8 @@
         buildingHeight, localProjection, destinationPoint, pointInBuilding, nearestEdge, facadeAzimuth,
         horizonFromBuildings, terrainZoom, terrainTileList, decodeTerrarium, createTerrainSampler,
         terrainProfile, horizonFromTerrain, combineProfiles,
+        SCENE_ALT_MIN, SCENE_ALT_MAX, normalizeScene, sceneRectangles, compileScene, sceneDirectionFree, sceneVisible,
+        sceneObstacle, sunPatch,
         apparentAltitude, sunDirection, moonDirection, createMoonEphemeris, findFullMoons,
         visibilityLevel, findVisibilityIntervals, computeLevelGrid, computeLevelSeries, observationDirection,
     };
