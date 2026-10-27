@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erde und Mond in 3D</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --border: #d6d5d0;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --border: #3a3a37;
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --border: #3a3a37;
+        }
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        h2 { margin-top: 28px; }
+        button { padding: 3px 10px; }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 12px; }
+
+        /* 3D-Ansicht: immer dunkler Weltraum, unabhängig vom Seitenthema */
+        .viewport {
+            position: relative;
+            height: min(72vh, 760px);
+            min-height: 380px;
+            background: #030306;
+            border-radius: 6px;
+            overflow: hidden;
+            user-select: none;
+        }
+        .viewport canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+        }
+        .viewport canvas:active { cursor: grabbing; }
+        .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .label {
+            position: absolute;
+            transform: translate(8px, -50%);
+            white-space: nowrap;
+            font-size: 12px;
+            color: #e8e8e8;
+            text-shadow: 0 0 3px #000, 0 0 3px #000;
+            transition: opacity 0.15s;
+        }
+        .label.center { transform: translate(-50%, -130%); }
+        .overlay-date {
+            position: absolute;
+            left: 12px;
+            top: 10px;
+            color: #f0f0f0;
+            font-size: 15px;
+            text-shadow: 0 0 3px #000;
+            pointer-events: none;
+            font-variant-numeric: tabular-nums;
+        }
+        .overlay-date small { color: #b0b0b0; font-size: 12px; }
+        .message {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+            color: #f0f0f0;
+            background: rgba(3, 3, 6, 0.85);
+        }
+        .message code { background: #222; padding: 1px 4px; border-radius: 3px; }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 20px;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls .group { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+        .controls .group > b { font-weight: 600; margin-right: 2px; }
+        .controls input[type="range"] { vertical-align: middle; width: min(140px, 40vw); }
+        .controls button[aria-pressed="true"] { font-weight: 600; outline: 2px solid #5999ff; outline-offset: -1px; }
+        .controls output { display: inline-block; min-width: 3.2em; font-variant-numeric: tabular-nums; }
+
+        .legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 0.9em; color: var(--text-2); margin: 8px 0 4px; }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 16px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before { background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px); }
+        .legend .area::before { height: 10px; opacity: 0.6; }
+
+        .columns { display: flex; flex-wrap: wrap; gap: 16px 32px; margin-top: 16px; }
+        .columns > div { flex: 1 1 380px; min-width: 0; }
+        #outputTable table { border-collapse: collapse; }
+        #outputTable td { padding: 1px 8px 1px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+        /* createTimeButtons (ui.js) setzt float per style-Attribut; hier als Raster mit −/+ nebeneinander */
+        #timeButtons { display: grid; grid-template-columns: repeat(2, max-content); gap: 4px; margin-top: 6px; }
+        #timeButtons button { float: none !important; margin: 0 !important; }
+        #timeButtons br { display: none; }
+        details { margin-top: 12px; }
+        .glossary { border-collapse: collapse; max-width: 900px; }
+        .glossary td { padding: 4px 12px 4px 0; vertical-align: top; }
+        .glossary td:first-child { font-weight: 600; white-space: nowrap; }
+        @media (max-width: 600px) {
+            .glossary td { display: block; padding: 0; }
+            .glossary td:last-child { padding-bottom: 8px; }
+        }
+        summary { cursor: pointer; }
+        /* Formulare aus ui.js haben einen festen hellen Hintergrund */
+        #locationControls > div, #timeControls > div { color: #0b0b0b; border-radius: 6px; overflow-x: auto; }
+    </style>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script src="orbit3d.js"></script>
+    <script src="gl3d.js"></script>
+
+    <!-- ============================ Shader ============================ -->
+
+    <!-- Erde und Mond: Einheitskugel in Körperachsen, kamerarelativ verschoben -->
+    <script type="x-shader/x-vertex" id="bodyVertex">#version 300 es
+        layout(location = 0) in vec3 aPosition;
+        layout(location = 1) in vec2 aUv;
+        uniform mat4 uModel;       // Körper → Welt, kamerarelativ
+        uniform mat4 uViewProj;
+        uniform mat3 uRotation;    // Körper → Welt (für Normalen)
+        out vec3 vNormal;
+        out vec3 vBody;            // Ort in Körperachsen (Einheitskugel)
+        out vec3 vPosRel;          // Ort relativ zum Auge
+        out vec2 vUv;
+        void main() {
+            vec4 p = uModel * vec4(aPosition, 1.0);
+            vPosRel = p.xyz;
+            vNormal = uRotation * aPosition;
+            vBody = aPosition;
+            vUv = aUv;
+            gl_Position = uViewProj * p;
+        }
+    </script>
+
+    <script type="x-shader/x-fragment" id="srgbChunk">
+        // lineare Farbe → sRGB (die Texturen werden beim Lesen nach linear gewandelt)
+        vec3 toSrgb(vec3 c) {
+            c = clamp(c, 0.0, 1.0);
+            return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
+        }
+    </script>
+
+    <script type="x-shader/x-fragment" id="airChunk">
+        // Atmosphäre: Dichte fällt mit der Höhe exponentiell ab (Skalenhöhe H, etwa 9-fach überhöht)
+        const float AIR_H = 0.012;                          // Erdradien
+        const vec3 AIR_COLOR = vec3(0.22, 0.42, 1.0) * 0.55;
+        float airGlow(float depth) { return 1.0 - exp(-7.0 * depth); }
+        float airLight(float sunHeight) { return smoothstep(-0.25, 0.3, sunHeight); }
+        // Luftmenge eines Strahls, der die Erde unter dem Winkel mu (cos zur Normalen) trifft; flach höchstens
+        // die Hälfte des streifenden Strahls
+        float airDepthToGround(float mu) { return AIR_H / max(mu, sqrt(2.0 * AIR_H / 3.14159)); }
+    </script>
+
+    <!-- Erde: Tagseite (Lambert), Dämmerung, Stadtlichter, Glanz auf dem Meer, Dunst -->
+    <script type="x-shader/x-fragment" id="earthFragment">#version 300 es
+        precision highp float;
+        uniform sampler2D uDay;
+        uniform sampler2D uNight;
+        uniform sampler2D uWater;
+        uniform vec3 uSunDir;      // zur Sonne (Welt)
+        uniform float uAir;        // 1 = Atmosphäre zeigen
+        in vec3 vNormal;
+        in vec3 vPosRel;
+        in vec2 vUv;
+        out vec4 outColor;
+        #include srgb
+        #include air
+        void main() {
+            vec3 n = normalize(vNormal);
+            vec3 v = normalize(-vPosRel);
+            float mu0 = dot(n, uSunDir);                    // Sinus der Sonnenhöhe
+            vec3 day = texture(uDay, vUv).rgb;
+            vec3 night = texture(uNight, vUv).rgb;
+            float water = texture(uWater, vUv).r;
+
+            // Tagseite: Lambert, an der Grenze etwas weicher (Dämmerung bis etwa −6°)
+            float diffuse = max(mu0, 0.0) + 0.04 * smoothstep(-0.1, 0.0, mu0) * (1.0 - smoothstep(0.0, 0.2, mu0));
+            vec3 color = day * diffuse * 1.15;
+
+            // Glanz der Sonne auf dem Meer
+            vec3 h = normalize(uSunDir + v);
+            float nh = max(dot(n, h), 0.0);
+            float spec = (pow(nh, 1500.0) * 0.2 + pow(nh, 60.0) * 0.02) * water * smoothstep(0.0, 0.1, mu0);
+            color += vec3(1.0, 0.95, 0.85) * spec;
+
+            // Nachtseite: Stadtlichter, wo die Sonne tiefer als etwa −6° steht
+            float dark = 1.0 - smoothstep(-0.12, 0.0, mu0);
+            color += night * night * dark * 6.0;
+
+            // Dunst der Atmosphäre, zum Rand hin dichter
+            float glow = airGlow(airDepthToGround(max(dot(n, v), 0.0))) * uAir;
+            color = color * (1.0 - 0.35 * glow) + AIR_COLOR * glow * airLight(mu0);
+
+            outColor = vec4(toSrgb(color), 1.0);
+        }
+    </script>
+
+    <!-- Mond: Lommel-Seeliger (Vollmond bis zum Rand hell), etwas Lambert beigemischt; Relief aus der
+         LOLA-Normal-Map; Erdschein auf der Nachtseite -->
+    <script type="x-shader/x-fragment" id="moonFragment">#version 300 es
+        precision highp float;
+        uniform sampler2D uColor;
+        uniform sampler2D uNormal;     // Ost, Nord, oben (·0,5 + 0,5)
+        uniform mat3 uRotation;
+        uniform vec3 uSunDir;
+        uniform vec3 uEarthDir;        // vom Mond zur Erde
+        uniform float uEarthshine;     // Stärke, schon mit der Erdphase multipliziert
+        uniform float uRelief;         // 0 = glatte Kugel, 1 = Normal-Map
+        in vec3 vNormal;
+        in vec3 vBody;
+        in vec3 vPosRel;
+        in vec2 vUv;
+        out vec4 outColor;
+        #include srgb
+        void main() {
+            vec3 ng = normalize(vNormal);                   // Kugelnormale (Welt)
+            vec3 v = normalize(-vPosRel);
+            // Normale aus der Normal-Map: Tangentenbasis Ost/Nord auf der Einheitskugel in Körperachsen
+            vec3 b = normalize(vBody);
+            vec3 east = vec3(-b.y, b.x, 0.0);
+            east = dot(east, east) > 1e-8 ? normalize(east) : vec3(0.0, 1.0, 0.0);
+            vec3 north = cross(b, east);
+            vec2 t = (texture(uNormal, vUv).rg * 2.0 - 1.0) * uRelief;
+            vec3 n = normalize(uRotation * (t.x * east + t.y * north + sqrt(max(1.0 - dot(t, t), 0.0)) * b));
+
+            // Sonne: Relief verschiebt die Helligkeit, der Terminator bleibt an der Kugel (Bergspitzen dürfen knapp
+            // dahinter noch Licht fangen)
+            float terminator = smoothstep(-0.03, 0.02, dot(ng, uSunDir));
+            float mu0 = max(dot(n, uSunDir), 0.0) * terminator;
+            float mu = max(dot(ng, v), 0.0);
+            float ls = min(2.0 * mu0 / (mu0 + mu + 1e-4), 1.4);    // Mitte des Vollmonds = 1
+            float brightness = mix(mu0, ls, 0.75) * 1.25;
+            // Erdschein: Lambert zur Erde, leicht bläulich
+            vec3 earthshine = vec3(0.8, 0.9, 1.0) * uEarthshine * max(dot(n, uEarthDir), 0.0);
+            vec3 albedo = texture(uColor, vUv).rgb;
+            outColor = vec4(toSrgb(albedo * (brightness + earthshine)), 1.0);
+        }
+    </script>
+
+    <!-- Atmosphärensaum außerhalb der Erdscheibe: Kugelschale um die Erde, additiv. Pro Bildpunkt die Luftmenge
+         entlang des Sehstrahls, beleuchtet nach der Sonnenhöhe am erdnächsten Punkt. Über der Erdscheibe
+         rechnet der Erd-Shader den Dunst (dort linear gemischt). Gezeichnet wird die Rückseite der Schale: Sie
+         liegt dort hinter der Erde und fällt durch den Tiefentest weg, auch an der geglätteten Kante -->
+    <script type="x-shader/x-fragment" id="atmosphereFragment">#version 300 es
+        precision highp float;
+        uniform vec3 uCenter;          // Erdmitte relativ zum Auge
+        uniform float uRadius;         // Erdradius in der Darstellung
+        uniform vec3 uSunDir;
+        in vec3 vNormal;
+        in vec3 vPosRel;
+        out vec4 outColor;
+        #include srgb
+        #include air
+        void main() {
+            vec3 d = normalize(vPosRel);
+            if (dot(normalize(vNormal), d) < 0.0) discard;  // nur die Rückseite der Schale
+            vec3 o = -uCenter / uRadius;                     // Auge relativ zur Erdmitte [Erdradien]
+            float b = dot(o, d);
+            vec3 p = o - d * b;                              // erdnächster Punkt des Strahls
+            float r = max(length(p), 1.0);
+            float depth = exp(-(r - 1.0) / AIR_H) * sqrt(2.0 * 3.14159 * r * AIR_H);
+            vec3 sky = AIR_COLOR * airGlow(depth) * airLight(dot(p / r, uSunDir));
+            outColor = vec4(toSrgb(sky), 1.0);
+        }
+    </script>
+
+    <!-- Ebenen: Scheibe in Einheiten des Radius; Füllung, Ringe, Speichen, Rand; additiv gemischt -->
+    <script type="x-shader/x-vertex" id="planeVertex">#version 300 es
+        layout(location = 0) in vec3 aPosition;
+        uniform mat4 uModel;
+        uniform mat4 uViewProj;
+        out vec2 vLocal;
+        void main() {
+            vLocal = aPosition.xy;
+            gl_Position = uViewProj * (uModel * vec4(aPosition, 1.0));
+        }
+    </script>
+    <script type="x-shader/x-fragment" id="planeFragment">#version 300 es
+        precision highp float;
+        uniform vec3 uColor;
+        uniform float uFill;       // Grundhelligkeit
+        uniform float uRings;      // Anzahl Ringe bis zum Rand (0 = keine)
+        uniform float uSpokes;     // Anzahl Speichen (0 = keine), Speiche 0 entlang +x hervorgehoben
+        in vec2 vLocal;
+        out vec4 outColor;
+        float lineMask(float d, float px) { return 1.0 - smoothstep(0.5 * px, 1.5 * px, d); }
+        void main() {
+            float r = length(vLocal);
+            if (r > 1.0) discard;
+            float px = length(fwidth(vLocal));                 // Pixelgröße in Scheibeneinheiten
+            float a = uFill;
+            a += 0.75 * lineMask(1.0 - r, px);                 // Rand
+            if (uRings > 0.0) {
+                float d = abs(fract(r * uRings + 0.5) - 0.5) / uRings;
+                a += 0.22 * lineMask(d, px) * step(0.5 / uRings, r);
+            }
+            if (uSpokes > 0.0) {
+                float step_ = 6.2831853 / uSpokes;
+                float ang = atan(vLocal.y, vLocal.x);
+                float k = floor(ang / step_ + 0.5);
+                float d = r * abs(sin(ang - k * step_));
+                float strength = (mod(k, uSpokes / 4.0) == 0.0) ? 0.45 : 0.2;   // 0°, 90°, 180°, 270° kräftiger
+                if (k == 0.0) strength = 0.9;                                   // Richtung Frühlingspunkt
+                a += strength * lineMask(d, px) * smoothstep(0.08, 0.2, r);
+            }
+            outColor = vec4(uColor * a, 1.0);
+        }
+    </script>
+
+    <!-- Linien: Segment als Band mit Breite in Bildschirmpixeln, an der nahen Ebene abgeschnitten -->
+    <script type="x-shader/x-vertex" id="lineVertex">#version 300 es
+        layout(location = 2) in vec3 aStart;
+        layout(location = 3) in vec3 aEnd;
+        layout(location = 4) in vec2 aSide;    // x: 0 Anfang / 1 Ende, y: −1/+1 Seite
+        layout(location = 5) in vec4 aColor;
+        layout(location = 6) in vec2 aDash;    // x: Parameter entlang der Linie, y: gestrichelt
+        uniform mat4 uView;
+        uniform mat4 uProj;
+        uniform vec3 uEye;
+        uniform vec2 uResolution;
+        uniform float uWidth;
+        uniform float uNear;
+        out vec4 vColor;
+        out vec2 vDash;
+        void main() {
+            vec4 a = uView * vec4(aStart - uEye, 1.0);
+            vec4 b = uView * vec4(aEnd - uEye, 1.0);
+            float lim = -uNear * 1.001;
+            if (a.z > lim && b.z > lim) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+            if (a.z > lim) a = mix(a, b, (lim - a.z) / (b.z - a.z));
+            else if (b.z > lim) b = mix(b, a, (lim - b.z) / (a.z - b.z));
+            vec4 ca = uProj * a, cb = uProj * b;
+            vec2 sa = ca.xy / ca.w * uResolution * 0.5;
+            vec2 sb = cb.xy / cb.w * uResolution * 0.5;
+            vec2 dir = sb - sa;
+            float len = length(dir);
+            dir = len > 1e-6 ? dir / len : vec2(1.0, 0.0);
+            vec2 normal = vec2(-dir.y, dir.x);
+            vec4 c = aSide.x < 0.5 ? ca : cb;
+            vec2 offset = normal * aSide.y * uWidth * 0.5 + dir * (aSide.x < 0.5 ? -0.5 : 0.5) * uWidth * 0.5;
+            c.xy += offset / (uResolution * 0.5) * c.w;
+            c.z -= 0.0002 * c.w;                               // knapp vor Flächen gleicher Tiefe
+            gl_Position = c;
+            vColor = aColor;
+            vDash = aDash;
+        }
+    </script>
+    <script type="x-shader/x-fragment" id="lineFragment">#version 300 es
+        precision highp float;
+        in vec4 vColor;
+        in vec2 vDash;
+        out vec4 outColor;
+        void main() {
+            if (vDash.y > 0.5 && fract(vDash.x) > 0.55) discard;
+            outColor = vColor;
+        }
+    </script>
+
+    <!-- Marken: runde Punkte mit dunklem Rand -->
+    <script type="x-shader/x-vertex" id="pointVertex">#version 300 es
+        layout(location = 0) in vec3 aPosition;
+        layout(location = 5) in vec4 aColor;
+        uniform mat4 uViewProj;
+        uniform vec3 uEye;
+        uniform float uSize;
+        out vec4 vColor;
+        void main() {
+            gl_Position = uViewProj * vec4(aPosition - uEye, 1.0);
+            gl_Position.z -= 0.0005 * gl_Position.w;
+            gl_PointSize = uSize;
+            vColor = aColor;
+        }
+    </script>
+    <script type="x-shader/x-fragment" id="pointFragment">#version 300 es
+        precision highp float;
+        in vec4 vColor;
+        out vec4 outColor;
+        void main() {
+            float r = length(gl_PointCoord * 2.0 - 1.0);
+            if (r > 1.0) discard;
+            vec3 c = mix(vColor.rgb, vec3(0.0), smoothstep(0.6, 0.8, r));
+            outColor = vec4(c, vColor.a * (1.0 - smoothstep(0.85, 1.0, r)));
+        }
+    </script>
+
+    <script>
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zustand                                //
+    /////////////////////////////////////////////////////////////////
+
+        const PATH_DAYS = 14;              // wahre Bahn ± so viele Tage
+        const ECLIPTIC_RADIUS = 80;        // Radius der Ekliptikscheibe [Erdradien]
+        const MOON_PLANE_RADIUS = 66;      // Radius der Mondbahnscheibe [Erdradien]
+        const SUN_LINE_LENGTH = 74;        // Länge des Sonnenpfeils [Erdradien]
+        const AIR_SHELL = 1.08;            // Radius der Atmosphärenschale [Erdradien]
+        const EARTHSHINE = 0.035;          // Erdschein bei voller Erde (etwa 300-fach verstärkt, sonst unsichtbar)
+        const PIN_LENGTH = 0.45;           // Standort-Nadel über der Oberfläche [Erdradien der Darstellung]
+
+        const COLORS = {
+            ecliptic: [0.95, 0.75, 0.3],
+            moonPlane: [0.35, 0.6, 1.0],
+            pathAbove: [0.6, 0.8, 1.0, 1],
+            pathBelow: [0.38, 0.5, 0.72, 1],
+            meanOrbit: [0.62, 0.62, 0.62, 1],
+            node: [1.0, 0.55, 0.25, 1],
+            apsis: [0.45, 0.9, 0.6, 1],
+            sun: [1.0, 0.86, 0.35, 1],
+            axis: [0.82, 0.82, 0.82, 1],
+            dayTick: [0.6, 0.8, 1.0, 0.9],
+            location: [1.0, 0.35, 0.55, 1],
+        };
+
+        let gl = null, canvas = null;
+        let programs = {}, meshes = {}, textures = {};
+        let camera = null;
+        let scene = null;                  // Ergebnis von sceneState()
+        let events = null;                 // Knoten, Apsiden, Phasen
+        let pathCache = null;              // { jd, points } wahre Bahn
+        let needsRender = true, needsGeometry = true;
+        let playing = false, playSpeed = 1, lastFrame = 0, lastUiUpdate = 0;
+        let distScale = 1, bodyScale = 4;
+        let focus = 'system';              // Ziel der Kamera: 'earth', 'moon', 'system'
+        let follow = true;                 // Kamera folgt dem Ziel
+        const layers = {};                 // Sichtbarkeit der Ebenen (Checkboxen)
+        let labels = [];                   // { el, pos, body } für die Beschriftungen
+        let pinTip = [0, 0, 0];            // Spitze der Standort-Nadel
+        let viewLock = null;               // Ansicht, deren Blickrichtung beim Mitführen nachgeführt wird
+
+    /////////////////////////////////////////////////////////////////
+    //                      Berechnung                             //
+    /////////////////////////////////////////////////////////////////
+
+        /** Ekliptik-Ort [Erdradien] → Darstellung (gestauchter Abstand) */
+        const toDisplay = p => [p[0] * distScale, p[1] * distScale, p[2] * distScale];
+        const earthRadius = () => bodyScale;
+        const moonRadius = () => MOON_RADIUS_ER * bodyScale;
+        const moonDisplayPos = () => toDisplay(scene.moon.position);
+
+        /** Phasenwinkel der Erde vom Mond aus gesehen (0 = volle Erde) */
+        function earthPhaseAngle() {
+            const toSun = gl3d.vec3.normalize(gl3d.vec3.sub(scene.sun.position, scene.moon.position));
+            const toEarth = gl3d.vec3.normalize(gl3d.vec3.scale(scene.moon.position, -1));
+            return Math.acos(Math.max(-1, Math.min(1, -gl3d.vec3.dot(toEarth, toSun))));
+        }
+
+        /** Beleuchteter Anteil der Erde vom Mond aus gesehen */
+        const earthLitFraction = () => (1 + Math.cos(earthPhaseAngle())) / 2;
+
+        /** Helligkeit der Erde vom Mond aus relativ zur vollen Erde (Phasenkurve einer Lambert-Kugel) */
+        function earthBrightness() {
+            const a = earthPhaseAngle();
+            return (Math.sin(a) + (Math.PI - a) * Math.cos(a)) / Math.PI;
+        }
+
+        function currentJd() {
+            return julianDayFromDate(datetime);
+        }
+
+        /** Szene und Ereignisse zum eingestellten Zeitpunkt neu berechnen */
+        function computeScene() {
+            const jd = currentJd();
+            scene = sceneState(jd);
+            const nodes = moonNodePassages(jd);
+            const apsides = moonApsides(jd);
+            events = {
+                ascending: nearestEvent(nodes.ascending, jd),
+                descending: nearestEvent(nodes.descending, jd),
+                perigee: nearestEvent(apsides.perigee, jd),
+                apogee: nearestEvent(apsides.apogee, jd),
+                nextNode: [nodes.ascending.next, nodes.descending.next].sort((a, b) => a.time - b.time)[0],
+                nextPerigee: apsides.perigee.next,
+                nextApogee: apsides.apogee.next,
+                nextNew: nextMoonPhase(jd, 0),
+                nextFull: nextMoonPhase(jd, Math.PI),
+                orbit: meanMoonOrbit(jd),
+            };
+            // Wahre Bahn nur neu, wenn sich der Zeitpunkt um mehr als 30 min geändert hat
+            if (!pathCache || Math.abs(pathCache.jd - jd) > 1 / 48) {
+                pathCache = { jd, points: moonPath(jd - PATH_DAYS, jd + PATH_DAYS, 1) };
+            }
+            needsGeometry = true;          // Mond, Achsen und Marken bewegen sich
+            needsRender = true;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Geometrie der Szene                    //
+    /////////////////////////////////////////////////////////////////
+
+        /** Linien und Marken aus dem aktuellen Zustand aufbauen */
+        function buildGeometry() {
+            const s = distScale;
+            const rE = earthRadius();
+
+            // Wahre Bahn: oberhalb der Ekliptik hell, unterhalb blasser und gestrichelt
+            const path = pathCache.points;
+            meshes.path.update(path.map(p => toDisplay(p.position)), {
+                colors: path.map(p => p.latitude >= 0 ? COLORS.pathAbove : COLORS.pathBelow),
+                dashed: path.map(p => p.latitude >= 0 ? 0 : 1),
+                dashLength: 2.5 * s,
+            });
+            // Tagesmarken (ganze Tage vor und nach dem Zeitpunkt)
+            const ticks = [];
+            for (let k = 24; k < path.length; k += 24) if (k !== PATH_DAYS * 24) ticks.push(toDisplay(path[k].position));
+            meshes.dayTicks.update(pointAttributes(ticks, COLORS.dayTick));
+
+            // Mittlere Bahnellipse
+            meshes.meanOrbit.update(ellipsePoints(events.orbit, 360).map(toDisplay),
+                                    { colors: COLORS.meanOrbit, dashed: 1, dashLength: 3 * s });
+
+            // Knotenlinie (mittlerer Knoten, wie die Bahnebene) und Marken an den wahren Durchgängen
+            const node = events.orbit.node;
+            const nodeDir = [Math.cos(node), Math.sin(node), 0];
+            const nl = MOON_PLANE_RADIUS * s;
+            meshes.nodeLine.update([gl3d.vec3.scale(nodeDir, -nl), gl3d.vec3.scale(nodeDir, nl)], { colors: COLORS.node });
+
+            // Apsidenlinie: Perigäum – Erde – Apogäum (zwei Segmente, die echten Apsiden liegen nicht genau gegenüber)
+            meshes.apsisLine.update([toDisplay(events.perigee.position), [0, 0, 0], toDisplay(events.apogee.position)],
+                                    { colors: COLORS.apsis });
+
+            // Sonnenrichtung
+            const sd = scene.sun.direction;
+            meshes.sunLine.update([gl3d.vec3.scale(sd, rE * 1.02), gl3d.vec3.scale(sd, SUN_LINE_LENGTH * s)],
+                                  { colors: COLORS.sun });
+
+            // Achsen von Erde und Mond (1,5 Radien über die Pole hinaus)
+            const earthPole = [scene.earth.rotation[2], scene.earth.rotation[5], scene.earth.rotation[8]];
+            meshes.earthAxis.update([gl3d.vec3.scale(earthPole, -1.5 * rE), gl3d.vec3.scale(earthPole, 1.5 * rE)],
+                                    { colors: COLORS.axis });
+            const moonPole = [scene.moon.rotation[2], scene.moon.rotation[5], scene.moon.rotation[8]];
+            const mp = moonDisplayPos(), rM = moonRadius();
+            meshes.moonAxis.update([gl3d.vec3.add(mp, gl3d.vec3.scale(moonPole, -1.6 * rM)),
+                                    gl3d.vec3.add(mp, gl3d.vec3.scale(moonPole, 1.6 * rM))], { colors: COLORS.axis });
+
+            // Standort-Nadel: senkrecht auf der Erde am Ort aus dem Formular
+            const loc = getLocation();
+            const up = applyRotation(scene.earth.rotation, sphericalToVector(loc.longitude, loc.latitude, 1));
+            pinTip = gl3d.vec3.scale(up, rE * (1 + PIN_LENGTH));
+            meshes.pin.update([gl3d.vec3.scale(up, rE), pinTip], { colors: COLORS.location });
+            meshes.pinMark.update(pointAttributes([pinTip], COLORS.location));
+
+            // Marken: Knoten, Apsiden, Sonne
+            meshes.nodeMarks.update(pointAttributes([toDisplay(events.ascending.position), toDisplay(events.descending.position)], COLORS.node));
+            meshes.apsisMarks.update(pointAttributes([toDisplay(events.perigee.position), toDisplay(events.apogee.position)], COLORS.apsis));
+            meshes.sunMark.update(pointAttributes([gl3d.vec3.scale(sd, SUN_LINE_LENGTH * s)], COLORS.sun));
+
+            updateLabelAnchors();
+            needsGeometry = false;
+        }
+
+        function pointAttributes(points, color) {
+            const position = new Float32Array(points.length * 3), colors = new Float32Array(points.length * 4);
+            points.forEach((p, i) => { position.set(p, i * 3); colors.set(color, i * 4); });
+            return { position: { data: position, size: 3 }, color: { data: colors, size: 4 } };
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Beschriftungen                         //
+    /////////////////////////////////////////////////////////////////
+
+        function createLabels() {
+            const container = document.getElementById('labels');
+            const defs = [
+                { id: 'earth', text: 'Erde', cls: 'center', layer: 'labels' },
+                { id: 'moon', text: 'Mond', cls: 'center', layer: 'labels' },
+                { id: 'sun', text: '☉ zur Sonne', color: COLORS.sun, layer: 'sun' },
+                { id: 'ascending', text: '☊ aufsteigender Knoten', color: COLORS.node, layer: 'nodes' },
+                { id: 'descending', text: '☋ absteigender Knoten', color: COLORS.node, layer: 'nodes' },
+                { id: 'perigee', text: 'Perigäum', color: COLORS.apsis, layer: 'apsides' },
+                { id: 'apogee', text: 'Apogäum', color: COLORS.apsis, layer: 'apsides' },
+                { id: 'location', text: 'Standort', color: COLORS.location, layer: 'location' },
+                { id: 'ecl0', text: '♈\uFE0E 0°', color: COLORS.ecliptic, layer: 'ecliptic' },
+                { id: 'ecl90', text: '90°', color: COLORS.ecliptic, layer: 'ecliptic' },
+                { id: 'ecl180', text: '180°', color: COLORS.ecliptic, layer: 'ecliptic' },
+                { id: 'ecl270', text: '270°', color: COLORS.ecliptic, layer: 'ecliptic' },
+            ];
+            labels = defs.map(d => {
+                const el = document.createElement('div');
+                el.className = 'label' + (d.cls ? ' ' + d.cls : '');
+                el.textContent = d.text;
+                if (d.color) el.style.color = `rgb(${d.color.slice(0, 3).map(c => Math.round(c * 255)).join(',')})`;
+                container.appendChild(el);
+                return Object.assign({ el, pos: [0, 0, 0] }, d);
+            });
+        }
+
+        const labelById = id => labels.find(l => l.id === id);
+
+        /** Orte der Beschriftungen und Texte mit Datum/Entfernung */
+        function updateLabelAnchors() {
+            const s = distScale;
+            const set = (id, pos, text) => { const l = labelById(id); l.pos = pos; if (text) l.el.textContent = text; };
+            set('earth', [0, 0, earthRadius()]);
+            const mp = moonDisplayPos();
+            set('moon', [mp[0], mp[1], mp[2] + moonRadius()]);
+            set('sun', gl3d.vec3.scale(scene.sun.direction, SUN_LINE_LENGTH * s));
+            set('location', pinTip);
+            set('ascending', toDisplay(events.ascending.position), '☊ aufsteigender Knoten ' + shortDate(events.ascending.time));
+            set('descending', toDisplay(events.descending.position), '☋ absteigender Knoten ' + shortDate(events.descending.time));
+            set('perigee', toDisplay(events.perigee.position),
+                `Perigäum ${shortDate(events.perigee.time)}, ${formatKm(events.perigee.distance)}`);
+            set('apogee', toDisplay(events.apogee.position),
+                `Apogäum ${shortDate(events.apogee.time)}, ${formatKm(events.apogee.distance)}`);
+            const r = ECLIPTIC_RADIUS * s * 1.03;
+            set('ecl0', [r, 0, 0]);
+            set('ecl90', [0, r, 0]);
+            set('ecl180', [-r, 0, 0]);
+            set('ecl270', [0, -r, 0]);
+        }
+
+        /** Beschriftungen an die projizierten Orte setzen; verdeckte (hinter Erde oder Mond) blass */
+        function placeLabels(viewProj, eye) {
+            const w = canvas.clientWidth, h = canvas.clientHeight;
+            const spheres = [{ c: [0, 0, 0], r: earthRadius(), id: 'earth' },
+                             { c: moonDisplayPos(), r: moonRadius(), id: 'moon' }];
+            for (const l of labels) {
+                const show = layers[l.layer];
+                const p = show ? gl3d.projectPoint(viewProj, eye, l.pos, w, h) : { visible: false };
+                if (!p.visible) { l.el.style.display = 'none'; continue; }
+                l.el.style.display = '';
+                l.el.style.left = p.x + 'px';
+                l.el.style.top = p.y + 'px';
+                // verdeckt? Strahl vom Auge zum Ankerpunkt schneidet eine Kugel vorher
+                const d = gl3d.vec3.sub(l.pos, eye), dist = gl3d.vec3.length(d), dir = gl3d.vec3.scale(d, 1 / dist);
+                let hidden = false;
+                for (const sp of spheres) {
+                    if (sp.id === l.id) continue;
+                    const t = gl3d.raySphere(eye, dir, sp.c, sp.r);
+                    if (t !== null && t < dist * 0.999) hidden = true;
+                }
+                l.el.style.opacity = hidden ? 0.2 : 1;
+            }
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      WebGL                                  //
+    /////////////////////////////////////////////////////////////////
+
+        function shaderSource(id) {
+            const chunk = name => document.getElementById(name + 'Chunk').textContent;
+            return document.getElementById(id).textContent.trim()
+                .replace('#include srgb', chunk('srgb')).replace('#include air', chunk('air'));
+        }
+
+        function initGL() {
+            canvas = document.getElementById('view');
+            gl = gl3d.createContext(canvas);
+            if (!gl) {
+                showMessage('Dieser Browser unterstützt kein WebGL2. Die 3D-Ansicht kann nicht angezeigt werden.');
+                return false;
+            }
+            programs.earth = gl3d.createProgram(gl, shaderSource('bodyVertex'), shaderSource('earthFragment'), 'Erde');
+            programs.moon = gl3d.createProgram(gl, shaderSource('bodyVertex'), shaderSource('moonFragment'), 'Mond');
+            programs.air = gl3d.createProgram(gl, shaderSource('bodyVertex'), shaderSource('atmosphereFragment'), 'Atmosphäre');
+            programs.plane = gl3d.createProgram(gl, shaderSource('planeVertex'), shaderSource('planeFragment'), 'Ebene');
+            programs.line = gl3d.createProgram(gl, shaderSource('lineVertex'), shaderSource('lineFragment'), 'Linie');
+            programs.point = gl3d.createProgram(gl, shaderSource('pointVertex'), shaderSource('pointFragment'), 'Marke');
+
+            const sphere = gl3d.sphereGeometry(128, 256);
+            meshes.sphere = gl3d.createMesh(gl, { position: { data: sphere.positions, size: 3 },
+                                                  uv: { data: sphere.uvs, size: 2 } }, sphere.indices);
+            const disc = gl3d.discGeometry(0, 256);
+            meshes.disc = gl3d.createMesh(gl, { position: { data: disc.positions, size: 3 } }, disc.indices);
+            for (const name of ['path', 'meanOrbit', 'nodeLine', 'apsisLine', 'sunLine', 'earthAxis', 'moonAxis', 'pin']) {
+                meshes[name] = gl3d.createLineMesh(gl, [], {});
+            }
+            for (const name of ['dayTicks', 'nodeMarks', 'apsisMarks', 'sunMark', 'pinMark']) {
+                meshes[name] = gl3d.createMesh(gl, pointAttributes([], [0, 0, 0, 0]), null);
+            }
+
+            const load = (key, url, options) => {
+                textures[key] = gl3d.loadTexture(gl, url, options);
+                textures[key].ready.then(() => { needsRender = true; })
+                    .catch(err => { console.error(err); showMessage(err.message + '. Ist die Seite über einen Webserver geöffnet?'); });
+            };
+            load('earthDay', 'textures/earth_day_4k.jpg', { srgb: true, placeholder: [40, 70, 130, 255] });
+            load('earthNight', 'textures/earth_night_2k.jpg', { srgb: true, placeholder: [0, 0, 0, 255] });
+            load('earthWater', 'textures/earth_water_2k.png', { placeholder: [0, 0, 0, 255] });
+            load('moon', 'lroc_color_2k.jpg', { srgb: true, placeholder: [120, 120, 120, 255] });
+            load('moonNormal', 'textures/moon_normal_2k.jpg', { placeholder: [128, 128, 255, 255] });
+            return true;
+        }
+
+        function bindTexture(unit, key) {
+            gl.activeTexture(gl.TEXTURE0 + unit);
+            gl.bindTexture(gl.TEXTURE_2D, textures[key].texture);
+        }
+
+        /** Drehmatrix (zeilenweise) → mat3 für WebGL (spaltenweise) */
+        const mat3FromRotation = r => [r[0], r[3], r[6], r[1], r[4], r[7], r[2], r[5], r[8]];
+
+        function render() {
+            gl3d.resizeCanvas(canvas);
+            const w = canvas.width, h = canvas.height;
+            // Im Hochformat den waagrechten Blickwinkel festhalten, damit die Bahn ins Bild passt
+            const baseFov = 40 * DEG2RAD;
+            camera.fovy = w < h ? 2 * Math.atan(Math.tan(baseFov / 2) * h / w) : baseFov;
+            gl.viewport(0, 0, w, h);
+            gl.clearColor(0.012, 0.012, 0.024, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            const eye = camera.eye();
+            const mp = moonDisplayPos();
+            const rE = earthRadius(), rM = moonRadius();
+
+            // Nahe Schnittebene: halber Abstand zur nächsten Oberfläche, damit der Tiefenpuffer reicht
+            const surface = Math.min(gl3d.vec3.length(eye) - rE, gl3d.vec3.length(gl3d.vec3.sub(eye, mp)) - rM);
+            const near = Math.max(1e-4, surface > 0 ? surface * 0.5 : 1e-3);
+            const far = gl3d.vec3.length(eye) + ECLIPTIC_RADIUS * distScale * 2 + 10;
+            const proj = gl3d.mat4.perspective(camera.fovy, w / h, near, far);
+            const view = camera.viewMatrix();
+            const viewProj = gl3d.mat4.multiply(proj, view);
+            const rel = p => gl3d.vec3.sub(p, eye);
+
+            // 1. Erde und Mond (undurchsichtig)
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthMask(true);
+            gl.disable(gl.BLEND);
+            const sunDir = scene.sun.direction;
+            programs.earth.use()
+                .set('uViewProj', viewProj)
+                .set('uModel', gl3d.mat4.fromRotation3(scene.earth.rotation, rel([0, 0, 0]), rE))
+                .set('uRotation', mat3FromRotation(scene.earth.rotation))
+                .set('uSunDir', sunDir)
+                .set('uAir', layers.air ? 1 : 0)
+                .set('uDay', 0).set('uNight', 1).set('uWater', 2);
+            bindTexture(0, 'earthDay'); bindTexture(1, 'earthNight'); bindTexture(2, 'earthWater');
+            meshes.sphere.draw();
+            // Sonnenrichtung am Ort des Mondes (unterscheidet sich höchstens um 0,15°)
+            const moonSunDir = gl3d.vec3.normalize(gl3d.vec3.sub(scene.sun.position, scene.moon.position));
+            const earthDir = gl3d.vec3.normalize(gl3d.vec3.scale(scene.moon.position, -1));
+            programs.moon.use()
+                .set('uViewProj', viewProj)
+                .set('uModel', gl3d.mat4.fromRotation3(scene.moon.rotation, rel(mp), rM))
+                .set('uRotation', mat3FromRotation(scene.moon.rotation))
+                .set('uSunDir', moonSunDir)
+                .set('uEarthDir', earthDir)
+                .set('uEarthshine', layers.earthshine ? EARTHSHINE * earthBrightness() : 0)
+                .set('uRelief', 1)
+                .set('uColor', 0).set('uNormal', 1);
+            bindTexture(0, 'moon'); bindTexture(1, 'moonNormal');
+            meshes.sphere.draw();
+
+            // 2. Ebenen: durchscheinend, additiv (Reihenfolge egal), schreiben keine Tiefe
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE);
+            gl.depthMask(false);
+            programs.plane.use().set('uViewProj', viewProj);
+            if (layers.ecliptic) {
+                const r = ECLIPTIC_RADIUS * distScale;
+                programs.plane.set('uModel', gl3d.mat4.fromRotation3([1, 0, 0, 0, 1, 0, 0, 0, 1], rel([0, 0, 0]), r))
+                    .set('uColor', COLORS.ecliptic).set('uFill', 0.045)
+                    .set('uRings', ECLIPTIC_RADIUS / 10).set('uSpokes', 12);
+                meshes.disc.draw();
+            }
+            if (layers.moonPlane) {
+                const o = events.orbit;
+                const x = [Math.cos(o.node), Math.sin(o.node), 0];
+                const z = o.normal;
+                const y = gl3d.vec3.cross(z, x);
+                const rot = [x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]];
+                programs.plane.set('uModel', gl3d.mat4.fromRotation3(rot, rel([0, 0, 0]), MOON_PLANE_RADIUS * distScale))
+                    .set('uColor', COLORS.moonPlane).set('uFill', 0.05).set('uRings', 0).set('uSpokes', 0);
+                meshes.disc.draw();
+            }
+            if (layers.air) {
+                programs.air.use()
+                    .set('uViewProj', viewProj)
+                    .set('uModel', gl3d.mat4.fromRotation3([1, 0, 0, 0, 1, 0, 0, 0, 1], rel([0, 0, 0]), rE * AIR_SHELL))
+                    .set('uRotation', [1, 0, 0, 0, 1, 0, 0, 0, 1])
+                    .set('uCenter', rel([0, 0, 0])).set('uRadius', rE)
+                    .set('uSunDir', sunDir);
+                meshes.sphere.draw();
+            }
+
+            // 3. Linien
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            const dpr = w / canvas.clientWidth;
+            programs.line.use()
+                .set('uView', view).set('uProj', proj).set('uEye', eye)
+                .set('uResolution', [w, h]).set('uNear', near);
+            const line = (name, width, layer) => {
+                if (layer && !layers[layer]) return;
+                programs.line.set('uWidth', width * dpr);
+                meshes[name].draw();
+            };
+            line('path', 2, 'path');
+            line('meanOrbit', 1.2, 'meanOrbit');
+            line('nodeLine', 1.5, 'nodes');
+            line('apsisLine', 1.5, 'apsides');
+            line('sunLine', 2, 'sun');
+            line('earthAxis', 1.5, 'axes');
+            line('moonAxis', 1.5, 'axes');
+            line('pin', 2, 'location');
+
+            // 4. Marken
+            programs.point.use().set('uViewProj', viewProj).set('uEye', eye);
+            const points = (name, size, layer) => {
+                if (layer && !layers[layer]) return;
+                programs.point.set('uSize', size * dpr);
+                meshes[name].draw(gl.POINTS);
+            };
+            points('dayTicks', 5, 'path');
+            points('nodeMarks', 11, 'nodes');
+            points('apsisMarks', 11, 'apsides');
+            points('sunMark', 12, 'sun');
+            points('pinMark', 8, 'location');
+
+            placeLabels(viewProj, eye);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Kamera                                 //
+    /////////////////////////////////////////////////////////////////
+
+        function focusPosition() {
+            if (focus === 'moon') return moonDisplayPos();
+            return [0, 0, 0];
+        }
+
+        function updateCameraLimits() {
+            camera.minDistance = focus === 'earth' ? earthRadius() * 1.15
+                               : focus === 'moon' ? moonRadius() * 1.2 : 0.5;
+            camera.maxDistance = ECLIPTIC_RADIUS * distScale * 12 + 50;
+        }
+
+        /**
+         * Ziel wechseln und weich hinfahren.
+         * @param extra weitere Kamerawerte (azimuth, elevation, distance), sonst bleibt die Blickrichtung
+         */
+        function setFocus(target, animate, extra) {
+            focus = target;
+            follow = true;
+            document.getElementById('follow').checked = true;
+            for (const b of document.querySelectorAll('[data-focus]')) b.setAttribute('aria-pressed', b.dataset.focus === target);
+            if (!extra) setViewLock(null);
+            updateCameraLimits();
+            const distance = target === 'earth' ? earthRadius() * 4.5
+                           : target === 'moon' ? moonRadius() * 6 : ECLIPTIC_RADIUS * distScale * 2.15;
+            const state = Object.assign({ target: focusPosition(), distance }, extra);
+            if (animate) camera.animateTo(state, 900);
+            else Object.assign(camera, state);
+            needsRender = true;
+        }
+
+        /**
+         * Ansichten: Ziel und Blickrichtung (Azimut/Höhe der Richtung vom Ziel zum Auge). Mit lock wird die
+         * Richtung beim Mitführen nachgeführt, z. B. bleibt „Erde → Mond“ im Zeitraffer auf der Verbindungslinie.
+         */
+        const VIEWS = {
+            overview: { focus: 'system', angles: () => ({ azimuth: scene.sun.longitude - 70 * DEG2RAD, elevation: 25 * DEG2RAD }) },
+            top: { focus: 'system', angles: () => ({ azimuth: -Math.PI / 2, elevation: 89.5 * DEG2RAD }),
+                   distance: () => ECLIPTIC_RADIUS * distScale * 2.9 },
+            // quer zur Knotenlinie, von der Seite, auf der die Sonne steht (damit Erde und Mond beleuchtet sind)
+            edge: { focus: 'system', lock: true, angles: () => {
+                        const side = Math.sin(scene.sun.longitude - events.orbit.node) >= 0 ? 1 : -1;
+                        return { azimuth: events.orbit.node + side * Math.PI / 2, elevation: 0 };
+                    },
+                    distance: () => ECLIPTIC_RADIUS * distScale * 1.5 },
+            fromSun: { focus: 'system', lock: true, angles: () => ({ azimuth: scene.sun.longitude, elevation: 8 * DEG2RAD }) },
+            earthToMoon: { focus: 'moon', lock: true,
+                           angles: () => ({ azimuth: scene.moon.longitude + Math.PI, elevation: -scene.moon.latitude }) },
+            moonToEarth: { focus: 'earth', lock: true,
+                           angles: () => ({ azimuth: scene.moon.longitude, elevation: scene.moon.latitude }) },
+        };
+
+        function setViewLock(name) {
+            viewLock = name;
+            for (const b of document.querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', b.dataset.view === name);
+        }
+
+        function applyView(name) {
+            const v = VIEWS[name];
+            const extra = v.angles();
+            if (v.distance) extra.distance = v.distance();
+            setFocus(v.focus, true, extra);
+            setViewLock(v.lock ? name : null);
+        }
+
+        /** Blickrichtung einer festgehaltenen Ansicht nachführen (auch während einer Kamerafahrt) */
+        function updateViewLock() {
+            if (!viewLock || !follow) return;
+            const a = VIEWS[viewLock].angles();
+            if (camera.animation) {
+                const from = camera.animation.from.azimuth;
+                camera.animation.to.azimuth = from + Math.atan2(Math.sin(a.azimuth - from), Math.cos(a.azimuth - from));
+                camera.animation.to.elevation = a.elevation;
+            } else {
+                const az = camera.azimuth + Math.atan2(Math.sin(a.azimuth - camera.azimuth), Math.cos(a.azimuth - camera.azimuth));
+                if (Math.abs(az - camera.azimuth) + Math.abs(a.elevation - camera.elevation) > 1e-9) {
+                    camera.azimuth = az;
+                    camera.elevation = a.elevation;
+                    camera.clamp();
+                    needsRender = true;
+                }
+            }
+        }
+
+        /** Doppelklick: Erde oder Mond unter dem Mauszeiger als Ziel */
+        function pick(ev) {
+            const rect = canvas.getBoundingClientRect();
+            const ray = camera.ray(ev.clientX - rect.left, ev.clientY - rect.top, rect.width, rect.height);
+            const tE = gl3d.raySphere(ray.origin, ray.dir, [0, 0, 0], earthRadius());
+            const tM = gl3d.raySphere(ray.origin, ray.dir, moonDisplayPos(), moonRadius() * 1.5);
+            if (tM !== null && (tE === null || tM < tE)) setFocus('moon', true);
+            else if (tE !== null) setFocus('earth', true);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Sprünge zu Ereignissen                 //
+    /////////////////////////////////////////////////////////////////
+
+        /** Zeitpunkt des nächsten (oder vorigen) Ereignisses einer Art */
+        function findEvent(kind, jd, backward) {
+            const from = backward ? jd - 1 / 1440 : jd + 1 / 1440;    // eine Minute weg vom aktuellen Ereignis
+            const pick = pair => (backward ? pair.previous : pair.next).time;
+            switch (kind) {
+                case 'new': return nextMoonPhase(from, 0, backward);
+                case 'first': return nextMoonPhase(from, Math.PI / 2, backward);
+                case 'full': return nextMoonPhase(from, Math.PI, backward);
+                case 'last': return nextMoonPhase(from, 3 * Math.PI / 2, backward);
+                case 'ascending': return pick(moonNodePassages(from).ascending);
+                case 'descending': return pick(moonNodePassages(from).descending);
+                case 'perigee': return pick(moonApsides(from).perigee);
+                case 'apogee': return pick(moonApsides(from).apogee);
+            }
+        }
+
+        function jump(backward) {
+            const kind = document.getElementById('jumpKind').value;
+            const t = findEvent(kind, currentJd(), backward);
+            datetime = julianDayToDate(t);
+            changeTime(0);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Formatierung                           //
+    /////////////////////////////////////////////////////////////////
+
+        const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+        const pad = n => n.toString().padStart(2, '0');
+
+        /** Datum/Zeit eines JD als Teile in Lokalzeit oder UTC (Checkbox „Lokalzeit“) */
+        function dateParts(jd) {
+            const d = julianDayToDate(jd);
+            return useLocalTime
+                ? { y: d.getFullYear(), mo: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes(), wd: d.getDay() }
+                : { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes(), wd: d.getUTCDay() };
+        }
+
+        function longDate(jd) {
+            const p = dateParts(jd);
+            return `${weekdays[p.wd]} ${pad(p.d)}.${pad(p.mo)}.${p.y} ${pad(p.h)}:${pad(p.mi)}`;
+        }
+
+        function shortDate(jd) {
+            const p = dateParts(jd);
+            return `${pad(p.d)}.${pad(p.mo)}. ${pad(p.h)}:${pad(p.mi)}`;
+        }
+
+        const formatKm = km => Math.round(km).toLocaleString('de-DE') + ' km';
+        const formatDeg = (rad, digits) => (rad * RAD2DEG).toFixed(digits === undefined ? 1 : digits).replace('.', ',') + '°';
+        const formatDays = d => {
+            if (Math.abs(d) < 1) return `in ${Math.round(d * 24)} h`;
+            return `in ${d.toFixed(1).replace('.', ',')} Tagen`;
+        };
+
+        const phaseNames = ['Neumond', 'zunehmende Sichel', 'erstes Viertel', 'zunehmender Mond',
+                            'Vollmond', 'abnehmender Mond', 'letztes Viertel', 'abnehmende Sichel'];
+        const phaseName = angle => phaseNames[Math.round(angle / (Math.PI / 4)) % 8];
+
+    /////////////////////////////////////////////////////////////////
+    //                      Infotabelle                            //
+    /////////////////////////////////////////////////////////////////
+
+        function updateTable() {
+            const jd = scene.jd;
+            const m = scene.moon;
+            const tz = timeZoneLabel();
+            // Winkel zwischen Sonne und Knotenlinie (0°–90°): klein → Finsternis möglich
+            let sunNode = Math.abs(normalizeAngleSigned(scene.sun.longitude - scene.meanNode));
+            if (sunNode > Math.PI / 2) sunNode = Math.PI - sunNode;
+            const subSolar = subPoint(scene.earth.rotation, scene.sun.direction);
+            const subEarth = subPoint(m.rotation, m.position.map(x => -x));
+            const lonString = r => formatDeg(Math.abs(r)) + (r >= 0 ? ' O' : ' W');
+            const latString = r => formatDeg(Math.abs(r)) + (r >= 0 ? ' N' : ' S');
+            const rows = [
+                { type: 'category', text: 'Zeitpunkt', value: `${longDate(jd)} ${tz}` },
+                { type: 'category', text: 'Mond' },
+                { type: 'row', key: 'Ekliptikale Länge λ', value: formatDeg(m.longitude, 2) },
+                { type: 'row', key: 'Ekliptikale Breite β', value: formatDeg(m.latitude, 2) + (m.latitude >= 0 ? ' (oberhalb der Ekliptik)' : ' (unterhalb der Ekliptik)') },
+                { type: 'row', key: 'Entfernung (Mittelpunkte)', value: formatKm(m.distance) },
+                { type: 'row', key: 'Elongation', value: formatDeg(m.elongation) },
+                { type: 'row', key: 'Beleuchteter Anteil', value: (m.illuminatedFraction * 100).toFixed(1).replace('.', ',') + ' %, ' + phaseName(m.phaseAngle) },
+                { type: 'row', key: 'Libration Länge / Breite', value: `${formatDeg(m.libration.longitude, 2)} / ${formatDeg(m.libration.latitude, 2)}` },
+                { type: 'category', text: 'Mondbahn' },
+                { type: 'row', key: 'Mittlerer aufsteigender Knoten Ω', value: formatDeg(scene.meanNode) },
+                { type: 'row', key: 'Winkel Sonne – Knotenlinie', value: formatDeg(sunNode) + (sunNode < 17 * DEG2RAD ? ' (Finsternis-Saison)' : '') },
+                { type: 'row', key: 'Nächster Knoten', value: `${events.nextNode.ascending ? '☊' : '☋'} ${shortDate(events.nextNode.time)} (${formatDays(events.nextNode.time - jd)})` },
+                { type: 'row', key: 'Nächstes Perigäum', value: `${shortDate(events.nextPerigee.time)}, ${formatKm(events.nextPerigee.distance)}` },
+                { type: 'row', key: 'Nächstes Apogäum', value: `${shortDate(events.nextApogee.time)}, ${formatKm(events.nextApogee.distance)}` },
+                { type: 'row', key: 'Nächster Neumond', value: `${shortDate(events.nextNew)} (${formatDays(events.nextNew - jd)})` },
+                { type: 'row', key: 'Nächster Vollmond', value: `${shortDate(events.nextFull)} (${formatDays(events.nextFull - jd)})` },
+                { type: 'category', text: 'Sonne und Erde' },
+                { type: 'row', key: 'Ekliptikale Länge der Sonne', value: formatDeg(scene.sun.longitude, 2) },
+                { type: 'row', key: 'Entfernung Erde – Sonne', value: formatKm(scene.sun.distance) },
+                { type: 'row', key: 'Sonne im Zenit über', value: `${latString(subSolar.latitude)}, ${lonString(subSolar.longitude)}` },
+                { type: 'row', key: 'Erde vom Mond aus beleuchtet', value: (earthLitFraction() * 100).toFixed(1).replace('.', ',') + ' %' },
+                { type: 'row', key: 'Erde im Zenit über (Mond)', value: `${latString(subEarth.latitude)}, ${lonString(subEarth.longitude)}` },
+            ];
+            renderOutputTable('outputTable', rows);
+
+            document.getElementById('overlayDate').innerHTML =
+                `${longDate(jd)} ${tz}<br><small>${phaseName(m.phaseAngle)}, ${(m.illuminatedFraction * 100).toFixed(0)} % beleuchtet</small>`;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Ablauf                                 //
+    /////////////////////////////////////////////////////////////////
+
+        /** Wird von ui.js nach jeder Zeitänderung aufgerufen */
+        function update() {
+            if (!camera) return;
+            computeScene();
+            updateTable();
+        }
+
+        function frame(now) {
+            const dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
+            lastFrame = now;
+            if (playing && dt > 0) {
+                datetime = new Date(datetime.getTime() + playSpeed * dt * 86400000);
+                computeScene();
+                // Formularfelder und Tabelle nur etwa 8-mal pro Sekunde (DOM ist teuer)
+                if (now - lastUiUpdate > 120) {
+                    lastUiUpdate = now;
+                    fillGregorianDate(datetime);
+                    const jd = currentJd();
+                    fillJulianDate(jd);
+                    fillSiderealTime(siderealTimeHours(jd));
+                    updateTable();
+                }
+            }
+            if (camera.update(now)) needsRender = true;
+            updateViewLock();
+            if (follow && focus === 'moon') {
+                const target = moonDisplayPos();
+                if (gl3d.vec3.length(gl3d.vec3.sub(target, camera.animation ? camera.animation.to.target : camera.target)) > 1e-9) {
+                    camera.retarget(target);
+                    needsRender = true;
+                }
+            }
+            if (needsGeometry) buildGeometry();
+            if (needsRender) {
+                needsRender = false;
+                render();
+            }
+            requestAnimationFrame(frame);
+        }
+
+        function showMessage(html) {
+            const el = document.getElementById('message');
+            el.innerHTML = html;
+            el.style.display = 'flex';
+        }
+
+        function initControls() {
+            // Ebenen
+            for (const cb of document.querySelectorAll('[data-layer]')) {
+                layers[cb.dataset.layer] = cb.checked;
+                cb.addEventListener('change', () => { layers[cb.dataset.layer] = cb.checked; needsRender = true; });
+            }
+            // Maßstab
+            const bodyInput = document.getElementById('bodyScale'), distInput = document.getElementById('distScale');
+            const applyScale = () => {
+                const oldFocusPos = focusPosition();
+                bodyScale = parseFloat(bodyInput.value);
+                distScale = parseFloat(distInput.value);
+                document.getElementById('bodyScaleOut').value = '×' + bodyScale.toString().replace('.', ',');
+                document.getElementById('distScaleOut').value = '×' + distScale.toString().replace('.', ',');
+                // Kamera beim Ziel halten
+                const shift = gl3d.vec3.sub(focusPosition(), oldFocusPos);
+                camera.target = gl3d.vec3.add(camera.target, shift);
+                updateCameraLimits();
+                camera.clamp();
+                needsGeometry = true;
+                needsRender = true;
+            };
+            bodyInput.addEventListener('input', applyScale);
+            distInput.addEventListener('input', applyScale);
+            document.getElementById('trueScale').addEventListener('click', () => {
+                bodyInput.value = 1;
+                distInput.value = 1;
+                applyScale();
+            });
+            applyScale();
+            // Kamera-Ziel
+            for (const b of document.querySelectorAll('[data-focus]')) {
+                b.addEventListener('click', () => setFocus(b.dataset.focus, true));
+            }
+            for (const b of document.querySelectorAll('[data-view]')) {
+                b.addEventListener('click', () => applyView(b.dataset.view));
+            }
+            document.getElementById('jumpBack').addEventListener('click', () => jump(true));
+            document.getElementById('jumpNext').addEventListener('click', () => jump(false));
+            document.getElementById('follow').addEventListener('change', ev => {
+                follow = ev.target.checked;
+                if (follow) setFocus(focus, true);
+            });
+            // Abspielen
+            const playButton = document.getElementById('play');
+            playButton.addEventListener('click', () => {
+                playing = !playing;
+                playButton.textContent = playing ? '⏸ Pause' : '▶ Abspielen';
+                if (!playing) update();
+            });
+            const speedSelect = document.getElementById('speed'), reverse = document.getElementById('reverse');
+            const applySpeed = () => { playSpeed = parseFloat(speedSelect.value) * (reverse.checked ? -1 : 1); };
+            speedSelect.addEventListener('change', applySpeed);
+            reverse.addEventListener('change', applySpeed);
+            applySpeed();
+            document.getElementById('now').addEventListener('click', () => {
+                datetime = new Date();
+                changeTime(0);
+            });
+        }
+
+        window.onload = function () {
+            if (location.protocol === 'file:') {
+                showMessage('Die Seite braucht einen lokalen Webserver, weil WebGL Bilddateien von <code>file://</code> nicht als Textur verwenden darf.<br><br>' +
+                            'Im Projektordner <code>python3 -m http.server 8000</code> starten und<br><code>http://localhost:8000/ErdeMond3D.html</code> öffnen.');
+            }
+            createLabels();
+            try {
+                if (!initGL()) return;
+            } catch (err) {
+                console.error(err);
+                showMessage('WebGL-Fehler: ' + err.message);
+                return;
+            }
+            camera = new gl3d.OrbitCamera({ distance: 200, elevation: 25 * DEG2RAD });
+            camera.attach(canvas);
+            camera.onChange = () => { needsRender = true; };
+            camera.onPan = () => {
+                if (follow) { follow = false; document.getElementById('follow').checked = false; }
+            };
+            camera.onRotate = () => { if (viewLock) setViewLock(null); };
+            canvas.addEventListener('dblclick', pick);
+            new ResizeObserver(() => { needsRender = true; }).observe(canvas);
+
+            initUI();                      // ruft update() auf
+            createTimeButtons('timeButtons', [
+                { label: '1 Stunde', step: 3600000 },
+                { label: '1 Tag', step: 86400000 },
+                { label: '1 Woche', step: 7 * 86400000 },
+                { label: '1 synod. Monat', step: SYNODIC_MONTH * 86400000 },
+            ]);
+            initControls();
+            update();
+            // Anfangsansicht: schräg, Sonne von rechts hinten, damit Phasen und Bahnneigung sichtbar sind
+            setFocus('system', false, VIEWS.overview.angles());
+            requestAnimationFrame(frame);
+        };
+    </script>
+</head>
+<body>
+    <h1>Erde und Mond in 3D</h1>
+    <p class="hint">
+        Erde und Mond zum eingestellten Zeitpunkt, mit Ekliptik, Mondbahn, Knoten und Apsiden. Das Sonnenlicht kommt aus
+        der Richtung des gelben Pfeils.
+        <b>Ziehen</b> dreht die Ansicht, <b>Mausrad</b> oder zwei Finger zoomen, <b>rechte Maustaste</b> oder
+        <b>Umschalt+Ziehen</b> verschiebt, <b>Doppelklick</b> auf Erde oder Mond setzt das Ziel.
+    </p>
+
+    <div class="viewport">
+        <canvas id="view"></canvas>
+        <div class="labels" id="labels"></div>
+        <div class="overlay-date" id="overlayDate"></div>
+        <div class="message" id="message"></div>
+    </div>
+
+    <div class="controls">
+        <div class="group">
+            <button id="play">▶ Abspielen</button>
+            <select id="speed" aria-label="Geschwindigkeit">
+                <option value="0.0000115741">Echtzeit</option>
+                <option value="0.000694444">1 min/s</option>
+                <option value="0.00694444">10 min/s</option>
+                <option value="0.0416667">1 h/s</option>
+                <option value="0.25" selected>6 h/s</option>
+                <option value="1">1 Tag/s</option>
+                <option value="7">1 Woche/s</option>
+                <option value="30.436875">1 Monat/s</option>
+                <option value="365.25">1 Jahr/s</option>
+            </select>
+            <label><input type="checkbox" id="reverse"> rückwärts</label>
+            <button id="now">Jetzt</button>
+        </div>
+        <div class="group">
+            <b>Ziel</b>
+            <button data-focus="system" aria-pressed="true">System</button>
+            <button data-focus="earth">Erde</button>
+            <button data-focus="moon">Mond</button>
+            <label><input type="checkbox" id="follow" checked> mitführen</label>
+        </div>
+        <div class="group">
+            <b>Ansicht</b>
+            <button data-view="overview">Übersicht</button>
+            <button data-view="top">von oben</button>
+            <button data-view="edge" title="in der Ekliptik, quer zur Knotenlinie: zeigt die Neigung der Mondbahn">Kante</button>
+            <button data-view="fromSun">von der Sonne</button>
+            <button data-view="earthToMoon">Erde → Mond</button>
+            <button data-view="moonToEarth">Mond → Erde</button>
+        </div>
+        <div class="group">
+            <b>Springen</b>
+            <button id="jumpBack" title="voriges Ereignis">◀</button>
+            <select id="jumpKind" aria-label="Ereignis">
+                <option value="new">Neumond</option>
+                <option value="first">erstes Viertel</option>
+                <option value="full">Vollmond</option>
+                <option value="last">letztes Viertel</option>
+                <option value="ascending">☊ aufsteigender Knoten</option>
+                <option value="descending">☋ absteigender Knoten</option>
+                <option value="perigee">Perigäum</option>
+                <option value="apogee">Apogäum</option>
+            </select>
+            <button id="jumpNext" title="nächstes Ereignis">▶</button>
+        </div>
+        <div class="group">
+            <label>Körper <input type="range" id="bodyScale" min="1" max="8" step="0.5" value="4"></label><output id="bodyScaleOut"></output>
+            <label>Abstand <input type="range" id="distScale" min="0.25" max="1" step="0.05" value="1"></label><output id="distScaleOut"></output>
+            <button id="trueScale">maßstäblich</button>
+        </div>
+        <div class="group">
+            <b>Anzeigen</b>
+            <label><input type="checkbox" data-layer="ecliptic" checked> Ekliptik</label>
+            <label><input type="checkbox" data-layer="moonPlane" checked> Mondbahnebene</label>
+            <label><input type="checkbox" data-layer="path" checked> wahre Bahn</label>
+            <label><input type="checkbox" data-layer="meanOrbit"> mittlere Ellipse</label>
+            <label><input type="checkbox" data-layer="nodes" checked> Knoten</label>
+            <label><input type="checkbox" data-layer="apsides" checked> Apsiden</label>
+            <label><input type="checkbox" data-layer="sun" checked> Sonnenrichtung</label>
+            <label><input type="checkbox" data-layer="axes" checked> Achsen</label>
+            <label><input type="checkbox" data-layer="location" checked> Standort</label>
+            <label><input type="checkbox" data-layer="air" checked> Atmosphäre</label>
+            <label><input type="checkbox" data-layer="earthshine" checked> Erdschein</label>
+            <label><input type="checkbox" data-layer="labels" checked> Namen</label>
+        </div>
+    </div>
+
+    <div class="legend">
+        <span class="area" style="--c:#f2bf4d">Ekliptik (Ringe alle 10 Erdradien, Speichen alle 30°)</span>
+        <span class="area" style="--c:#5999ff">Mondbahnebene (mittlere, 5,1° geneigt)</span>
+        <span style="--c:#99ccff">Mondbahn ±14 Tage, oberhalb der Ekliptik</span>
+        <span class="dashed" style="--c:#6180b8">unterhalb der Ekliptik</span>
+        <span style="--c:#ff8c40">Knotenlinie</span>
+        <span style="--c:#73e699">Apsidenlinie</span>
+        <span style="--c:#ffdb59">Sonnenrichtung</span>
+        <span style="--c:#ff598c">Standort (Beobachtungsort)</span>
+    </div>
+    <p class="hint">
+        Punkte auf der Bahn: Ort des Mondes in ganzen Tagen vor und nach dem Zeitpunkt.
+        Erde und Mond sind in der Grundeinstellung 4-fach vergrößert, das Größenverhältnis bleibt richtig.
+        Die Atmosphäre ist dicker gezeichnet und der Erdschein heller, als sie wirklich sind.
+    </p>
+
+    <div class="columns">
+        <div>
+            <h2>Werte</h2>
+            <div id="outputTable"></div>
+        </div>
+        <div>
+            <h2>Zeit</h2>
+            <div id="timeControls"></div>
+            <div id="timeButtons"></div>
+            <details>
+                <summary>Beobachtungsort</summary>
+                <div id="locationControls"></div>
+            </details>
+        </div>
+    </div>
+
+    <h2>Begriffe</h2>
+    <table class="glossary">
+        <tr><td>Ekliptik</td><td>Die Ebene, in der die Erde um die Sonne läuft. Von der Erde aus gesehen wandert die Sonne
+            im Lauf eines Jahres einmal entlang der Ekliptik um den Himmel. Die Längen werden ab dem Frühlingspunkt ♈︎
+            gezählt, dort steht die Sonne zu Frühlingsbeginn.</td></tr>
+        <tr><td>Mondbahnebene</td><td>Die Ebene, in der der Mond um die Erde läuft. Sie ist um etwa 5,1° gegen die Ekliptik
+            geneigt, deshalb steht der Mond meist etwas über oder unter der Ekliptik.</td></tr>
+        <tr><td>Knoten</td><td>Die beiden Punkte, an denen der Mond die Ekliptik kreuzt: im aufsteigenden Knoten ☊ nach
+            Norden, im absteigenden ☋ nach Süden. Die Verbindung heißt Knotenlinie. Sie dreht sich in 18,6 Jahren einmal
+            rückwärts herum.</td></tr>
+        <tr><td>Drachenmonat</td><td>Die Zeit von einem aufsteigenden Knoten zum nächsten, im Mittel 27,21 Tage.</td></tr>
+        <tr><td>Apsiden</td><td>Der erdnächste (Perigäum) und der erdfernste Punkt (Apogäum) der Mondbahn. Die Entfernung
+            schwankt zwischen etwa 356 000 und 407 000 km. Die Apsidenlinie dreht sich in 8,85 Jahren einmal vorwärts.</td></tr>
+        <tr><td>Anomalistischer Monat</td><td>Die Zeit von einem Perigäum zum nächsten, im Mittel 27,55 Tage.</td></tr>
+        <tr><td>Synodischer Monat</td><td>Die Zeit von einem Neumond zum nächsten, im Mittel 29,53 Tage. Er ist länger als
+            ein Umlauf, weil die Erde inzwischen ein Stück um die Sonne weitergelaufen ist.</td></tr>
+        <tr><td>Wahre Bahn und mittlere Ellipse</td><td>Die Sonne zieht ständig am Mond, deshalb ist seine wahre Bahn keine
+            feste Ellipse. Die mittlere Ellipse zeigt die Bahn ohne diese Störungen.</td></tr>
+        <tr><td>Libration</td><td>Ein scheinbares Schwanken des Mondes. Dadurch sieht man von der Erde aus mit der Zeit etwa
+            59 % der Mondoberfläche, nicht nur die Hälfte.</td></tr>
+        <tr><td>Erdschein</td><td>Sonnenlicht, das die Erde auf die Nachtseite des Mondes wirft. Kurz vor und nach Neumond ist
+            er am hellsten, weil man dann vom Mond aus eine fast volle Erde sieht.</td></tr>
+        <tr><td>Finsternis-Saison</td><td>Zeitraum von gut einem Monat, in dem die Sonne nahe der Knotenlinie steht (Winkel
+            unter etwa 17°). Nur dann stehen Neu- oder Vollmond nahe genug an der Ekliptik für eine Sonnen- oder
+            Mondfinsternis. Das kommt etwa zweimal im Jahr vor.</td></tr>
+    </table>
+
+    <h2>Quellen</h2>
+    <p class="hint">
+        Positionen und Orientierung nach Jean Meeus, <i>Astronomische Algorithmen</i> (<code>astro.js</code>).
+        Mond: Farbkarte (LROC) und Höhen (LOLA) aus dem <a href="https://svs.gsfc.nasa.gov/4720">CGI Moon Kit</a> der NASA.
+        Erde: <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/">Blue Marble Next Generation</a>
+        (NASA Earth Observatory, R. Stöckli), Mai 2004; Nachtlichter
+        <a href="https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps">Black Marble 2016</a> (NASA Earth Observatory);
+        Wassermaske aus der GEBCO-Topographie (NASA Visible Earth).
+    </p>
+</body>
+</html>
