@@ -159,6 +159,8 @@
         table.data tr.full td { background: var(--highlight); }
         .tables { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: flex-start; }
         .scroll { overflow-x: auto; max-width: 100%; }
+        .scene-views { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+        #sceneForm h3 { margin: 10px 0 4px; }
         #map { height: 420px; border-radius: 6px; margin-bottom: 6px; background: var(--surface-2); }
         .empty { color: var(--muted); font-style: italic; }
         .value { color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -219,6 +221,7 @@
                 floor: Number.isFinite(num(v.floor)) ? num(v.floor) : 0,
                 floorHeight: num(v.floorHeight) > 0 ? num(v.floorHeight) : 3,
                 eyeHeight: Number.isFinite(num(v.eyeHeight)) ? num(v.eyeHeight) : 1.6,
+                scene: normalizeScene(v.scene),
             }));
             const selected = Number.isInteger(s.selected) && s.selected >= -1 && s.selected < viewpoints.length
                 ? s.selected : 0;
@@ -271,7 +274,8 @@
         // Standpunkte mit berechneter Horizontlinie (Gebäude, Gelände) vorbereiten
         function recompile() {
             envProfiles = state.viewpoints.map(environmentProfile);
-            compiledVps = state.viewpoints.map((vp, i) => compileViewpoint(vp, envProfiles[i] && envProfiles[i].combined));
+            compiledVps = state.viewpoints.map((vp, i) =>
+                compileViewpoint({ ...vp, scene: compiledSceneOf(vp) }, envProfiles[i] && envProfiles[i].combined));
             compiledFor = latitude + '|' + longitude;
             maskVersion++;
         }
@@ -752,6 +756,11 @@
 
         // Was verdeckt die Richtung? Gebäude oder Gelände des ersten aktiven Standpunkts mit Umgebung
         function obstacleText(A, h) {
+            const inside = activeCompiled().find(vp => vp.scene && !sceneVisible(vp.scene, A, h));
+            if (inside && h > horizonAltitude(inside, A)) {
+                const hit = sceneObstacle(inside.scene, A, h);
+                if (hit) return ` · ${hit.name} (${fmtNum(hit.distance)} m)`;
+            }
             const p = activeIndices().map(i => envProfiles[i]).find(Boolean);
             if (!p) return '';
             const k = Math.round(normalizeDegrees(A) / HORIZON_STEP) % HORIZON_BINS;
@@ -930,6 +939,7 @@
             const obsBox = document.getElementById('observationTable');
             document.getElementById('maskTables').style.display = vp ? '' : 'none';
             document.getElementById('maskTablesHint').style.display = vp ? 'none' : '';
+            renderScene();
             if (!vp) return;
 
             // Sichtbereiche
@@ -1053,8 +1063,10 @@
             const name = prompt('Name des neuen Standpunkts:', 'Fenster');
             if (!name) return;
             const like = editableViewpoint() || state.viewpoints[0];
+            // Gleiche Wohnung, anderer Platz: Raum und Balkon werden übernommen
             state.viewpoints.push({ name, sectors: [], horizon: [], observations: [],
-                                    floor: like.floor, floorHeight: like.floorHeight, eyeHeight: like.eyeHeight });
+                                    floor: like.floor, floorHeight: like.floorHeight, eyeHeight: like.eyeHeight,
+                                    scene: like.scene ? JSON.parse(JSON.stringify(like.scene)) : null });
             recompile();
             selectViewpoint(state.viewpoints.length - 1);
         }
@@ -1529,6 +1541,407 @@
         }
 
     /////////////////////////////////////////////////////////////////
+    //                  Wohnung und Balkon (Stufe 3)               //
+    /////////////////////////////////////////////////////////////////
+
+        const WALL_NAMES = [['front', 'Fensterwand'], ['left', 'linke Wand'], ['right', 'rechte Wand'], ['back', 'Rückwand']];
+        const sceneCache = new Map();
+
+        // Vorbereitete Szene (Raster-Maske) eines Standpunkts, zwischengespeichert; die Lage in der Karte zählt nicht
+        function compiledSceneOf(vp) {
+            if (!vp.scene) return null;
+            const key = JSON.stringify([{ ...vp.scene, anchor: null }, vp.eyeHeight]);
+            if (!sceneCache.has(key)) {
+                if (sceneCache.size > 20) sceneCache.clear();
+                sceneCache.set(key, compileScene(vp.scene, vp.eyeHeight));
+            }
+            return sceneCache.get(key);
+        }
+
+        // Fassadenrichtung für eine neue Szene: Mitte des ersten Sichtbereichs, sonst Süden
+        function defaultFacade(vp) {
+            const s = vp.sectors[0];
+            return s ? round1(normalizeDegrees(s.azimuthFrom + (normalizeDegrees(s.azimuthTo - s.azimuthFrom) || 360) / 2)) : 180;
+        }
+        function defaultRoom(vp) {
+            const height = Math.max(2.2, round1(vp.floorHeight - 0.4));
+            return { width: 4, depth: 5, height, windows: [{ wall: 'front', from: 1, to: 3, sill: 0.9, top: Math.min(2.2, height) }] };
+        }
+        function defaultBalcony(vp) {
+            const room = vp.scene && vp.scene.room;
+            const mid = room ? room.width / 2 : 1.5;
+            return { from: round1(mid - 1.5), to: round1(mid + 1.5), depth: 1.5, ceiling: Math.max(2.2, round1(vp.floorHeight - 0.3)),
+                     slab: true, parapet: 1, glass: false, dividerLeft: false, dividerRight: false };
+        }
+        function createScene(withBalcony) {
+            const vp = editableViewpoint();
+            if (!vp) return;
+            vp.scene = { facade: defaultFacade(vp), wall: 0.35, anchor: null, room: defaultRoom(vp), balcony: null,
+                         eye: { place: 'room', x: 2, y: 1.5 } };
+            if (withBalcony) {
+                vp.scene.room = null;
+                vp.scene.balcony = defaultBalcony(vp);
+                vp.scene.eye = { place: 'balcony', x: 1.5, y: 0.75 };
+            }
+            maskChanged();
+        }
+
+        // Punkt der Szene (x entlang der Fassade, y nach außen) [m] → [lat, lon]. Ohne Lage in der Karte sitzt
+        // das Auge auf dem Standort.
+        function sceneLatLng(cs, x, y) {
+            const sc = cs.scene;
+            let a = sc.anchor && [sc.anchor.latitude, sc.anchor.longitude];
+            if (!a) {
+                const p = destination(latitude, longitude, sc.facade + 90, -cs.eye[0]);
+                a = destination(p[0], p[1], sc.facade, -cs.eye[1]);
+            }
+            const p = destination(a[0], a[1], sc.facade + 90, x);
+            return destination(p[0], p[1], sc.facade, y);
+        }
+
+        // Lotfußpunkt von p auf die Strecke a–b (alle [lat, lon], ebene Näherung)
+        function footOnEdge(a, b, p) {
+            const k = Math.cos(p[0] * DEG2RAD);
+            const ax = (a[1] - p[1]) * k, ay = a[0] - p[0], bx = (b[1] - p[1]) * k, by = b[0] - p[0];
+            const dx = bx - ax, dy = by - ay;
+            const t = Math.min(1, Math.max(0, -(ax * dx + ay * dy) / (dx * dx + dy * dy || 1)));
+            return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+        }
+
+        // Wohnung an eine Fassade aus der Karte setzen: Richtung der Wand, Mitte der Wohnung an der Klickstelle
+        function snapScene(vp, az, edgeStart, edgeEnd, latlng) {
+            if (!vp.scene) {
+                vp.scene = { facade: az, wall: 0.35, anchor: null, room: defaultRoom(vp), balcony: null, eye: { place: 'room', x: 2, y: 1.5 } };
+            }
+            const sc = vp.scene;
+            sc.facade = round1(az);
+            const n = normalizeScene(sc);
+            const xc = n.room ? n.room.width / 2 : (n.balcony.from + n.balcony.to) / 2;
+            const foot = footOnEdge(edgeStart, edgeEnd, [latlng.lat, latlng.lng]);
+            const a = destination(foot[0], foot[1], sc.facade + 90, -xc);
+            sc.anchor = { latitude: a[0], longitude: a[1] };
+        }
+
+        // Standort (für Gebäude und Gelände) auf die Augenposition setzen
+        function locationToEye() {
+            const vp = editableViewpoint();
+            const cs = vp && compiledSceneOf(vp);
+            if (!cs || !cs.scene.anchor) return;
+            const [lat, lon] = sceneLatLng(cs, cs.eye[0], cs.eye[1]);
+            setLocation(lat, lon);
+        }
+
+        // Formular der Szene
+        function renderScene() {
+            const box = document.getElementById('sceneForm');
+            const vp = editableViewpoint();
+            document.getElementById('sceneViews').style.display = vp && vp.scene ? '' : 'none';
+            if (!vp) {
+                box.replaceChildren(el('p', { className: 'hint', textContent: 'Zum Bearbeiten einen einzelnen Standpunkt wählen.' }));
+                return;
+            }
+            if (!vp.scene) {
+                const room = el('button', { textContent: 'Raum anlegen', onclick: () => createScene(false) });
+                const balcony = el('button', { textContent: 'Balkon anlegen', onclick: () => createScene(true) });
+                box.replaceChildren(el('div', { className: 'controls' }, [
+                    el('span', { className: 'empty', textContent: `Für „${vp.name}“ ist noch kein Raum und kein Balkon angelegt.` }),
+                    room, balcony]));
+                return;
+            }
+            const sc = vp.scene;
+            const soon = () => { maskChangedSoon(); drawScene(); };
+            const field = (obj, key, label, unit = 'm', step = 0.05) =>
+                el('label', {}, [label + ' ', numberInput(obj[key], v => { obj[key] = v; soon(); }, step), unit ? ' ' + unit : '']);
+            const checkbox = (obj, key, label, onChange = soon) => {
+                const b = el('input', { type: 'checkbox', checked: !!obj[key] });
+                b.addEventListener('change', () => { obj[key] = b.checked; onChange(); });
+                return el('label', {}, [b, ' ' + label]);
+            };
+            const part = { room: !!sc.room, balcony: !!sc.balcony };
+            const toggle = (key, make) => () => {
+                sc[key] = part[key] ? null : make(vp);
+                if (!sc.room && !sc.balcony) vp.scene = null;
+                else if (!sc[sc.eye.place]) sc.eye = { place: key === 'room' ? 'balcony' : 'room', x: undefined, y: undefined };
+                maskChanged();
+            };
+            const placeSelect = el('select', {}, [['room', 'im Raum'], ['balcony', 'auf dem Balkon']]
+                .map(([v, t]) => el('option', { value: v, textContent: t, selected: sc.eye.place === v, disabled: !sc[v] })));
+            placeSelect.addEventListener('change', () => {
+                sc.eye = { place: placeSelect.value, x: undefined, y: undefined };
+                maskChanged();
+            });
+            const children = [
+                el('div', { className: 'controls' }, [
+                    checkbox(part, 'room', 'Raum', toggle('room', defaultRoom)),
+                    checkbox(part, 'balcony', 'Balkon vor der Fassade', toggle('balcony', defaultBalcony)),
+                    field(sc, 'facade', 'Fassade zeigt nach', '°', 1),
+                    field(sc, 'wall', 'Wandstärke'),
+                    el('label', {}, ['Auge ', placeSelect]),
+                ]),
+            ];
+            const n = normalizeScene(sc);
+            sc.eye.x ??= n.eye.x;
+            sc.eye.y ??= n.eye.y;
+            children.push(el('div', { className: 'controls' }, [
+                field(sc.eye, 'x', 'Auge', 'm von links,'),
+                field(sc.eye, 'y', '', sc.eye.place === 'room' ? 'm vor der Fensterwand' : 'm vor der Hauswand'),
+                el('span', { className: 'value', textContent: `Augenhöhe ${fmtNum(vp.eyeHeight)} m (oben bei Stockwerk)` }),
+            ]));
+            if (sc.room) {
+                const r = sc.room;
+                children.push(el('h3', { textContent: 'Raum' }));
+                children.push(el('div', { className: 'controls' }, [field(r, 'width', 'Breite'), field(r, 'depth', 'Tiefe'), field(r, 'height', 'Höhe')]));
+                const table = el('table', { className: 'data' }, [el('tr', {}, ['Fenster in', 'von', 'bis', 'Brüstung', 'Sturz', '']
+                    .map(t => el('th', { textContent: t })))]);
+                r.windows.forEach((w, i) => {
+                    const wall = el('select', {}, WALL_NAMES.map(([v, t]) => el('option', { value: v, textContent: t, selected: w.wall === v })));
+                    wall.addEventListener('change', () => { w.wall = wall.value; maskChanged(); });
+                    const cell = key => el('td', {}, [numberInput(w[key], v => { w[key] = v; soon(); }, 0.05)]);
+                    table.append(el('tr', {}, [el('td', {}, [wall]), cell('from'), cell('to'), cell('sill'), cell('top'),
+                        el('td', {}, [deleteButton(() => { r.windows.splice(i, 1); maskChanged(); })])]));
+                });
+                if (!r.windows.length) table.append(el('tr', {}, [el('td', { colSpan: 6, className: 'empty', textContent: 'keine Fenster – nichts sichtbar' })]));
+                const add = el('button', { textContent: '+ Fenster', onclick: () => {
+                    r.windows.push({ wall: 'front', from: 1, to: Math.min(r.width, 2.5), sill: 0.9, top: Math.min(2.2, r.height) });
+                    maskChanged();
+                } });
+                children.push(table, add);
+            }
+            if (sc.balcony) {
+                const b = sc.balcony;
+                children.push(el('h3', { textContent: 'Balkon' }));
+                children.push(el('div', { className: 'controls' }, [
+                    field(b, 'from', 'von'), field(b, 'to', 'bis'), field(b, 'depth', 'Tiefe'),
+                    field(b, 'parapet', 'Brüstung'), checkbox(b, 'glass', 'aus Glas'),
+                ]));
+                children.push(el('div', { className: 'controls' }, [
+                    checkbox(b, 'slab', 'Balkonplatte darüber'), field(b, 'ceiling', 'in'),
+                    checkbox(b, 'dividerLeft', 'Trennwand links'), checkbox(b, 'dividerRight', 'Trennwand rechts'),
+                ]));
+            }
+            const toEye = el('button', { textContent: 'Standort aufs Auge setzen', disabled: !sc.anchor, onclick: locationToEye,
+                                         title: sc.anchor ? 'Gebäude und Gelände von der Augenposition aus rechnen' : 'Erst in der Karte an eine Fassade setzen' });
+            const remove = el('button', { textContent: 'Raum und Balkon entfernen', onclick: () => {
+                if (!confirm(`Raum und Balkon von „${vp.name}“ entfernen?`)) return;
+                vp.scene = null;
+                maskChanged();
+            } });
+            children.push(el('div', { className: 'controls' }, [
+                el('span', { className: 'value', textContent: sc.anchor ? 'In der Karte an einer Fassade eingerastet.'
+                    : 'Noch nicht in der Karte platziert: Gebäude anklicken → „Wohnung hier“.' }),
+                el('span', { style: 'flex:1' }), toEye, remove,
+            ]));
+            box.replaceChildren(...children);
+        }
+
+        // Sonnenfleck des gewählten Standpunkts zum eingestellten Zeitpunkt (null: Sonne nicht frei)
+        function currentSunPatch(vpc, sun) {
+            if (!vpc.scene || sun.altitude <= 0 || sun.altitude <= horizonAltitude(vpc, sun.azimuth)) return null;
+            return sunPatch(vpc.scene, sun.azimuth, sun.altitude, 0.1);
+        }
+
+        // Maßstab für eine Zeichnung: Bereich [x0, x1] × [y0, y1] in m mittig in w × h Pixel, y nach oben
+        function fitView(x0, x1, y0, y1, w, h, pad = 14) {
+            const k = Math.min((w - 2 * pad) / (x1 - x0), (h - 2 * pad) / (y1 - y0));
+            const ox = (w - (x1 - x0) * k) / 2, oy = (h - (y1 - y0) * k) / 2;
+            return { k, X: x => ox + (x - x0) * k, Y: y => h - oy - (y - y0) * k };
+        }
+
+        function drawScene() {
+            const vp = editableViewpoint();
+            const vpc = vp && compiledVps[state.selected];
+            const info = document.getElementById('sceneInfo');
+            if (!vpc || !vpc.scene) { info.textContent = ''; return; }
+            const cs = vpc.scene, sc = cs.scene;
+            const sun = sunDirection(currentJd(), getLocation());
+            const patch = currentSunPatch(vpc, sun);
+            const level = visibilityLevel(sun, vpc);
+            drawSceneTop(document.getElementById('sceneTop'), cs, sun, patch, level);
+            drawSceneFront(document.getElementById('sceneFront'), cs, vp.eyeHeight);
+            const where = sc.eye.place === 'room' ? 'im Raum' : 'auf dem Balkon';
+            info.textContent = `${fmtDate(currentJd())}, ${fmtTime(currentJd())}: Sonne ${fmtDirection(sun)} – vom Auge ${where} ${LEVEL_TEXT[level]}`
+                + (patch && patch.area > 0 ? `; Sonnenfleck auf dem Boden ${fmtNum(patch.area)} m²` : '; kein Sonnenfleck auf dem Boden') + '.';
+        }
+
+        // Draufsicht: Fassade oben (außen), Wände mit Fensteröffnungen, Balkon, Sonnenfleck, Auge, Richtung zur Sonne
+        function drawSceneTop(canvas, cs, sun, patch, level) {
+            const { ctx, w, h } = setupCanvas(canvas, 300);
+            const sc = cs.scene, s = sc.wall, R = sc.room, B = sc.balcony;
+            let x0 = Infinity, x1 = -Infinity, y0 = -s - 0.3, y1 = 0;
+            if (R) { x0 = -s; x1 = R.width + s; y0 = -2 * s - R.depth; }
+            if (B) { x0 = Math.min(x0, B.from); x1 = Math.max(x1, B.to); y1 = B.depth; }
+            const v = fitView(x0 - 0.5, x1 + 0.5, y0 - 0.3, y1 + 0.9, w, h);
+            const rect = (ax, ay, bx, by) => ctx.fillRect(v.X(ax), v.Y(by), (bx - ax) * v.k, (by - ay) * v.k);
+            const line = (ax, ay, bx, by) => { ctx.beginPath(); ctx.moveTo(v.X(ax), v.Y(ay)); ctx.lineTo(v.X(bx), v.Y(by)); ctx.stroke(); };
+            ctx.fillStyle = css('--surface');
+            ctx.fillRect(0, 0, w, h);
+
+            // Hauswand (Außenseite y = 0) über die ganze Breite, dann Raum
+            const wallColor = css('--axis'), glass = css('--accent');
+            ctx.fillStyle = wallColor;
+            if (!R) rect(-1e3, -s, 1e3, 0);
+            ctx.strokeStyle = css('--muted');
+            ctx.setLineDash([4, 3]);
+            line(-1e3, 0, 1e3, 0);
+            ctx.setLineDash([]);
+            if (R) {
+                const W = R.width, D = R.depth, yIn = -s, yBack = -s - D;
+                ctx.fillStyle = wallColor;
+                rect(-s, yBack - s, W + s, 0);
+                ctx.fillStyle = css('--surface-2');
+                rect(0, yBack, W, yIn);
+                ctx.fillStyle = glass;
+                for (const win of R.windows) {
+                    if (win.wall === 'front') rect(win.from, yIn, win.to, 0);
+                    if (win.wall === 'back') rect(win.from, yBack - s, win.to, yBack);
+                    if (win.wall === 'left') rect(-s, yIn - win.to, 0, yIn - win.from);
+                    if (win.wall === 'right') rect(W, yIn - win.to, W + s, yIn - win.from);
+                }
+            }
+            if (B) {
+                ctx.fillStyle = css('--surface-2');
+                rect(B.from, 0, B.to, B.depth);
+                ctx.strokeStyle = css('--text-2');
+                ctx.lineWidth = 2;
+                if (B.parapet > 0) {
+                    ctx.setLineDash(B.glass ? [5, 4] : []);
+                    ctx.beginPath();
+                    ctx.moveTo(v.X(B.from), v.Y(0)); ctx.lineTo(v.X(B.from), v.Y(B.depth));
+                    ctx.lineTo(v.X(B.to), v.Y(B.depth)); ctx.lineTo(v.X(B.to), v.Y(0));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                ctx.lineWidth = 5;
+                if (B.dividerLeft) line(B.from, 0, B.from, B.depth);
+                if (B.dividerRight) line(B.to, 0, B.to, B.depth);
+                ctx.lineWidth = 1;
+            }
+
+            // Sonnenfleck
+            if (patch) {
+                ctx.fillStyle = css('--sun');
+                ctx.globalAlpha = 0.75;
+                const st = patch.step;
+                for (const [px, py] of [...patch.room, ...patch.balcony]) rect(px - st / 2, py - st / 2, px + st / 2, py + st / 2);
+                ctx.globalAlpha = 1;
+            }
+
+            // Auge und Richtung zur Sonne (Länge nach der Höhe verkürzt)
+            const [ex, ey] = cs.eye;
+            if (sun.altitude > ALT_MIN) {
+                const a = (sun.azimuth - sc.facade) * DEG2RAD, len = 1.6 * Math.cos(sun.altitude * DEG2RAD);
+                ctx.strokeStyle = css('--sun');
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash(level >= VisibilityLevel.Partial ? [] : [5, 4]);
+                line(ex, ey, ex + len * Math.sin(a), ey + len * Math.cos(a));
+                ctx.setLineDash([]);
+                ctx.lineWidth = 1;
+            }
+            ctx.fillStyle = css('--accent');
+            ctx.beginPath();
+            ctx.arc(v.X(ex), v.Y(ey), 5, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Beschriftung: außen, Fassadenrichtung, Nordpfeil
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            haloText(ctx, `außen · Fassade ${fmtNum(sc.facade, 0)}° ${compass(sc.facade)}`, w / 2, 6, css('--text-2'));
+            const na = -sc.facade * DEG2RAD, cx = w - 24, cy = 34;
+            ctx.strokeStyle = css('--text-2');
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(cx - 12 * Math.sin(na), cy + 12 * Math.cos(na));
+            ctx.lineTo(cx + 12 * Math.sin(na), cy - 12 * Math.cos(na));
+            ctx.stroke();
+            ctx.textBaseline = 'middle';
+            haloText(ctx, 'N', cx + 20 * Math.sin(na), cy - 20 * Math.cos(na), css('--text-2'));
+        }
+
+        // Fensterwand von innen gesehen (gleiche Seiten wie die Draufsicht): Fenster, dahinter Balkon, Auge
+        function drawSceneFront(canvas, cs, eyeHeight) {
+            const { ctx, w, h } = setupCanvas(canvas, 300);
+            const sc = cs.scene, R = sc.room, B = sc.balcony;
+            let x0 = Infinity, x1 = -Infinity, z1 = cs.eye[2];
+            if (R) { x0 = 0; x1 = R.width; z1 = Math.max(z1, R.height); }
+            if (B) { x0 = Math.min(x0, B.from); x1 = Math.max(x1, B.to); z1 = Math.max(z1, B.ceiling); }
+            const v = fitView(x0 - 0.5, x1 + 0.5, -0.2, z1 + 0.6, w, h);
+            const rect = (ax, az, bx, bz) => ctx.fillRect(v.X(ax), v.Y(bz), (bx - ax) * v.k, (bz - az) * v.k);
+            ctx.fillStyle = css('--surface');
+            ctx.fillRect(0, 0, w, h);
+
+            // Balkon (liegt hinter der Fensterwand)
+            if (B) {
+                ctx.fillStyle = B.glass ? css('--accent') : css('--text-2');
+                ctx.globalAlpha = B.glass ? 0.25 : 0.45;
+                if (B.parapet > 0) rect(B.from, 0, B.to, B.parapet);
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = css('--text-2');
+                if (B.slab) rect(B.from, B.ceiling, B.to, B.ceiling + 0.2);
+                if (B.dividerLeft) rect(B.from - 0.06, 0, B.from + 0.06, B.ceiling);
+                if (B.dividerRight) rect(B.to - 0.06, 0, B.to + 0.06, B.ceiling);
+                ctx.globalAlpha = 1;
+            }
+            // Wand mit Fensteröffnungen (gerade/ungerade: Fenster bleiben frei)
+            if (R) {
+                ctx.beginPath();
+                ctx.rect(v.X(0), v.Y(R.height), R.width * v.k, R.height * v.k);
+                for (const win of R.windows.filter(x => x.wall === 'front')) {
+                    ctx.rect(v.X(win.from), v.Y(win.top), (win.to - win.from) * v.k, (win.top - win.sill) * v.k);
+                }
+                ctx.fillStyle = css('--axis');
+                ctx.globalAlpha = 0.85;
+                ctx.fill('evenodd');
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = css('--accent');
+                ctx.lineWidth = 1.5;
+                for (const win of R.windows.filter(x => x.wall === 'front')) {
+                    ctx.strokeRect(v.X(win.from), v.Y(win.top), (win.to - win.from) * v.k, (win.top - win.sill) * v.k);
+                }
+            }
+            ctx.strokeStyle = css('--muted');
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(v.X(x0 - 0.5), v.Y(0));
+            ctx.lineTo(v.X(x1 + 0.5), v.Y(0));
+            ctx.stroke();
+            // Auge
+            ctx.fillStyle = css('--accent');
+            ctx.beginPath();
+            ctx.arc(v.X(cs.eye[0]), v.Y(cs.eye[2]), 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            haloText(ctx, R ? 'Fensterwand von innen' : 'Blick vom Balkon nach außen', w / 2, 6, css('--text-2'));
+        }
+
+        // Raum und Balkon der aktiven Standpunkte in der Karte
+        function drawScenesOnMap(color, vpc) {
+            const cs = vpc.scene;
+            if (!cs) return;
+            const sc = cs.scene, s = sc.wall, opts = { pane: 'directions', interactive: false };
+            const poly = (pts, style) => L.polygon(pts.map(([x, y]) => sceneLatLng(cs, x, y)), { ...opts, ...style }).addTo(overlayLayer);
+            const box = (ax, ay, bx, by) => [[ax, ay], [bx, ay], [bx, by], [ax, by]];
+            if (sc.room) {
+                const W = sc.room.width, D = sc.room.depth;
+                poly(box(-s, -2 * s - D, W + s, 0), { color: '#6b6a64', weight: 1, fillColor: '#6b6a64', fillOpacity: 0.55 });
+                poly(box(0, -s - D, W, -s), { color, weight: 1.5, fillColor: '#ffffff', fillOpacity: 0.35 });
+                for (const win of sc.room.windows) {
+                    const yIn = -s, yBack = -s - D;
+                    const seg = { front: [[win.from, yIn / 2], [win.to, yIn / 2]], back: [[win.from, yBack - s / 2], [win.to, yBack - s / 2]],
+                                  left: [[-s / 2, yIn - win.from], [-s / 2, yIn - win.to]], right: [[W + s / 2, yIn - win.from], [W + s / 2, yIn - win.to]] }[win.wall];
+                    L.polyline(seg.map(([x, y]) => sceneLatLng(cs, x, y)), { ...opts, color, weight: 4 }).addTo(overlayLayer);
+                }
+            }
+            if (sc.balcony) {
+                poly(box(sc.balcony.from, 0, sc.balcony.to, sc.balcony.depth), { color, weight: 1.5, fillColor: color, fillOpacity: 0.25 });
+            }
+            L.circleMarker(sceneLatLng(cs, cs.eye[0], cs.eye[1]), { ...opts, radius: 4, color, weight: 2, fillColor: color, fillOpacity: 1 })
+                .addTo(overlayLayer);
+        }
+
+    /////////////////////////////////////////////////////////////////
     //                  Karte                                      //
     /////////////////////////////////////////////////////////////////
 
@@ -1658,8 +2071,15 @@
                     leafletMap.closePopup();
                     maskChanged();
                 });
-                children.push(el('div', {}, [`Fassade (markiert): ${fmtNum(az)}° ${compass(az)} `, take]));
                 const ring = b.rings[edge.ring];
+                const snap = el('button', { textContent: 'Wohnung hier', disabled: !vp,
+                                            title: vp ? `Raum/Balkon von „${vp.name}“ an diese Fassade setzen` : 'Erst einen einzelnen Standpunkt wählen' });
+                snap.addEventListener('click', () => {
+                    snapScene(vp, az, ring[edge.edge], ring[edge.edge + 1], latlng);
+                    leafletMap.closePopup();
+                    maskChanged();
+                });
+                children.push(el('div', {}, [`Fassade (markiert): ${fmtNum(az)}° ${compass(az)} `, take, ' ', snap]));
                 edgeLayer.clearLayers();
                 L.polyline([ring[edge.edge], ring[edge.edge + 1]], { color: css('--accent'), weight: 5, pane: 'directions' }).addTo(edgeLayer);
             }
@@ -1736,6 +2156,7 @@
                         .bindTooltip(`${vp.name}: ${fmtNum(s.azimuthFrom, 0)}°–${fmtNum(s.azimuthTo, 0)}°, Höhe ${fmtNum(s.altitudeFrom, 0)}°–${fmtNum(s.altitudeTo, 0)}°`)
                         .addTo(overlayLayer);
                 }
+                drawScenesOnMap(color, vp);
                 for (const [a, h] of vp.horizon) {
                     L.polyline([here, destination(latitude, longitude, a, 70)], { ...onTop, color, weight: 1, opacity: 0.8 })
                         .bindTooltip(`${vp.name}: Horizont ${fmtNum(a, 0)}° ${compass(a)}, ${fmtNum(h)}°`).addTo(directionLayer);
@@ -2138,6 +2559,7 @@
 
         function redrawAll() {
             drawHorizonChart();
+            drawScene();
             drawMap();
             drawYearChart();
             drawDay();
@@ -2202,7 +2624,7 @@
             let resizeTimer = null;
             new ResizeObserver(() => {
                 clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(() => { drawHorizonChart(); drawYearChart(); drawDay(); }, 100);
+                resizeTimer = setTimeout(() => { drawHorizonChart(); drawScene(); drawYearChart(); drawDay(); }, 100);
             }).observe(document.body);
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
 
@@ -2216,8 +2638,9 @@
     <p>Wann ist die Sonne auf dem Balkon, wann sieht man den Mond vom Fenster aus? Für jeden Standpunkt beschreibt eine
         <b>Sichtmaske</b>, welche Richtungen am Himmel frei sind: ein oder mehrere Sichtbereiche (Azimut und Höhe von–bis)
         und eine Horizontlinie für Hindernisse wie Nachbarhäuser oder Bäume. Die Horizontlinie lässt sich von Hand zeichnen
-        oder aus den Gebäuden in OpenStreetMap und den Geländehöhen berechnen. Daraus ermittelt die Seite, wann Sonne und
-        Mond in einem freien Bereich stehen. Grundlage ist das <a href="Konzept-Sichtbarkeit.md">Konzept</a> (Stufen 1 und 2).</p>
+        oder aus den Gebäuden in OpenStreetMap und den Geländehöhen berechnen. Wer es genauer will, beschreibt Zimmer und Balkon
+        mit Fenstern, Balkonplatte und Brüstung. Daraus ermittelt die Seite, wann Sonne und Mond in einem freien Bereich stehen.
+        Grundlage ist das <a href="Konzept-Sichtbarkeit.md">Konzept</a> (Stufen 1 bis 3).</p>
 
     <div id="locationControls"></div>
     <div id="timeControls"></div>
@@ -2322,7 +2745,7 @@
     <p class="hint">Den Standort-Marker an die eigene Position ziehen. Richtung zu Sonne und Mond zum eingestellten
         Zeitpunkt: durchgezogen = sichtbar, gestrichelt = verdeckt, blass = unter dem Horizont.
         Klick auf ein Gebäude: Höhe ändern, als eigenes Gebäude ausschließen oder die angeklickte Fassade als
-        Sichtbereich übernehmen (Halbraum vor der Wand). „Schatten“ zeigt den Schattenwurf zur eingestellten Zeit –
+        Sichtbereich übernehmen (Halbraum vor der Wand) bzw. Raum und Balkon dort ansetzen („Wohnung hier“). „Schatten“ zeigt den Schattenwurf zur eingestellten Zeit –
         passt er zu einem Luftbild, stimmen die Höhen ungefähr.</p>
     <p class="hint">Die berechnete Horizontlinie ist für jede Richtung der höchste Winkel zu einer Dachkante bzw. zum
         Gelände, gesehen aus der Augenhöhe des Standpunkts. Das Gelände wird bis zur eingestellten Entfernung abgetastet
@@ -2332,6 +2755,28 @@
         dl-de/zero-2-0; in Brandenburg © GeoBasis-DE/LGB, dl-de/by-2-0; sonst u. a. Copernicus GLO-30 © DLR, Airbus,
         EU/ESA), ersatzweise aus den <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a>
         (Mapzen, AWS Open Data; u. a. SRTM, EU-DEM © Copernicus).</p>
+
+    <h2>Wohnung und Balkon</h2>
+    <p class="hint">Raum und Balkon als Kästen aus Wänden, Fensteröffnungen, Balkonplatte, Brüstung und Trennwänden. Für jede
+        Richtung prüft ein Strahl vom Auge, ob er durch ein Fenster bzw. am Balkon vorbei ins Freie kommt; die Laibung (Wandstärke)
+        engt den Blick seitlich ein. Das Ergebnis wirkt in der Sichtmaske zusätzlich zu Sichtbereichen und Horizontlinie.
+        Maße in Metern; „links“ und „rechts“ gelten mit Blick nach draußen. Fenster an Fensterwand und Rückwand zählen ab der
+        linken Raumecke, an den Seitenwänden ab der Fensterwand; der Balkon zählt ebenfalls ab der linken Raumecke.</p>
+    <div id="sceneForm"></div>
+    <div id="sceneViews">
+        <div class="scene-views">
+            <canvas id="sceneTop"></canvas>
+            <canvas id="sceneFront"></canvas>
+        </div>
+        <div class="legend">
+            <span class="swatch" style="--c: var(--axis)">Wand</span>
+            <span style="--c: var(--accent)">Fenster, Auge</span>
+            <span class="swatch" style="--c: var(--sun)">Sonnenfleck zum eingestellten Zeitpunkt</span>
+            <span style="--c: var(--sun)">Richtung zur Sonne (gestrichelt: verdeckt)</span>
+            <span class="dashed" style="--c: var(--text-2)">Glasbrüstung</span>
+        </div>
+        <p class="hint" id="sceneInfo"></p>
+    </div>
 
     <h2>Jahresübersicht Sonne</h2>
     <div class="legend">

@@ -1,6 +1,6 @@
 # Konzept: Wann sind Sonne und Mond von Wohnung/Balkon aus sichtbar?
 
-Stand: 27.10.2026, Konzept abgestimmt, Stufen 1 und 2 umgesetzt (`Sichtbarkeit.html`, `visibility.js`,
+Stand: 27.10.2026, Konzept abgestimmt, Stufen 1 bis 3 umgesetzt (`Sichtbarkeit.html`, `visibility.js`,
 `testVisibility.js`).
 
 ## Ziel
@@ -287,14 +287,28 @@ Standort in einem Grundriss liegt.
 
 ### Eingabe
 
-- Grundriss der Wohnung bzw. des Balkons als drehbares Rechteck in der Karte, das an der per Klick gewählten
-  OSM-Fassade einrastet.
+- Grundriss der Wohnung bzw. des Balkons in der Karte: Klick auf ein Gebäude, „Wohnung hier“ übernimmt die
+  Richtung der angeklickten Fassade und setzt die Mitte der Wohnung an die Klickstelle. Statt eines drehbaren
+  Rechtecks zum Ziehen gibt es die Fassadenrichtung als Zahl im Formular (Feinkorrektur).
 - Fenster, Balkonplatte, Brüstung, Trennwände per Formular (Maße in m).
-- Kontrolle über eine Raum-Draufsicht und eine Ansicht von außen auf die Fassade.
+- Kontrolle über eine Raum-Draufsicht (mit Sonnenfleck und Richtung zur Sonne) und eine Ansicht der Fensterwand
+  **von innen**: so stimmen links und rechts mit der Draufsicht und dem Formular überein (Blick nach draußen).
+  Dazu das Horizontdiagramm, in dem die Fenster als freie Flächen erscheinen; der Tooltip nennt das verdeckende
+  Teil (Wand, Laibung, Sturz, Balkonplatte …).
 
 Modell B (Quader): Breite, Tiefe, Raumhöhe; pro Fenster Wand, Lage entlang der Wand (u₁…u₂), Brüstungshöhe
 z₁, Sturzhöhe z₂, Wandstärke s (Laibung). Modell C (Balkon): Hauswand dahinter, Balkonplatte darüber,
 Trennwände, Brüstung (Glas als „durchsichtig“ markierbar).
+
+Umgesetzt sind B und C **in einer Szene**: Raum und Balkon sind je optional, das Auge steht im Raum oder auf dem
+Balkon. So lässt sich auch „Sofa im Zimmer hinter dem Balkon“ rechnen (Fenster, davor Balkonplatte und
+Trennwand). Ein neuer Standpunkt übernimmt Raum und Balkon des gewählten (gleiche Wohnung, anderer Platz).
+Vereinfachungen: Balkonboden auf Höhe des Raumbodens; Balkonplatte darüber so groß wie der Balkon; Trennwände so
+hoch wie die Platte; vom Balkon aus ist die Hauswand undurchsichtig (kein Blick durch die Wohnung).
+
+Raum-Koordinaten: x entlang der Fassade (nach rechts mit Blick nach draußen), y nach außen (y = 0 Außenseite
+der Fensterwand), z nach oben (z = 0 Fußboden). Fenster an Fensterwand und Rückwand zählen ab der linken
+Raumecke, an den Seitenwänden ab der Fensterwand; der Balkon zählt ebenfalls ab der linken Raumecke.
 
 ### Strahltest
 
@@ -318,10 +332,29 @@ Ab hier lohnt die **Raster-Maske**: Azimut 0,25° × Höhe 0,25°, Höhe −5°�
 Standpunkt einmal vorberechnen; an Übergängen exakter Test. Das Ergebnis ist wieder eine Maske pro
 Standpunkt, verknüpft mit der Horizontlinie wie in Stufe 1.
 
+Umsetzung: Alle Teile liegen parallel zu den Achsen der Raum-Koordinaten, darum sind die Rechtecke achsparallel
+(Ebene x, y oder z = konstant). Der Raum ist innen geschlossen (Wände mit Fensterlöchern, Decke, Boden), jedes
+Fenster ist ein Durchgang mit vier Laibungsflächen. Die Raster-Maske speichert die 1440 × 381 Knoten; sind die
+vier Ecken einer Zelle gleich, gilt ihr Wert, sonst entscheidet der exakte Strahltest. Unter −5° wird immer
+exakt gerechnet. Die Szene wirkt zusätzlich zu Sichtbereichen und Horizontlinie (alle Bedingungen „und“).
+
+Ergebnisse der Tests (`testVisibility.js`, Nr. 14–17):
+
+- Fenster 2 m breit, 2 m vor der Wand, Wand 35 cm: frei ±23,05° = atan(1 / 2,35); die Außenkante der Laibung
+  begrenzt. Geradeaus nach oben bis 16,59°, 20° seitlich nur bis 15,64° (gekrümmte Kante).
+- Raster gegen exakten Test: 0 von 50 000 Zufallsrichtungen abweichend (Raum, Raum mit Eckfenster und Balkon,
+  Balkon); Raster in 10–45 ms.
+- Jahres-Heatmap mit Szene nicht langsamer als ohne (weniger Randpunkte zu prüfen).
+
 ### Optionales Extra: Sonnenfleck
 
 Projektion der vier Fensterecken entlang −d auf den Boden (z = 0), beschnitten auf den Grundriss, in der
 Raum-Draufsicht zur gewählten Zeit.
+
+Umgesetzt anders: Der Boden von Raum und Balkon wird im 10-cm-Raster abgetastet, von jedem Punkt geht ein
+Strahl zur Sonne durch dieselben Rechtecke. Das berücksichtigt Laibung, Balkonplatte und mehrere Fenster ohne
+Polygon-Schnitte. Die Umgebung (Horizontlinie) entscheidet vorab, ob die Sonne überhaupt frei steht. Test: Sonne
+aus Süden in 30° Höhe, Fenster wie oben → 4,20 m² (exakt 4,15 m²).
 
 ## Datenmodell
 
@@ -336,7 +369,14 @@ Gespeichert in `localStorage` wie die übrigen Einstellungen in `ui.js`; zusätz
       "sectors": [ { "azimuthFrom": 120, "azimuthTo": 250, "altitudeFrom": 5, "altitudeTo": 60 } ],
       "horizon": [ [100, 12.0], [140, 8.5], [230, 15.0] ],
       "observations": [ { "time": "2026-10-12T15:42:00+02:00", "body": "sun", "event": "disappear" } ],
-      "scene": null
+      "scene": {                                                              // null ohne Raum/Balkon
+        "facade": 180, "wall": 0.35, "anchor": { "latitude": 52.52, "longitude": 13.40 },   // anchor: x = 0, y = 0
+        "room": { "width": 4, "depth": 5, "height": 2.6,
+                  "windows": [ { "wall": "front", "from": 1, "to": 3, "sill": 0.9, "top": 2.2 } ] },  // front|left|right|back
+        "balcony": { "from": 0.5, "to": 3.5, "depth": 1.5, "ceiling": 2.7, "slab": true,
+                     "parapet": 1.0, "glass": false, "dividerLeft": false, "dividerRight": true },
+        "eye": { "place": "room", "x": 2, "y": 1.5 }                          // y: Abstand zur Wand
+      }
     }
   ],
   "environment": {
@@ -376,7 +416,8 @@ aus.
    Jahres-Heatmap, Mondliste, Tagesdetail und Karte; `testVisibility.js`.
 2. **Stufe 2 (umgesetzt):** OSM-Gebäude (auch Relationen), Gelände (Nah- und Fernbereich), Zwischenspeichern,
    Fassade per Klick, Höhen bearbeiten, Schattenwurf; Stockwerk/Geschosshöhe/Augenhöhe je Standpunkt.
-3. **Stufe 3:** Modell B/C mit Strahltest und Raster-Maske; optional Sonnenfleck.
+3. **Stufe 3 (umgesetzt):** Modell B/C als eine Szene mit Strahltest und Raster-Maske, Sonnenfleck,
+   Draufsicht und Fensterwand-Ansicht, Einrasten an einer OSM-Fassade.
 
 Später und optional:
 
@@ -422,4 +463,16 @@ terrainProfile(sampleElevation, origin, options)    // obere Hülle je Azimut (w
 horizonFromTerrain(profile, eyeElevation)           // Profil für eine Augenhöhe
 combineProfiles(...profiles)                        // Maximum
 pointInBuilding, nearestEdge, facadeAzimuth         // Karte: eigenes Gebäude, Fassade per Klick
+```
+
+Umgesetzt in Stufe 3 (Szene im Standpunkt als `viewpoint.scene`, Augenhöhe aus `viewpoint.eyeHeight`):
+
+```js
+normalizeScene(scene)                               // Zahlen begrenzen, Fenster in die Wand, Auge in den Raum
+compileScene(scene, eyeHeight)                      // Rechtecke + Raster-Maske (compileViewpoint ruft es selbst auf)
+sceneRectangles(scene, place)                       // undurchsichtige Rechtecke für Auge im Raum / auf dem Balkon
+sceneDirectionFree(cs, azimuth, altitude)           // exakter Strahltest
+sceneVisible(cs, azimuth, altitude)                 // über die Raster-Maske, exakt an Übergängen
+sceneObstacle(cs, azimuth, altitude)                // { name, distance } des verdeckenden Teils
+sunPatch(cs, azimuth, altitude, step)               // besonnte Bodenstellen und Fläche
 ```
