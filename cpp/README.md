@@ -308,7 +308,8 @@ von `ASTRO_EXACT_DELTA_T` auf 0 setzen oder mit `-DASTRO_EXACT_DELTA_T=0` übers
 | ΔT ab 1961 | bis auf UT1 − UTC (< 0,9 s) exakt |
 
 Nicht berücksichtigt sind Nutation und Aberration; die Positionen beziehen sich auf das mittlere Äquinoktium des
-Datums. Die atmosphärische Refraktion steckt nur pauschal in der Standardhöhe für Auf- und Untergang.
+Datums. Die atmosphärische Refraktion steckt beim Auf- und Untergang pauschal in der Standardhöhe; für
+andere Höhen liefert `calculateRefraction` sie nach Formel 15.4.
 
 ## Funktionen im Überblick
 
@@ -318,7 +319,7 @@ Datums. Die atmosphärische Refraktion steckt nur pauschal in der Standardhöhe 
 | Zeit | `JulianDay::fromCalendar`, `fromTm`, `fromUnixTime`, `fromDynamicalTime`, `toUnixTime`, `midnight`, `deltaT`, `taiMinusUtc`, `dynamicalTime` |
 | Sternzeit | `calculateGreenwichSiderealTime`, `calculateLocalSiderealTime` |
 | Sonne, Erdbahn | `calculateSunPosition`, `calculateObliquity`, `calculateEquationOfTime`, `calculateEarthTrueAnomaly`, `calculateEarthEccentricity`, `calculateNextEarthApsis`, `calculateEquinoxSolstice` |
-| Koordinaten | `calculateEquatorial`, `calculateHorizontal`, `calculateTopocentric`, `calculateParallacticAngle` |
+| Koordinaten | `calculateEquatorial`, `calculateHorizontal`, `calculateTopocentric`, `calculateParallacticAngle`, `calculateRefraction` |
 | Mond | `calculateMoonPosition`, `calculateMoonPositionSimple`, `calculateMoonIlluminatedFraction`, `calculateMoonOrientation`, `calculateMoonAscendingNode`, `calculateNextMoonApsis`, `calculateNextMoonNode` |
 | Auf-/Untergang | `calculateSunRiseSet`, `calculateMoonRiseSet` |
 | Sonstiges | `interpolate`, `createRotationMatrix`, Operatoren für `Mat3` und `Vec3` |

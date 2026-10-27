@@ -514,6 +514,24 @@ Equatorial calculateTopocentric(const Equatorial& equ, const Angle parallax, con
 }
 
 // ---------------------------------------------------------------
+//  Refraktion (Kapitel 15)
+// ---------------------------------------------------------------
+
+/**
+ * Atmosphärische Refraktion aus der wahren Höhe, Formel 15.4 (Saemundsson), für 1010 mbar und 10 °C.
+ * Scheinbare Höhe = wahre Höhe + R. Der Zusatz 0,0019279′ macht R bei h = 90° zu 0.
+ * Die Formel hat bei h = −5,11° eine Polstelle; unter −1° (Blick von erhöhtem Standpunkt unter den
+ * Horizont) wird der Wert bei −1° verwendet.
+ * @param altitude Wahre Höhe h
+ * @return Refraktion R ≥ 0
+ */
+Angle calculateRefraction(const Angle altitude) {
+    const double h = altitude.deg() < -1.0 ? -1.0 : altitude.deg();
+    const double R = 1.02 / std::tan((h + 10.3 / (h + 5.11)) * DEG2RAD) + 0.0019279;  // [′]
+    return Angle::fromDeg((R > 0.0 ? R : 0.0) / 60.0);
+}
+
+// ---------------------------------------------------------------
 //  Interpolation (Kapitel 3)
 // ---------------------------------------------------------------
 

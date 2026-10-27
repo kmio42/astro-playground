@@ -24,6 +24,7 @@
  * 12  Umwandeln von Koordinaten                    12.3–12.6                 calculateEquatorial, calculateHorizontal
  * 13  Der parallaktische Winkel                    13.1                      calculateParallacticAngle
  * 14  Aufgang, Durchgang, Untergang (Sonne; h0)    14.1, 14.2, Δm            calculateSunRiseSet
+ * 15  Atmosphärische Refraktion                   15.4                      calculateRefraction
  * 21  Schiefe der Ekliptik (ohne Nutation)         21.2                      calculateObliquity
  * 24  Koordinaten der Sonne (niedrige Genauigk.)   24.1–24.5                 calculateSunPosition, calculateEarthEccentricity
  * 26  Äquinoktien und Solstitien                   Tab. 26.2, 26.3           calculateEquinoxSolstice
@@ -48,7 +49,7 @@
  * Nicht umgesetzt:
  *  1 Hinweise und Tips, 2 Über Genauigkeit (ohne Algorithmen),
  *  4 Kurvenanpassung, 5 Iteration, 6 Sortieren von Zahlen,
- * 15 Atmosphärische Refraktion, 16 Winkelabstand,
+ * 16 Winkelabstand,
  * 17 Planetenkonjunktionen, 18 Objekte auf gerader Linie, 19 Drei Himmelsobjekte im kleinsten Kreis,
  * 20 Präzession, 22 Scheinbarer Ort eines Sternes,
  * 23 Reduktion ekliptikaler Elemente auf ein anderes Äquinoktium,
@@ -347,6 +348,7 @@ Horizontal calculateHorizontal(const Equatorial& equ, SiderealTime localSidereal
 Angle calculateParallacticAngle(const Equatorial& equ, SiderealTime localSiderealTime, const GeoLocation& location);
 Equatorial calculateTopocentric(const Equatorial& equ, Angle parallax, SiderealTime localSiderealTime,
                                 const GeoLocation& location);
+Angle calculateRefraction(Angle altitude);              // Refraktion R aus der wahren Höhe, scheinbar = h + R
 
 // Interpolation
 double interpolate(double y1, double y2, double y3, double n);

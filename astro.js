@@ -499,6 +499,24 @@
     }
 
     // ---------------------------------------------------------------
+    //  Refraktion (Kapitel 15)
+    // ---------------------------------------------------------------
+
+    /**
+     * Atmosphärische Refraktion aus der wahren Höhe, Formel 15.4 (Saemundsson), für 1010 mbar und 10 °C.
+     * Scheinbare Höhe = wahre Höhe + R. Der Zusatz 0,0019279′ macht R bei h = 90° zu 0.
+     * Die Formel hat bei h = −5,11° eine Polstelle; unter −1° (Blick von erhöhtem Standpunkt unter den
+     * Horizont) wird der Wert bei −1° verwendet.
+     * @param altitude Wahre Höhe h [rad]
+     * @return Refraktion R ≥ 0 [rad]
+     */
+    function calculateRefraction(altitude) {
+        const h = Math.max(altitude * RAD2DEG, -1);
+        const R = 1.02 / Math.tan((h + 10.3 / (h + 5.11)) * DEG2RAD) + 0.0019279;  // [′]
+        return Math.max(R, 0) / 60 * DEG2RAD;
+    }
+
+    // ---------------------------------------------------------------
     //  Interpolation (Kapitel 3)
     // ---------------------------------------------------------------
 
@@ -1456,6 +1474,7 @@
         calculateEquationOfTime, calculateEquinoxSolstice, calculateNextEarthApsis,
         // Koordinaten
         calculateEquatorial, calculateHorizontal, calculateParallacticAngle, calculateTopocentric,
+        calculateRefraction,
         // Interpolation, Auf-/Untergang
         interpolate, calculateSunRiseSet, calculateMoonRiseSet,
         // Mond
