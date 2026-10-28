@@ -77,6 +77,7 @@
         .controls label { white-space: nowrap; }
         .controls input[type="number"] { width: 6em; }
         .controls input[type="text"] { width: 9em; }
+        .controls input[type="range"] { vertical-align: middle; width: min(200px, 50vw); margin-left: -12px; }
         .controls input.invalid { border-color: red; }
         .feedback { color: var(--text-2); font-size: 0.9em; }
         .figure { position: relative; margin-bottom: 8px; }
@@ -145,6 +146,7 @@
 
         let yearData = null;      // Ergebnis von computeYear()
         let timeMode = 'local';   // 'local' (Browser mit Sommerzeit), 'standard' (Zonenzeit ohne Sommerzeit), 'utc'
+        let horizonAltitude = -0.8333;   // Höhe des Sonnenmittelpunkts bei Auf-/Untergang [°]
         let hoverIndex = null;    // Tag unter dem Mauszeiger (Index im Jahr)
         let selectedIndex = 0;    // Tag für die Kennzahlen
 
@@ -178,7 +180,7 @@
                 const offset = utcOffsetForDay(year, 0, 1 + i);
                 const midnightUT = Date.UTC(year, 0, 1 + i) / 86400000 + 2440587.5;
                 const start = midnightUT - offset / 24;              // 0 Uhr Anzeigezeit als JD
-                const r = calculateSunRiseSet(start + 0.5, location, offset);
+                const r = calculateSunRiseSet(start + 0.5, location, offset, horizonAltitude * DEG2RAD);
                 const rise = r.hasRise ? r.rise : NaN;
                 const set = r.hasSet ? r.set : NaN;
                 let length;
@@ -698,6 +700,7 @@
             const latOk = Number.isFinite(lat) && Math.abs(lat) <= 90;
             const lonOk = Number.isFinite(lon) && Math.abs(lon) <= 180;
             latInput.classList.toggle('invalid', !latOk);
+            if (latOk) document.getElementById('latSlider').value = lat;   // Regler folgt dem Textfeld
             lonInput.classList.toggle('invalid', !lonOk);
             const year = parseInt(document.getElementById('year').value, 10);
             if (!latOk || !lonOk || !Number.isFinite(year)) return null;
@@ -708,6 +711,7 @@
             const input = readInputs();
             if (!input) return;
             timeMode = document.getElementById('timeMode').value;
+            horizonAltitude = parseFloat(document.getElementById('horizon').value);
             const oldYear = yearData ? yearData.year : null;
             yearData = computeYear(input.year, input.location);
             if (!keepSelection || oldYear !== input.year) {
@@ -758,6 +762,15 @@
                 document.getElementById(id).addEventListener('input', () => recompute(true));
             }
             document.getElementById('timeMode').addEventListener('change', () => recompute(true));
+            // Schieberegler schreibt die Breite als Dezimalgrad ins Textfeld; Neuberechnung höchstens einmal pro Bild
+            let sliderFrame = null;
+            document.getElementById('latSlider').addEventListener('input', ev => {
+                document.getElementById('lat').value = Number(ev.target.value).toFixed(1);
+                if (sliderFrame === null) {
+                    sliderFrame = requestAnimationFrame(() => { sliderFrame = null; recompute(true); });
+                }
+            });
+            document.getElementById('horizon').addEventListener('change', () => recompute(true));
 
             setupChartInteraction(charts.gain);
             setupChartInteraction(charts.times);
@@ -783,6 +796,7 @@
 
     <div class="controls">
         <label>Breite <input type="text" id="lat"></label>
+        <input type="range" id="latSlider" min="-90" max="90" step="0.1" aria-label="Breite">
         <label>Länge (Ost +) <input type="text" id="lon"></label>
         <button onclick="useGps()">GPS-Position</button>
         <button onclick="saveLocation()">Ort merken</button>
@@ -800,6 +814,14 @@
         <span class="feedback" id="zoneText"></span>
         <button onclick="showToday()">Heute</button>
     </div>
+    <div class="controls">
+        <label>Auf-/Untergang bei
+            <select id="horizon">
+                <option value="-0.8333">−0°50′: Oberrand sichtbar am Horizont (üblich)</option>
+                <option value="0">0°: Sonnenmitte am Horizont, ohne Lichtbrechung</option>
+            </select>
+        </label>
+    </div>
 
     <h2>Zunahme pro Tag</h2>
     <div class="legend">
@@ -812,7 +834,7 @@
         <div class="tooltip" id="gainTooltip"></div>
     </div>
     <p class="hint">Minuten pro Tag. Die Zunahme ist am größten um die Tagundnachtgleichen (März, September) und null an den Sonnenwenden. Die Sommerzeit ändert sie nicht.</p>
-    <p class="hint"><b>Warum liegt die stärkste Zunahme nicht genau auf der Tagundnachtgleiche?</b> Die Zunahme hängt von zwei Dingen ab: wie schnell sich der Sonnenstand ändert (am schnellsten an der Tagundnachtgleiche) und wie stark die Tageslänge darauf reagiert (dort am schwächsten). Beides gleicht sich fast aus, das Maximum ist deshalb sehr flach – bei 50° N ändert sich die Zunahme eine Woche lang nur um Bruchteile einer Sekunde. So verschieben schon kleine Effekte das Datum um einige Tage: die elliptische Erdbahn (die Erde läuft im März langsamer werdend, im September schneller werdend um die Sonne) und die Lichtbrechung am Horizont (Tag und Nacht sind schon einige Tage vor der Tagundnachtgleiche gleich lang). Ab etwa 61° Breite wächst die Zunahme sogar bis kurz vor Polartag bzw. Polarnacht.</p>
+    <p class="hint"><b>Warum liegt die stärkste Zunahme nicht genau auf der Tagundnachtgleiche?</b> Die Zunahme hängt von zwei Dingen ab: wie schnell sich der Sonnenstand ändert (am schnellsten an der Tagundnachtgleiche) und wie stark die Tageslänge darauf reagiert (dort am schwächsten). Beides gleicht sich fast aus, das Maximum ist deshalb sehr flach – bei 50° N ändert sich die Zunahme eine Woche lang nur um Bruchteile einer Sekunde. So verschieben schon kleine Effekte das Datum um einige Tage: die elliptische Erdbahn (die Erde läuft im März langsamer werdend, im September schneller werdend um die Sonne) und die Lichtbrechung am Horizont (Tag und Nacht sind schon einige Tage vor der Tagundnachtgleiche gleich lang). Die beiden heben sich teilweise auf: Mit Auf-/Untergang bei 0° bleibt nur die Erdbahn übrig, und das Maximum rückt weiter weg (50° N: 15. statt 18. März). Ab etwa 61° Breite wächst die Zunahme sogar bis kurz vor Polartag bzw. Polarnacht.</p>
 
     <h2>Sonnenaufgang und Sonnenuntergang</h2>
     <div class="legend">
@@ -830,6 +852,6 @@
     <h2>Kennzahlen</h2>
     <div id="outputTable"></div>
 
-    <p class="hint">Berechnung mit <code>calculateSunRiseSet()</code> aus <code>astro.js</code> (Meeus, Kap. 15, Standardhöhe −0°50′). Die Lokalzeit ist die Zeitzone des Browsers, auch wenn der Ort woanders liegt.</p>
+    <p class="hint">Berechnung mit <code>calculateSunRiseSet()</code> aus <code>astro.js</code> (Meeus, Kap. 15). Die übliche Höhe −0°50′ enthält die Lichtbrechung (34′) und den Sonnenradius (16′). Die Lokalzeit ist die Zeitzone des Browsers, auch wenn der Ort woanders liegt.</p>
 </body>
 </html>
