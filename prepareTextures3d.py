@@ -39,6 +39,12 @@ def earth_day():
     im.resize((4096, 2048), Image.LANCZOS).save(os.path.join(OUT, 'earth_day_4k.jpg'), quality=88)
 
 
+def earth_day_small():
+    """Tagseite für die datensparende Version (ErdeMond3D.html?klein): 2048×1024"""
+    im = Image.open(os.path.join(SRC, 'world.topo.bathy.200405.3x5400x2700.jpg')).convert('RGB')
+    im.resize((2048, 1024), Image.LANCZOS).save(os.path.join(OUT, 'earth_day_2k.jpg'), quality=85)
+
+
 def earth_night():
     """Nachtseite: Black Marble auf 2048×1024"""
     im = Image.open(os.path.join(SRC, 'BlackMarble_2016_01deg.jpg')).convert('RGB')
@@ -68,13 +74,23 @@ def earth_water():
 
 
 def moon_normal():
+    """Mond-Normal-Map 2048×1024 aus den LOLA-Höhen (Einzelheiten in make_moon_normal)"""
+    make_moon_normal(2048, 90, 'moon_normal_2k.jpg')
+
+
+def moon_normal_small():
+    """Mond-Normal-Map für die datensparende Version (ErdeMond3D.html?klein): 1024×512"""
+    make_moon_normal(1024, 88, 'moon_normal_1k.jpg')
+
+
+def make_moon_normal(w, quality, name):
     """
-    Mond-Normal-Map 2048×1024 aus den LOLA-Höhen. Kanäle: Ost, Nord, oben (je ·0,5 + 0,5), also
+    Mond-Normal-Map w×w/2 aus den LOLA-Höhen. Kanäle: Ost, Nord, oben (je ·0,5 + 0,5), also
     tangential zur Kugel. Der Abstand in Ost-Richtung schrumpft mit cos(Breite).
     Als JPG ohne Farbunterabtastung (1,2 MB statt 3,8 MB als PNG); der Shader rechnet „oben“ aus Ost
     und Nord neu, das gleicht einen Teil der JPG-Fehler aus.
     """
-    w, h = 2048, 1024
+    h = w // 2
     im = Image.open(os.path.join(SRC, 'ldem_16_uint.tif'))
     heights = np.asarray(im, dtype=np.float32) * 0.5 - 10000           # Meter
     heights = np.asarray(Image.fromarray(heights, mode='F').resize((w, h), Image.BOX), dtype=np.float64)
@@ -87,12 +103,12 @@ def moon_normal():
     n = np.stack([-MOON_RELIEF * east, -MOON_RELIEF * north, np.ones_like(east)], axis=-1)
     n /= np.linalg.norm(n, axis=-1, keepdims=True)
     rgb = np.clip(np.round((n * 0.5 + 0.5) * 255), 0, 255).astype(np.uint8)
-    Image.fromarray(rgb, 'RGB').save(os.path.join(OUT, 'moon_normal_2k.jpg'), quality=90, subsampling=0)
+    Image.fromarray(rgb, 'RGB').save(os.path.join(OUT, name), quality=quality, subsampling=0)
 
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    steps = (earth_day, earth_night, earth_water, moon_normal)
+    steps = (earth_day, earth_day_small, earth_night, earth_water, moon_normal, moon_normal_small)
     wanted = sys.argv[1:]
     for step in steps:
         if wanted and step.__name__ not in wanted:

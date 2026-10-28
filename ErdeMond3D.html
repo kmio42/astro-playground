@@ -556,6 +556,8 @@
         const EARTHSHINE = 0.035;          // Erdschein bei voller Erde (etwa 300-fach verstärkt, sonst unsichtbar)
         const PIN_LENGTH = 0.45;           // Standort-Nadel über der Oberfläche [Erdradien der Darstellung]
         const ECLIPSE_SEASON = 17 * DEG2RAD;   // Sonne näher an der Knotenlinie → Finsternis möglich
+        // Datensparende Version (ErdeMond3D.html?klein): Erde 2k statt 4k, Mondrelief 1k statt 2k (1,7 statt 3,6 MB)
+        const SMALL_TEXTURES = new URLSearchParams(location.search).has('klein');
 
         const COLORS = {
             ecliptic: [0.95, 0.75, 0.3],
@@ -896,11 +898,13 @@
                 textures[key].ready.then(() => { needsRender = true; })
                     .catch(err => { console.error(err); showMessage(err.message + '. Ist die Seite über einen Webserver geöffnet?'); });
             };
-            load('earthDay', 'textures/earth_day_4k.jpg', { srgb: true, placeholder: [40, 70, 130, 255] });
+            load('earthDay', SMALL_TEXTURES ? 'textures/earth_day_2k.jpg' : 'textures/earth_day_4k.jpg',
+                 { srgb: true, placeholder: [40, 70, 130, 255] });
             load('earthNight', 'textures/earth_night_2k.jpg', { srgb: true, placeholder: [0, 0, 0, 255] });
             load('earthWater', 'textures/earth_water_2k.png', { placeholder: [0, 0, 0, 255] });
             load('moon', 'lroc_color_2k.jpg', { srgb: true, placeholder: [120, 120, 120, 255] });
-            load('moonNormal', 'textures/moon_normal_2k.jpg', { placeholder: [128, 128, 255, 255] });
+            load('moonNormal', SMALL_TEXTURES ? 'textures/moon_normal_1k.jpg' : 'textures/moon_normal_2k.jpg',
+                 { placeholder: [128, 128, 255, 255] });
             return true;
         }
 
@@ -1867,6 +1871,9 @@
                 showMessage('Die Seite braucht einen lokalen Webserver, weil WebGL Bilddateien von <code>file://</code> nicht als Textur verwenden darf.<br><br>' +
                             'Im Projektordner <code>python3 -m http.server 8000</code> starten und<br><code>http://localhost:8000/ErdeMond3D.html</code> öffnen.');
             }
+            document.getElementById('textureSwitch').innerHTML = SMALL_TEXTURES
+                ? 'Datensparende Version (1,7 MB). <a href="ErdeMond3D.html">Volle Auflösung laden</a> (3,6 MB).'
+                : 'Bei langsamer Verbindung: <a href="ErdeMond3D.html?klein">datensparende Version</a> (1,7 statt 3,6 MB).';
             createLabels();
             try {
                 if (!initGL()) return;
@@ -1910,6 +1917,7 @@
         <b>Umschalt+Ziehen</b> verschiebt, <b>Doppelklick</b> auf Erde oder Mond setzt das Ziel.
         Die Rundgänge führen Schritt für Schritt durch Besonderheiten der Mondbahn; alle Einstellungen sind
         <a href="#einstellungen">unten erklärt</a>.
+        <span id="textureSwitch"></span>
     </p>
 
     <div class="tours">
@@ -2081,6 +2089,10 @@
             und aus. <i>Namen</i>: Beschriftungen.</td></tr>
         <tr><td>Beobachtungsort</td><td>Breite und Länge für die Standort-Nadel und die Kulminationshöhe in der Tabelle.
             Der Ort wird im Browser gespeichert und gilt auch auf den anderen Seiten.</td></tr>
+        <tr><td>Datenmenge</td><td>Die Seite lädt beim ersten Aufruf 3,6 MB, fast alles Texturen. Die datensparende
+            Version (<a href="ErdeMond3D.html?klein">ErdeMond3D.html?klein</a>) lädt 1,7 MB: Die Erde ist dann 2048 statt
+            4096 Pixel breit, das Mondrelief 1024 statt 2048. Aus der Nähe sind Erde und Krater etwas unschärfer, sonst
+            ist alles gleich.</td></tr>
         <tr><td>Geführte Rundgänge</td><td>Jeder Schritt stellt Zeitpunkt, Ansicht und Anzeigen passend ein und startet
             bei Bedarf den Zeitraffer. Danach kann man frei weiterdrehen; „↺ Noch einmal“ stellt den Schritt wieder
             her. Am Ende (oder mit ✕) kommen Anzeigen und Maßstab wieder wie vorher.</td></tr>

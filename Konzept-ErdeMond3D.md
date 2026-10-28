@@ -17,6 +17,8 @@ Monatsgang, große/kleine Mondwende, 18,6 Jahre, Vollmond im Winter/Sommer), „
 (Drachenmonat, Rückwanderung, Finsternis-Saisons, Saros) und „Apsiden“ (anomalistischer Monat, Vorwanderung in
 8,85 Jahren, Supermond/Minimond, totale/ringförmige Finsternis). Jeder Schritt setzt Zeitpunkt, Anzeigen, Maßstab,
 Kamera und Zeitraffer; am Ende kommen Anzeigen und Maßstab wieder wie vorher.
+Datensparende Version `ErdeMond3D.html?klein`: Erde 2048 statt 4096 Pixel (`earth_day_2k.jpg`, 0,34 MB), Mondrelief
+1024 statt 2048 (`moon_normal_1k.jpg`, 0,25 MB); zusammen 1,7 statt 3,6 MB je Aufruf. Link oben auf der Seite.
 
 ## Ziel
 

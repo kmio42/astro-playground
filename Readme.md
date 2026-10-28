@@ -41,7 +41,7 @@ All pages run directly in a browser without a build step.
 |------|-------------|
 | `Erdposition.html` | Solar position, rise/set times, equation of time, solstices/equinoxes, sidereal time, 2D Earth orbit visualization |
 | `Mond.html` | moon orbit around Earth, 3D moon phase rendering with pixel-by-pixel surface mapping |
-| `ErdeMond3D.html` | Interactive 3D model of Earth and Moon (own WebGL2, NASA textures, needs `python3 -m http.server`): ecliptic and moon orbit plane, true moon path, nodes, apsides, lit sides with moon relief, earthshine and atmosphere, umbra/penumbra and shadow cones, lunar and solar eclipses, view buttons, jumps to phases/nodes/apsides/eclipses, playback, guided tours (moon height and lunar standstills, nodes and eclipses, apsides) (uses `orbit3d.js`, `gl3d.js`) |
+| `ErdeMond3D.html` | Interactive 3D model of Earth and Moon (own WebGL2, NASA textures, needs `python3 -m http.server`): ecliptic and moon orbit plane, true moon path, nodes, apsides, lit sides with moon relief, earthshine and atmosphere, umbra/penumbra and shadow cones, lunar and solar eclipses, view buttons, jumps to phases/nodes/apsides/eclipses, playback, guided tours (moon height and lunar standstills, nodes and eclipses, apsides); 3.6 MB of textures, data-saving version `ErdeMond3D.html?klein` with 1.7 MB (uses `orbit3d.js`, `gl3d.js`) |
 | `Sichtbarkeit.html` | When are sun and moon visible from a balcony or window: visibility mask per viewpoint, horizon line computed from OSM buildings and terrain, room and balcony with windows (ray test, sun patch on the floor), horizon diagram, OSM map, yearly sun overview, moon visibility dates (uses `visibility.js`) |
 ---
 
