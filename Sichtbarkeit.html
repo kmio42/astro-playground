@@ -3649,13 +3649,13 @@
             const parts = [plural(vp.observations.length, 'Beobachtung', 'Beobachtungen')];
             if (vp.horizon.length) parts.push(plural(vp.horizon.length, 'Horizontpunkt', 'Horizontpunkte'));
             if (vp.sectors.length) parts.push(plural(vp.sectors.length, 'Sichtbereich', 'Sichtbereiche'));
-            return { done: vp.observations.length > 0, summary: parts.join(' · ') + (vp.observations.length ? '' : ' – freiwillig') };
+            return { done: vp.observations.length > 0, summary: parts.join(' · ') + (vp.observations.length ? '' : ' – optional') };
         }
 
         function placeHintText(vp, kind) {
             if (!vp || !kind) return '';
             if (kind === 'hand') {
-                return 'Freiwillig: in der Karte eine Wand anklicken und den Halbraum davor als Sichtbereich übernehmen. ' +
+                return 'Optional: in der Karte eine Wand anklicken und den Halbraum davor als Sichtbereich übernehmen. ' +
                        'Feiner geht es in Schritt 4 im Horizontdiagramm.';
             }
             if (vp.scene.anchor) {
@@ -4062,7 +4062,7 @@
 
         <section class="step" id="step4">
             <button class="step-head" type="button" onclick="toggleStep(4)">
-                <span class="step-num">4</span><span class="step-title">Sichtbereich</span><span class="step-summary" id="step4Summary"></span>
+                <span class="step-num">4</span><span class="step-title">Sichtmaske</span><span class="step-summary" id="step4Summary"></span>
             </button>
             <div class="step-body">
                 <p class="hint">Grau ist verdeckt. Passt das zu dem, was man vom Platz aus sieht? Fehlen Bäume oder Dachformen,

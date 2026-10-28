@@ -3,7 +3,7 @@
 Ergänzt [Konzept-Sichtbarkeit.md](Konzept-Sichtbarkeit.md). Rechnung und Datenmodell bleiben gleich, es geht
 nur um Reihenfolge, Führung und Ausblenden. Alle Funktionen bleiben erhalten (Inventar am Ende).
 
-**Stand 28.10.2026:** umgesetzt, Stufen 1–4. Die Schritte heißen inzwischen ① Haus/Umgebung, ② Standpunkt, ③ Raum/Balkon, ④ Sichtbereich. Entscheidungen zu den offenen Fragen: zwei Ansichten, Umgebung vom
+**Stand 28.10.2026:** umgesetzt, Stufen 1–4. Die Schritte heißen inzwischen ① Haus/Umgebung, ② Standpunkt, ③ Raum/Balkon, ④ Sichtmaske („Sichtbereich“ bleibt den selbst gezogenen Rechtecken vorbehalten). Entscheidungen zu den offenen Fragen: zwei Ansichten, Umgebung vom
 Auge aus, Laden weiter per Knopf. Abweichungen vom ersten Entwurf sind unten vermerkt.
 
 ## Was heute stört
@@ -95,7 +95,7 @@ Satz Einführung. Sonst öffnet sich „Ergebnis“.
                       │ ▸ Mehr: Wandstärke, weitere Fenster, Trennwände, Glas, …         │
                       │                                                     [Weiter]     │
                       └──────────────────────────────────────────────────────────────────┘
-④ Sichtbereich        offen
+④ Sichtmaske          offen
 ```
 
 ### ① Haus/Umgebung
@@ -152,7 +152,7 @@ Nur bei Fenster/Balkon. Formular und Zeichnungen stehen nebeneinander (schmal: u
 
 Das Auge lässt sich in der Draufsicht mit der Maus verschieben; x/y als Zahlen stehen unter „Mehr“.
 
-### ④ Sichtbereich (prüfen und ergänzen)
+### ④ Sichtmaske (prüfen und ergänzen)
 
 Stimmt die Sichtmaske? Hier steht das Horizontdiagramm mit allen Bearbeitungswerkzeugen.
 
