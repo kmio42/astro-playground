@@ -596,14 +596,13 @@
      * @param jd Julianischer Tag eines Zeitpunkts des gewünschten Tages
      * @param location Beobachtungsort
      * @param utcOffset Zeitzone des Tages [h], ohne Angabe 0 (UT-Tag)
+     * @param h0 Höhe des Sonnenmittelpunkts bei Auf- und Untergang [rad], ohne Angabe die Standardhöhe −0°50′
+     *           (Refraktion 34′ und Sonnenradius 16′); 0 für den geometrischen Horizontdurchgang
      * @return { hasRise, hasSet, hasTransit, rise, set, transit [h seit Tagesbeginn], maxAltitude [rad] über h0,
      *           maxAltitudeTime [h seit Tagesbeginn] }; bei Polartag oder Polarnacht weder Auf- noch Untergang
      */
-    function calculateSunRiseSet(jd, location, utcOffset = 0) {
+    function calculateSunRiseSet(jd, location, utcOffset = 0, h0 = -0.8333 * DEG2RAD) {
         const phi = location.latitude;
-
-        // Standardhöhe der Sonne h0 = −0°50′
-        const h0 = -0.8333 * DEG2RAD;
 
         // Stützstellen am Tagesbeginn sowie einen Tag davor und danach; α stetig fortgesetzt
         const start = localMidnight(jd, utcOffset);

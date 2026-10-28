@@ -308,7 +308,8 @@ von `ASTRO_EXACT_DELTA_T` auf 0 setzen oder mit `-DASTRO_EXACT_DELTA_T=0` übers
 | ΔT ab 1961 | bis auf UT1 − UTC (< 0,9 s) exakt |
 
 Nicht berücksichtigt sind Nutation und Aberration; die Positionen beziehen sich auf das mittlere Äquinoktium des
-Datums. Die atmosphärische Refraktion steckt beim Auf- und Untergang pauschal in der Standardhöhe; für
+Datums. Die atmosphärische Refraktion steckt beim Auf- und Untergang pauschal in der Standardhöhe −0°50′
+(optionaler vierter Parameter `h0` von `calculateSunRiseSet`, 0 für den geometrischen Horizontdurchgang); für
 andere Höhen liefert `calculateRefraction` sie nach Formel 15.4.
 
 ## Funktionen im Überblick

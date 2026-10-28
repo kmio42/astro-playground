@@ -353,8 +353,10 @@ Angle calculateRefraction(Angle altitude);              // Refraktion R aus der 
 // Interpolation
 double interpolate(double y1, double y2, double y3, double n);
 
-// Auf-/Untergang am Tag, der jd enthält; utcOffset [h] wählt den Kalendertag einer Zeitzone (0: UT-Tag)
-RiseTransitSet calculateSunRiseSet(JulianDay jd, const GeoLocation& location, double utcOffset = 0.0);
+// Auf-/Untergang am Tag, der jd enthält; utcOffset [h] wählt den Kalendertag einer Zeitzone (0: UT-Tag).
+// h0: Höhe des Sonnenmittelpunkts bei Auf-/Untergang, Standard −0°50′ (Refraktion + Sonnenradius), 0: geometrisch
+RiseTransitSet calculateSunRiseSet(JulianDay jd, const GeoLocation& location, double utcOffset = 0.0,
+                                   Angle h0 = -0.8333_deg);
 RiseTransitSet calculateMoonRiseSet(JulianDay jd, const GeoLocation& location, double utcOffset = 0.0);
 
 // Solstitien und Äquinoktien (UT), Perihel/Aphel der Erde

@@ -627,13 +627,13 @@ bool sunEventInDay(const SunNodes& nodes, const double mStart, const GeoLocation
  * @param jd Julianischer Tag eines Zeitpunkts des gewünschten Tages
  * @param location Beobachtungsort
  * @param utcOffset Zeitzone des Tages [h], 0 für den UT-Tag
+ * @param h0 Höhe des Sonnenmittelpunkts bei Auf- und Untergang, Standardhöhe −0°50′ (Refraktion 34′ und
+ *           Sonnenradius 16′); 0 für den geometrischen Horizontdurchgang
  * @return Zeiten [h seit Tagesbeginn]; bei Polartag oder Polarnacht weder Auf- noch Untergang
  */
-RiseTransitSet calculateSunRiseSet(const JulianDay jd, const GeoLocation& location, const double utcOffset) {
+RiseTransitSet calculateSunRiseSet(const JulianDay jd, const GeoLocation& location, const double utcOffset,
+                                   const Angle h0) {
     const Angle phi = location.latitude;
-
-    // Standardhöhe der Sonne h0 = −0°50′
-    constexpr Angle h0 = -0.8333_deg;
 
     // Stützstellen am Tagesbeginn sowie einen Tag davor und danach; α stetig fortgesetzt
     const JulianDay start = localMidnight(jd, utcOffset);
