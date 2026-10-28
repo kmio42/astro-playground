@@ -173,9 +173,23 @@ Reihenfolge nach der Frage, die man hat:
    Mondliste), sie werden nur zusammengefasst.
 2. **Jahresübersicht Sonne** mit Sonnenstunden. Klick wählt Tag und Uhrzeit wie heute.
 3. **Tag** mit Zeitleiste und Tabelle.
-4. **Mond-Termine.** Die Filter (Zeitraum, Mindestdauer, Beleuchtung, nur bei Dunkelheit) liegen eingeklappt
+4. **Sonne im Raum** (bzw. „auf dem Balkon“), nur bei einem Standpunkt mit Raum oder Balkon. Wann Sonne auf den
+   Boden fällt, ist etwas anderes als die Jahresübersicht (Sonne vom Auge aus): Der Sturz kann die Sonne fürs Auge
+   verdecken, während auf dem Boden ein Fleck liegt.
+   - Grobe Orientierung: ein Satz („Sonne fällt auf den Boden etwa vom 12.10. bis 28.2., je nach Tag zwischen 9:40
+     und 14:10 Uhr, bis 7,4 m². Vom 1.3. bis 11.10. fällt keine Sonne herein.“) und eine kleine Jahres-Heatmap
+     (Tag × Uhrzeit in 10-min-Schritten, Farbe = Fleckgröße). Klick wählt Tag und Uhrzeit.
+   - Genauer Zeitpunkt: Tagesstreifen mit der Fleckgröße über den Tag und darunter ein Uhrzeit-Regler (5 min,
+     Sonnenaufgang − 30 min bis Sonnenuntergang + 30 min), „Zum größten Fleck“. Beim Ziehen wandern Fleck und
+     Markierung nur als Vorschau; beim Loslassen übernimmt die Kopfleiste die Zeit.
+   - Darunter Draufsicht mit Sonnenfleck und Fensterwand, dieselben Zeichnungen wie in ③ (dort umgehängt), hier ohne
+     Verschieben des Auges.
+   - Die Fleckgröße hängt nur von der Richtung zur Sonne ab. Sie wird je Szene einmal im 2°-Raster vorgerechnet
+     (`sunPatchTable`, ≈ 0,25 s), Jahr und Tag lesen nur noch aus der Tabelle.
+   - Bei „Alle Standpunkte“ ein Hinweis, einen einzelnen zu wählen.
+5. **Mond-Termine.** Die Filter (Zeitraum, Mindestdauer, Beleuchtung, nur bei Dunkelheit) liegen eingeklappt
    hinter „Filter“. Die Kopfzeile nennt die aktiven Filter („3 Monate · ab 10 min“).
-5. **Rundumblick**: das Horizontdiagramm, nur zum Ansehen (Zoom, Tooltip mit Hindernis, Sonnenbahnen), ohne
+6. **Rundumblick**: das Horizontdiagramm, nur zum Ansehen (Zoom, Tooltip mit Hindernis, Sonnenbahnen), ohne
    Bearbeitungswerkzeuge. Daneben ein Link „bearbeiten“, der zu ④ springt.
 
 Am Ende steht ein eingeklappter Kasten „Karte mit der Richtung zu Sonne und Mond“; erst beim Aufklappen wird die
@@ -277,7 +291,7 @@ S = sichtbar, M = unter „Mehr“, K = nur im passenden Kontext.
 | Auge x/y | ③ | M (sichtbar: in der Draufsicht ziehen) |
 | „Standort aufs Auge setzen“ | entfällt (Logikänderung 1) | – |
 | „Raum und Balkon entfernen“ | ③ | M |
-| Draufsicht mit Sonnenfleck, Wandansicht | ③ | S |
+| Draufsicht mit Sonnenfleck, Wandansicht | ③ und Ergebnis „Sonne im Raum“ | S |
 | Jahresübersicht, Sonnenstunden, Klick wählt Tag | Ergebnis | S |
 | Tag: Zeitleiste, Tabelle | Ergebnis | S |
 | Mond-Termine, Klick öffnet Tag | Ergebnis | S |

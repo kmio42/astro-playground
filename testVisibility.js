@@ -472,6 +472,16 @@ console.log('17. Szene in der Maske und Sonnenfleck');
     check(Math.abs(patch.area - expected) < 0.15 && Math.min(...ys) > 0.9 / t - 0.05 && Math.max(...ys) < 2.3 / t - 0.35 + 0.05,
           `Sonnenfleck ${patch.area.toFixed(2)} m² (erwartet ${expected.toFixed(2)} m²), ${(0.9 / t).toFixed(2)}–${(2.3 / t - 0.35).toFixed(2)} m vor der Wand`);
     check(vis.sunPatch(vp.scene, 0, 30).area === 0, 'Sonne von Norden: kein Fleck');
+
+    // Tabelle der Fleckgröße je Richtung: stimmt mit der direkten Rechnung überein
+    const table = vis.sunPatchTable(vp.scene);
+    let worst = 0;
+    for (const [az, alt] of [[180, 30], [165, 15], [200, 40], [150, 25], [181, 9]]) {
+        worst = Math.max(worst, Math.abs(vis.sunPatchArea(table, az, alt) - vis.sunPatch(vp.scene, az, alt, 0.05).area));
+    }
+    check(worst < 0.5, `Fleck aus der Tabelle weicht höchstens ${worst.toFixed(2)} m² ab`);
+    check(vis.sunPatchArea(table, 0, 30) === 0 && vis.sunPatchArea(table, 270, 20) === 0 && vis.sunPatchArea(table, 180, -1) === 0,
+          'Tabelle: kein Fleck hinter der Fassade und unter dem Horizont');
 }
 
 console.log(failures ? `\n${failures} Fehler` : '\nAlle Tests bestanden');

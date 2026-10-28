@@ -764,6 +764,35 @@
         return result;
     }
 
+    /**
+     * Größe des Sonnenflecks für alle Richtungen vorrechnen: Fläche [m²] für Azimut 0–360° × Höhe 0–90° im Raster
+     * step [°]. Die Fläche hängt nur von der Richtung ab, nicht vom Datum; für eine Jahresübersicht reicht daher
+     * diese Tabelle (sunPatchArea liest sie aus). cell: Abtastweite des Bodens [m], siehe sunPatch.
+     * @return { step, cols, rows, area: Float32Array (Zeile = Höhe, Spalte = Azimut) }
+     */
+    function sunPatchTable(cs, { step = 2, cell = 0.25 } = {}) {
+        const cols = Math.round(360 / step), rows = Math.round(90 / step) + 1;
+        const area = new Float32Array(cols * rows);
+        for (let j = 0; j < rows; j++) {
+            // Höhe 0° selbst trifft den Boden nie; die unterste Zeile mit knapp darüber rechnen
+            const alt = Math.max(j * step, 0.25);
+            for (let i = 0; i < cols; i++) area[j * cols + i] = sunPatch(cs, i * step, alt, cell).area;
+        }
+        return { step, cols, rows, area };
+    }
+
+    /** Fläche des Sonnenflecks [m²] aus der Tabelle, bilinear interpoliert; unter 0,05 m² gilt als kein Fleck */
+    function sunPatchArea(table, azimuth, altitude) {
+        if (!table || altitude <= 0) return 0;
+        const { step, cols, rows, area } = table;
+        const x = wrap360(azimuth) / step, y = Math.min(altitude / step, rows - 1);
+        const i = Math.floor(x) % cols, i1 = (i + 1) % cols, fx = x - Math.floor(x);
+        const j = Math.min(Math.floor(y), rows - 2), fy = y - j;
+        const at = (jj, ii) => area[jj * cols + ii];
+        const v = (1 - fy) * ((1 - fx) * at(j, i) + fx * at(j, i1)) + fy * ((1 - fx) * at(j + 1, i) + fx * at(j + 1, i1));
+        return v < 0.05 ? 0 : v;
+    }
+
     // ---------------------------------------------------------------
     //  Richtung von Sonne und Mond
     // ---------------------------------------------------------------
@@ -1106,7 +1135,7 @@
         horizonFromBuildings, terrainZoom, terrainTileList, decodeTerrarium, createTerrainSampler,
         terrainProfile, horizonFromTerrain, combineProfiles,
         SCENE_ALT_MIN, SCENE_ALT_MAX, normalizeScene, sceneRectangles, compileScene, sceneDirectionFree, sceneVisible,
-        sceneObstacle, sunPatch,
+        sceneObstacle, sunPatch, sunPatchTable, sunPatchArea,
         apparentAltitude, sunDirection, moonDirection, createMoonEphemeris, findFullMoons,
         visibilityLevel, findVisibilityIntervals, computeLevelGrid, computeLevelSeries, observationDirection,
     };
