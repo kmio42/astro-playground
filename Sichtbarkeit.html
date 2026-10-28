@@ -201,6 +201,21 @@
         .callout { padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 4px; margin: 8px 0 10px; }
         .callout:empty { display: none; }
         .callout.stale { border-left-color: #d03b3b; }
+        /* Unter „Einrichten“ zählt der Zeitpunkt nicht: keine Zeitleiste, keine Sonnen-/Mond-Legenden */
+        body.view-setup #timeBar, #viewSetup .sun-only { display: none; }
+        .map-label-anchor { overflow: visible; }
+        .map-label {
+            display: inline-block;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--accent);
+            font: 12px Arial, sans-serif;
+        }
+        .map-label.strong { font-weight: 700; }
         .scene-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
         @media (min-width: 860px) {
             .scene-layout { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
@@ -718,8 +733,8 @@
                 ['swatch', 'var(--mask)', 'verdeckt'],
                 ['', 'var(--accent)', 'Sichtbereich, Horizontlinie'],
                 (hasEnv || hasScene) && ['', 'var(--text-2)', hasScene && hasEnv ? 'Gebäude, Gelände, Fenster' : hasScene ? 'Fenster und Balkon' : 'Gebäude und Gelände'],
-                ['', 'var(--sun)', 'Sonne am eingestellten Tag'],
-                s.showMoon && ['', 'var(--moon)', 'Mond am eingestellten Tag'],
+                currentView !== 'setup' && ['', 'var(--sun)', 'Sonne am eingestellten Tag'],
+                currentView !== 'setup' && s.showMoon && ['', 'var(--moon)', 'Mond am eingestellten Tag'],
                 s.showMonthPaths && ['', 'color-mix(in srgb, var(--sun) 45%, transparent)', 'Sonnenbahn am 21. jedes Monats'],
                 s.showHourLines && ['dashed', 'var(--muted)', 'Stundenlinie (Normalzeit)'],
             ].filter(Boolean);
@@ -862,20 +877,21 @@
                 ctx.setLineDash([]);
             }
 
-            // Bahnen und Positionen des gewählten Tages
-            const day = computeDayPaths();
+            // Bahnen und Positionen des gewählten Tages (nur unter „Ergebnis“, beim Einrichten zählt der Zeitpunkt nicht)
+            const withDay = currentView !== 'setup';
+            const day = withDay ? computeDayPaths() : null;
             ctx.lineWidth = 2.2;
             ctx.strokeStyle = sunColor;
-            strokePath(ctx, day.sun);
-            if (state.settings.showMoon) {
+            if (withDay) strokePath(ctx, day.sun);
+            if (withDay && state.settings.showMoon) {
                 ctx.strokeStyle = css('--moon');
                 strokePath(ctx, day.moon);
             }
             const jd = currentJd();
             const pxPerDeg = pw / span;
-            const sun = sunDirection(jd, loc);
-            const bodies = [{ dir: sun, color: sunColor }];
-            if (state.settings.showMoon) bodies.push({ dir: moonDirection(jd, loc), color: css('--moon') });
+            const bodies = [];
+            if (withDay) bodies.push({ dir: sunDirection(jd, loc), color: sunColor });
+            if (withDay && state.settings.showMoon) bodies.push({ dir: moonDirection(jd, loc), color: css('--moon') });
             for (const b of bodies) {
                 ctx.beginPath();
                 ctx.arc(azToX(b.dir.azimuth), altToY(b.dir.altitude), Math.max(5, b.dir.radius * pxPerDeg), 0, 2 * Math.PI);
@@ -2056,8 +2072,7 @@
                 // Vorschau ohne Neuberechnung der Maske
                 const ex = e.x, ey = t.cs.scene.eye.place === 'room' ? -t.cs.scene.wall - e.y : e.y;
                 const preview = { ...t.cs, eye: [ex, ey, t.cs.eye[2]] };
-                const sun = sunDirection(currentJd(), getLocation());
-                drawSceneTop(canvas, preview, sun, null, VisibilityLevel.Hidden);
+                drawSceneTop(canvas, preview, null, null, null);
                 canvas.style.cursor = 'grabbing';
             });
             const finish = () => {
@@ -2091,6 +2106,14 @@
             if (!vpc || !vpc.scene) { info.textContent = ''; return; }
             if (!shown('sceneTop')) return;
             const cs = vpc.scene, sc = cs.scene;
+            if (currentView === 'setup') {
+                // Beim Einrichten nur die Maße; Sonne und Sonnenfleck zeigt „Ergebnis“ → „Sonne im Raum“
+                drawSceneTop(document.getElementById('sceneTop'), cs, null, null, null);
+                drawSceneFront(document.getElementById('sceneFront'), cs, vp.eyeHeight);
+                info.textContent = 'Sonne und Sonnenfleck zu einem Zeitpunkt zeigt „Ergebnis“ → „' +
+                    (sc.room ? 'Sonne im Raum' : 'Sonne auf dem Balkon') + '“.';
+                return;
+            }
             const sun = sunDirection(jd, getLocation());
             const patch = currentSunPatch(vpc, sun);
             const level = visibilityLevel(sun, vpc);
@@ -2167,7 +2190,7 @@
 
             // Auge und Richtung zur Sonne (Länge nach der Höhe verkürzt)
             const [ex, ey] = cs.eye;
-            if (sun.altitude > ALT_MIN) {
+            if (sun && sun.altitude > ALT_MIN) {
                 const a = (sun.azimuth - sc.facade) * DEG2RAD, len = 1.6 * Math.cos(sun.altitude * DEG2RAD);
                 ctx.strokeStyle = css('--sun');
                 ctx.lineWidth = 2.5;
@@ -2493,6 +2516,85 @@
             }
         }
 
+        // Himmelsrichtungen, in die man vom Auge aus hinaussieht (Sichtbereiche, Raum/Balkon; ohne Umgebung), als
+        // Bereiche [{ from, to, width }] [°] im Uhrzeigersinn; null = keine Einschränkung (ganzer Horizont)
+        let angleCache = { key: null, ranges: null };
+        function visibleAzimuthRanges(index) {
+            const vp = state.viewpoints[index];
+            const key = maskVersion + '|' + index;
+            if (angleCache.key === key) return angleCache.ranges;
+            const own = compileViewpoint({ name: vp.name, sectors: vp.sectors, horizon: [], eyeHeight: vp.eyeHeight,
+                                           scene: compiledSceneOf(vp) }, null);
+            let ranges = null;
+            if (own.sectors.length || own.scene) {
+                const step = 0.5, n = 720, free = [];
+                for (let i = 0; i < n; i++) {
+                    let ok = false;
+                    for (let h = 1; h < 90 && !ok; h += 2) ok = isDirectionVisible(own, i * step, h);
+                    free.push(ok);
+                }
+                ranges = [];
+                if (free.every(Boolean)) {
+                    ranges = null;
+                } else {
+                    // Läufe freier Richtungen, beginnend nach einer verdeckten (damit kein Lauf über Nord zerfällt)
+                    const start = free.findIndex(f => !f);
+                    let run = null;
+                    for (let j = 1; j <= n; j++) {
+                        const i = (start + j) % n;
+                        if (free[i] && !run) run = { first: i, count: 0 };
+                        if (free[i]) run.count++;
+                        if ((!free[i] || j === n) && run) {
+                            // Ränder: erste und letzte freie Richtung
+                            ranges.push({ from: run.first * step, to: normalizeDegrees((run.first + run.count - 1) * step),
+                                          width: (run.count - 1) * step });
+                            run = null;
+                        }
+                    }
+                }
+            }
+            angleCache = { key, ranges };
+            return ranges;
+        }
+
+        // Beschriftung in der Karte (ohne Marker-Symbol)
+        function mapLabel(latlng, text, cls = '') {
+            return L.marker(latlng, { pane: 'directions', interactive: false, keyboard: false,
+                icon: L.divIcon({ className: 'map-label-anchor', iconSize: [0, 0], html: `<span class="map-label ${cls}">${text}</span>` }) });
+        }
+
+        // Was den Blickwinkel begrenzt (Beschriftung in der Mitte des Winkels)
+        function limitLabel(vp) {
+            const sc = vp.scene, what = sc && sc.room ? 'Fenster' : sc ? 'Balkon' : null;
+            if (what && vp.sectors.length) return `${what} + Sichtbereich`;
+            return what || 'Sichtbereich';
+        }
+
+        // Schritt 4: Blickwinkel vom Auge aus, mit Gradzahlen an den Rändern
+        function drawAngleOverlay(index, color) {
+            const vp = state.viewpoints[index];
+            const eye = eyePosition(vp);
+            const at = (az, dist) => destination(eye.latitude, eye.longitude, az, dist);
+            const ranges = visibleAzimuthRanges(index);
+            const R = 60;
+            if (!ranges) {
+                L.circle([eye.latitude, eye.longitude], { radius: R, color, weight: 1.5, dashArray: '4 4', fillOpacity: 0.06, pane: 'directions', interactive: false })
+                    .addTo(overlayLayer);
+                mapLabel(at(0, R + 12), 'Rundumblick (kein Raum, kein Sichtbereich)').addTo(overlayLayer);
+                return;
+            }
+            for (const r of ranges) {
+                const pts = [[eye.latitude, eye.longitude]];
+                for (let k = 0; k <= 48; k++) pts.push(at(r.from + r.width * k / 48, R));
+                L.polygon(pts, { color, weight: 1.5, fillColor: color, fillOpacity: 0.15, pane: 'directions', interactive: false }).addTo(overlayLayer);
+                for (const az of [r.from, r.to]) {
+                    L.polyline([[eye.latitude, eye.longitude], at(az, R + 25)], { color, weight: 2, pane: 'directions', interactive: false }).addTo(overlayLayer);
+                    mapLabel(at(az, R + 36), `${fmtNum(az, 0)}° ${compass(az)}`).addTo(overlayLayer);
+                }
+                mapLabel(at(r.from + r.width / 2, R * 0.6), `${limitLabel(vp)} ${fmtNum(r.width, 0)}°`, 'strong').addTo(overlayLayer);
+            }
+        }
+
         function drawMap() {
             if (!leafletMap || !shown('map')) return;
             const here = [latitude, longitude];
@@ -2502,10 +2604,13 @@
             directionLayer.clearLayers();
             const loc = getLocation();
             const onTop = { pane: 'directions' };
+            // Unter „Einrichten“ keine Sonne und kein Mond; in Schritt 4 statt der Sichtbereiche der Winkel vom Auge
+            const withSun = currentView !== 'setup';
+            const angles = currentView === 'setup' && state.ui.step === 4;
 
             // Sonnenwenden: Auf- und Untergangsrichtung
             const year = selectedYear();
-            for (const [type, label] of [[EquinoxType.Summer, '21.6.'], [EquinoxType.Winter, '21.12.']]) {
+            for (const [type, label] of withSun ? [[EquinoxType.Summer, '21.6.'], [EquinoxType.Winter, '21.12.']] : []) {
                 const jd = calculateEquinoxSolstice(year, type);
                 const rs = calculateSunRiseSet(jd, loc);
                 const midnight = julianDayMidnight(jd);
@@ -2522,7 +2627,8 @@
             activeIndices().forEach((idx, n) => {
                 const vp = compiledVps[idx];
                 const color = css(VP_COLORS[n % VP_COLORS.length]);
-                for (const s of vp.sectors) {
+                if (angles) drawAngleOverlay(idx, color);
+                for (const s of angles ? [] : vp.sectors) {
                     const pts = [here];
                     const span = normalizeDegrees(s.azimuthTo - s.azimuthFrom) || 360;
                     for (let k = 0; k <= 36; k++) pts.push(destination(latitude, longitude, s.azimuthFrom + span * k / 36, 100));
@@ -2541,7 +2647,7 @@
             const jd = currentJd();
             const vps = activeCompiled();
             const sun = sunDirection(jd, loc);
-            for (const [dir, colorName, name] of [[sun, '--sun', 'Sonne'], [moonDirection(jd, loc), '--moon', 'Mond']]) {
+            for (const [dir, colorName, name] of withSun ? [[sun, '--sun', 'Sonne'], [moonDirection(jd, loc), '--moon', 'Mond']] : []) {
                 const level = Math.max(...vps.map(vp => visibilityLevel(dir, vp)));
                 const visible = level >= VisibilityLevel.Partial;
                 const below = level === VisibilityLevel.Below;
@@ -3240,6 +3346,7 @@
         let currentView = null;         // 'setup' (Einrichten) oder 'result' (Ergebnis)
         let lastEditable = 0;           // zuletzt gewählter einzelner Standpunkt
         let mapShown = false;           // Karte schon einmal sichtbar gewesen (Ausschnitt setzen)
+        let lastMapSlot = null;         // wo die Karte zuletzt hing
         const VIEW_HASH = { setup: 'einrichten', result: 'ergebnis' };
 
         // Element sichtbar (nicht in einer ausgeblendeten Ansicht, einem zugeklappten Schritt oder geparkt)?
@@ -3273,6 +3380,7 @@
                 saveState();
             }
             document.getElementById('viewSetup').hidden = view !== 'setup';
+            document.body.classList.toggle('view-setup', view === 'setup');
             document.getElementById('viewResult').hidden = view !== 'result';
             document.getElementById('tabSetup').setAttribute('aria-pressed', String(view === 'setup'));
             document.getElementById('tabResult').setAttribute('aria-pressed', String(view === 'result'));
@@ -3289,7 +3397,7 @@
         // Karte und Horizontdiagramm gibt es nur einmal; sie hängen dort, wo sie gerade gebraucht werden
         function placeMovables() {
             const setup = currentView === 'setup', step = state.ui.step;
-            const mapSlot = setup ? (step === 1 ? 'mapSlot1' : step === 2 ? 'mapSlot2' : null)
+            const mapSlot = setup ? (step === 1 ? 'mapSlot1' : step === 2 ? 'mapSlot2' : step === 4 ? 'mapSlot4' : null)
                                   : (document.getElementById('resultMapMore').open ? 'mapSlotResult' : null);
             const hzSlot = setup ? (step === 4 ? 'hzSlotSetup' : null) : 'hzSlotResult';
             const move = (id, slot) => {
@@ -3305,7 +3413,14 @@
                     leafletMap.setView([latitude, longitude], 17);
                     mapShown = true;
                 }
+                // Schritt 4: auf den Winkel vom Auge aus einstellen
+                const vp = editableViewpoint();
+                if (mapSlot === 'mapSlot4' && lastMapSlot !== 'mapSlot4' && vp) {
+                    const eye = eyePosition(vp);
+                    leafletMap.setView([eye.latitude, eye.longitude], 17);
+                }
             }
+            lastMapSlot = mapSlot;
         }
 
         function plural(n, one, many) {
@@ -3729,7 +3844,7 @@
                         <label><input type="checkbox" id="envShowShadows"> Schatten</label>
                     </div>
                     <p class="hint">Gebäudehöhe korrigieren: Gebäude in der Karte anklicken → „Höhe korrigieren“. „Schatten“ zeigt den
-                        Schattenwurf zur eingestellten Zeit – passt er zu einem Luftbild, stimmen die Höhen ungefähr.</p>
+                        Schattenwurf zu der unter „Ergebnis“ eingestellten Zeit – passt er zu einem Luftbild, stimmen die Höhen ungefähr.</p>
                     <p class="hint">Die berechnete Horizontlinie ist für jede Richtung der höchste Winkel zu einer Dachkante bzw. zum
                         Gelände, gesehen aus der Augenhöhe des Standpunkts. Ist der Standpunkt in der Karte an einer Fassade
                         eingerastet, zählen die Gebäude vom Auge aus, sonst vom Marker. Das Gelände wird bis zur eingestellten
@@ -3797,6 +3912,12 @@
                     <label><input type="radio" name="hzMode" value="horizon"> Horizontpunkte setzen</label>
                 </div>
                 <div id="hzSlotSetup"></div>
+                <h3>Blickwinkel in der Karte</h3>
+                <p class="hint">In welche Himmelsrichtungen man vom Auge aus hinaussieht, mit den Gradzahlen an den Rändern.
+                    Bei Zimmer oder Balkon begrenzen Fensteröffnung, Wände und Trennwände den Blick – auch ohne eigenen
+                    Sichtbereich. Ohne Raum, Balkon und Sichtbereich gilt der Rundumblick. Nachbarhäuser kommen noch dazu; das
+                    zeigt das Diagramm oben.</p>
+                <div id="mapSlot4"></div>
                 <h3>Beobachtungen</h3>
                 <div id="observationTable" class="scroll"></div>
                 <button type="button" onclick="addObservation()">+ Beobachtung</button>
@@ -3923,8 +4044,8 @@
             <div class="legend">
                 <span class="swatch" style="--c: var(--axis)">Wand</span>
                 <span style="--c: var(--accent)">Fenster, Auge</span>
-                <span class="swatch" style="--c: var(--sun)">Sonnenfleck</span>
-                <span style="--c: var(--sun)">Richtung zur Sonne (gestrichelt: verdeckt)</span>
+                <span class="swatch sun-only" style="--c: var(--sun)">Sonnenfleck</span>
+                <span class="sun-only" style="--c: var(--sun)">Richtung zur Sonne (gestrichelt: verdeckt)</span>
                 <span class="dashed" style="--c: var(--text-2)">Glasbrüstung</span>
             </div>
             <p class="hint" id="sceneInfo"></p>
@@ -3937,9 +4058,9 @@
             <div id="map"></div>
             <div class="legend">
                 <span style="--c: var(--accent)">Sichtbereich, Horizontpunkte</span>
-                <span style="--c: var(--sun)">Sonne</span>
-                <span style="--c: var(--moon)">Mond</span>
-                <span class="dashed" style="--c: var(--muted)">Sonnenauf-/-untergang am 21.6. und 21.12.</span>
+                <span class="sun-only" style="--c: var(--sun)">Sonne</span>
+                <span class="sun-only" style="--c: var(--moon)">Mond</span>
+                <span class="dashed sun-only" style="--c: var(--muted)">Sonnenauf-/-untergang am 21.6. und 21.12.</span>
             </div>
             <div class="legend" id="heightLegend">
                 <span style="--c: transparent">Gebäudehöhe:</span>
@@ -3952,8 +4073,8 @@
             </div>
             <details class="note">
                 <summary>Wie lese ich die Karte?</summary>
-                <p class="hint">Richtung zu Sonne und Mond zum eingestellten Zeitpunkt: durchgezogen = sichtbar, gestrichelt =
-                    verdeckt, blass = unter dem Horizont. Die Gebäude sind nach Höhe eingefärbt. Ein Klick auf ein Gebäude bietet
+                <p class="hint">Unter „Ergebnis“: Richtung zu Sonne und Mond zum eingestellten Zeitpunkt, durchgezogen =
+                    sichtbar, gestrichelt = verdeckt, blass = unter dem Horizont. Die Gebäude sind nach Höhe eingefärbt. Ein Klick auf ein Gebäude bietet
                     an, was im gerade offenen Schritt passt; mit „Alle Optionen zeigen“ (Menü ⋯) alles auf einmal.</p>
             </details>
         </div>
@@ -3964,7 +4085,7 @@
                 <details class="more inline" data-more="hzDisplay">
                     <summary>Mehr</summary>
                     <label><input type="checkbox" id="showHourLines"> Stundenlinien</label>
-                    <label><input type="checkbox" id="showMoon"> Mond</label>
+                    <label class="sun-only"><input type="checkbox" id="showMoon"> Mond</label>
                     <button type="button" onclick="zoomToSectors()">Auf Sichtbereich</button>
                 </details>
             </div>

@@ -72,7 +72,9 @@ Dazu kommen:
   automatisch ein einzelner Standpunkt bearbeitet, die Meldung „Zum Bearbeiten einen einzelnen Standpunkt wählen“
   fällt weg.
 - Datum und Uhrzeit kompakt in einer Zeile, Zeitknöpfe als ◀/▶ mit Schrittweite (10 min, 1 Std, 1 Tag,
-  7 Tage), Lokalzeit.
+  7 Tage), „Jetzt“, Lokalzeit – nur unter „Ergebnis“. Zum Einrichten ist der Zeitpunkt nicht nötig; dort zeigen
+  Karte (Schritte 1–3), Draufsicht und Horizontdiagramm auch keine Sonne und keinen Mond zu einem Zeitpunkt (die
+  Sonnenbahnen am 21. jedes Monats bleiben).
 - Umschalter zwischen den Ansichten. Die gewählte Ansicht steht in der Adresse (`#ergebnis`, `#einrichten`),
   damit Zurück im Browser funktioniert und man Lesezeichen setzen kann.
 - Menü ⋯: Neuer Standpunkt, Umbenennen, Löschen, Exportieren, Importieren, Alle Eingaben löschen (mit Rückfrage; der Ort
@@ -157,6 +159,11 @@ Stimmt die Sichtmaske? Hier steht das Horizontdiagramm mit allen Bearbeitungswer
 - **Sichtbar:** Horizontdiagramm mit Sonnenbahnen; Werkzeuge Ansehen / Sichtbereich aufziehen / Horizontpunkte
   setzen; Beobachtungen (der wichtigste Abgleich mit der Wirklichkeit); Hinweis „Bäume oder Dachformen fehlen?
   Horizontpunkte setzen“.
+- **Karte „Blickwinkel in der Karte“:** vom Auge aus der Winkel, in den man hinaussieht (Sichtbereiche, Fenster
+  und Balkon, in irgendeiner Höhe, ohne Umgebung), mit den Gradzahlen der Ränder; in der Mitte, was ihn begrenzt
+  („Fenster 56°“, „Balkon …“, „Sichtbereich …“). Bewusst nicht „Sichtbereich“ genannt: Das Wort steht für die selbst
+  gezogenen Rechtecke, ein Fenster begrenzt den Blick auch ohne sie. Ohne Raum, Balkon und Sichtbereich ein Kreis
+  „Rundumblick“. Beim Öffnen des Schritts steht die Karte auf dem Auge.
 - **Unter „Mehr“:** Tabellen Sichtbereiche und Horizontlinie zum Eintippen, Stundenlinien, Mond im Diagramm,
   „Auf Sichtbereich“ zoomen, ausführliche Legende und Bedienhinweise (Mausrad, Doppelklick, Rechtsklick).
 - **Ende:** Knopf „Fertig – zum Ergebnis“.
