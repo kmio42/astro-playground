@@ -3957,10 +3957,6 @@
                     <input type="file" id="importFile" accept="application/json,.json" hidden>
                     <hr>
                     <label><input type="checkbox" id="expertMode"> Alle Optionen zeigen</label>
-                    <details class="more" data-more="timeExact">
-                        <summary>Genaue Zeit, Sternzeit, Julianisches Datum</summary>
-                        <div id="timeControls"></div>
-                    </details>
                     <hr>
                     <a href="#about" onclick="menuAction()">Hilfe und Begriffe</a>
                 </div>
@@ -4216,6 +4212,9 @@
 
     <!-- Bausteine, die je nach Ansicht umgehängt werden -->
     <div id="parking" hidden>
+        <!-- Zeitfelder aus ui.js (Sekunden, Sternzeit, JD): werden nicht angezeigt, ui.js schreibt aber hinein;
+             Datum, Uhrzeit und Lokalzeit holt setupTimeBar() in die Kopfleiste -->
+        <div id="timeControls"></div>
         <div id="sceneViews">
             <div class="scene-views">
                 <canvas id="sceneTop"></canvas>
