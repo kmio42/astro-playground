@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Nicht in Suchmaschinen aufnehmen -->
+    <meta name="robots" content="noindex, nofollow">
+    <title>Astro-Spielwiese</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #fafafa;
+            --fg: #222;
+            --muted: #666;
+            --card: #fff;
+            --border: #ddd;
+            --link: #0b5cad;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #16181c;
+                --fg: #e4e4e4;
+                --muted: #9a9a9a;
+                --card: #1f2227;
+                --border: #343840;
+                --link: #7db4f0;
+            }
+        }
+        body {
+            font-family: system-ui, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 20px 16px 40px;
+            line-height: 1.45;
+        }
+        h1 { margin-bottom: 0.2em; }
+        .hint { color: var(--muted); font-size: 0.92em; }
+        h2 { margin-top: 1.6em; font-size: 1.15em; }
+        ul.pages { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+        ul.pages li {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+        }
+        a { color: var(--link); }
+        ul.pages a.main { font-weight: 600; text-decoration: none; }
+        ul.pages a.main:hover { text-decoration: underline; }
+        .file { color: var(--muted); font-family: monospace; font-size: 0.85em; margin-left: 0.4em; }
+        .desc { margin: 4px 0 0; }
+        .extra { margin: 4px 0 0; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Astro-Spielwiese</h1>
+    <p class="hint">Experimente zu Sonnen- und Mondstand, Auf- und Untergängen, Mondphasen und
+        Koordinatentransformationen, nach Jean Meeus, <i>Astronomische Algorithmen</i>.
+        Unfertig und ohne Gewähr.</p>
+
+    <h2>Sonne und Erde</h2>
+    <ul class="pages">
+        <li>
+            <a class="main" href="Erdposition.html">Sternzeit und Erdposition</a><span class="file">Erdposition.html</span>
+            <p class="desc">Erdbahn um die Sonne mit Tagundnachtgleichen, Sonnenwenden, Perihel und Aphel;
+                Erde mit geneigter Achse; Sternzeit, Zeitgleichung, Sonnen- und Mondposition.</p>
+        </li>
+        <li>
+            <a class="main" href="Tageslaenge.html">Tageslänge im Jahr</a><span class="file">Tageslaenge.html</span>
+            <p class="desc">Zunahme der Tageslänge am Morgen und Abend, Auf-, Untergangs- und Mittagszeiten über ein Jahr.</p>
+        </li>
+        <li>
+            <a class="main" href="Sichtbarkeit.html">Sonne und Mond vom Balkon</a><span class="file">Sichtbarkeit.html</span>
+            <p class="desc">Wann Sonne und Mond von einem Fenster oder Balkon aus sichtbar sind: Sektoren,
+                Horizontlinie aus Gebäuden und Gelände, Raum mit Fenstern, Jahresübersicht.</p>
+        </li>
+    </ul>
+
+    <h2>Mond</h2>
+    <ul class="pages">
+        <li>
+            <a class="main" href="Mond.html">Mond</a><span class="file">Mond.html</span>
+            <p class="desc">Mondbahn um die Erde, Mondphase mit Libration und parallaktischem Winkel,
+                Bahn am Himmel; Auf-/Untergang, Perigäum/Apogäum.</p>
+        </li>
+        <li>
+            <a class="main" href="Mondbahn.html">Mondbahn um die Sonne</a><span class="file">Mondbahn.html</span>
+            <p class="desc">Bahnen von Erde und Mond um die Sonne über ein Jahr, mit einstellbarer Überhöhung.</p>
+        </li>
+        <li>
+            <a class="main" href="ErdeMond3D.html">Erde und Mond in 3D</a><span class="file">ErdeMond3D.html</span>
+            <p class="desc">Interaktives 3D-Modell (WebGL2): Ekliptik, Mondbahn, Knoten, Apsiden, Schatten
+                und Finsternisse, geführte Rundgänge.</p>
+            <p class="extra">Etwa 3,6&nbsp;MB Texturen –
+                <a href="ErdeMond3D.html?klein">datensparende Version</a> mit 1,7&nbsp;MB.</p>
+        </li>
+    </ul>
+
+    <h2>Versuche</h2>
+    <ul class="pages">
+        <li>
+            <a class="main" href="MondBlend.html">Mond – Überblendung</a><span class="file">MondBlend.html</span>
+            <p class="desc">Ausrichtung des Mondfotos an der LROC-Textur abgleichen.</p>
+        </li>
+    </ul>
+</body>
+</html>
