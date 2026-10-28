@@ -62,7 +62,7 @@ Dazu kommen:
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Sonne und Mond vom Balkon                                            │
 │ Standpunkt [Wohnzimmer ▾]   28.10.2026 [14:30]  ◀ 1 Tag ▶  ☑ Lokalzeit│  ← Kopfleiste, bleibt oben stehen
-│ ( Ergebnis )  ( Einrichten )                              ⋯ Menü      │
+│ ( Einrichten )  ( Ergebnis )                              ⋯ Menü      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -101,7 +101,8 @@ Satz Einführung. Sonst öffnet sich „Ergebnis“.
 Wo steht das Haus, und was ist ringsum?
 
 - **Sichtbar:** Karte mit Standortmarker („Marker auf das eigene Haus ziehen“), Knopf „Umgebung laden“ mit den
-  Standardradien, Status der Umgebung. Klick auf ein Gebäude → Popup mit **„Das ist mein Haus“**.
+  Standardradien, beim Laden Ladebalken mit Sekundenzähler (Overpass meldet keinen Fortschritt, dort wächst der Balken
+  mit der Wartezeit), Hinweis, dass es bis zu ein paar Minuten dauern kann, Status der Umgebung. Klick auf ein Gebäude → Popup mit **„Das ist mein Haus“**.
 - **Unter „Mehr“:** Breite und Länge eintippen, GPS-Position, Gebäuderadius, Geländeradius, Gebäude und Gelände
   ein/aus, Schatten, Gebäudehöhe im Popup korrigieren bzw. auf den OSM-Wert zurücksetzen, Höhenlegende,
   Datenquellen.

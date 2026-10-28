@@ -190,6 +190,10 @@
             box-shadow: inset 0 0 0 1px var(--accent);
             background: color-mix(in srgb, var(--accent) 10%, var(--surface));
         }
+        button.primary:disabled { opacity: 0.55; cursor: default; }
+        .env-progress { display: inline-flex; align-items: center; gap: 10px; flex: 1; min-width: 200px; }
+        .env-progress[hidden] { display: none; }
+        .env-progress progress { flex: 1; height: 14px; accent-color: var(--accent); }
         .callout { padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 4px; margin: 8px 0 10px; }
         .callout:empty { display: none; }
         .scene-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
@@ -1345,7 +1349,8 @@
 
         let envVersion = 0;             // zählt Änderungen an Gebäuden, Höhen, eigenem Gebäude
         let buildingList = [];          // Gebäude mit wirksamer Höhe (OSM, geschätzt oder eigene Angabe)
-        let envLoading = null;          // Fortschritt beim Laden { buildings, terrain } (Text) oder null
+        let envLoading = null;          // beim Laden { buildings, terrain (Text), started, parts: { b, t } (0–1 oder null), overpass } sonst null
+        let envTick = null;             // Uhr für Sekundenzähler und Ladebalken
         let envErrors = [];
         let storageFull = false;
         const profileCache = new Map();
@@ -1438,7 +1443,11 @@
         // Overpass-Abfrage, bei Fehlern der nächste Server
         async function fetchOverpass(query) {
             const errors = [];
-            for (const url of OVERPASS_SERVERS) {
+            for (const [i, url] of OVERPASS_SERVERS.entries()) {
+                if (i > 0 && envLoading) {
+                    envLoading.buildings = `Gebäude werden geladen … (${errors[errors.length - 1]}, versuche Server ${i + 1} von ${OVERPASS_SERVERS.length})`;
+                    renderEnvironmentStatus();
+                }
                 const abort = new AbortController();
                 const timer = setTimeout(() => abort.abort(), 45000);
                 try {
@@ -1547,9 +1556,12 @@
 
         async function loadBuildings(here, radius, source) {
             envLoading.buildings = 'Gebäude werden geladen …';
+            envLoading.overpass = Date.now();
             renderEnvironmentStatus();
             const q = `around:${radius},${here.latitude},${here.longitude}`;
             const data = await fetchOverpass(`[out:json][timeout:25];(way["building"](${q});relation["building"](${q}););out body geom;`);
+            envLoading.overpass = null;
+            envLoading.parts.b = 0.6;
             const items = parseBuildings(data);
             // Fußpunkthöhen der Gebäude aus Zoomstufe 14, Zoomstufe 12 als Rückfall (Mapterhorn außerhalb
             // hochaufgelöster Gebiete)
@@ -1558,6 +1570,7 @@
             try {
                 tiles = await loadTiles(source, list, (done, total) => {
                     envLoading.buildings = `${items.length} Gebäude, Fußpunkthöhen ${done}/${total} Kacheln …`;
+                    envLoading.parts.b = 0.6 + 0.4 * done / total;
                     renderEnvironmentStatus();
                 });
             } catch (e) {
@@ -1579,9 +1592,11 @@
             const list = terrainTileList(here, radius);
             const tiles = await loadTiles(source, list, (done, total) => {
                 envLoading.terrain = `Gelände ${done}/${total} Kacheln …`;
+                envLoading.parts.t = 0.85 * done / total;
                 renderEnvironmentStatus();
             });
             envLoading.terrain = 'Geländeprofil wird berechnet …';
+            envLoading.parts.t = 0.9;
             renderEnvironmentStatus();
             await new Promise(r => setTimeout(r, 30));      // Status anzeigen, bevor die Rechnung blockiert
             const sample = createTerrainSampler(tiles);
@@ -1595,9 +1610,11 @@
             if (envLoading) return;
             let env = state.environment;
             const here = { latitude, longitude };
-            envLoading = { buildings: null, terrain: null };
+            envLoading = { buildings: null, terrain: null, started: Date.now(), overpass: null,
+                           parts: { b: env.buildingRadius > 0 ? 0 : null, t: env.terrainRadius > 0 ? 0 : null } };
             envErrors = [];
             document.getElementById('envLoad').disabled = true;
+            envTick = setInterval(renderEnvironmentStatus, 500);
             const loaded = new Date().toISOString();
             envLoading.buildings = 'Höhendaten werden geprüft …';
             renderEnvironmentStatus();
@@ -1630,11 +1647,25 @@
                 env.terrain = null;
             }
             envLoading = null;
+            clearInterval(envTick);
             document.getElementById('envLoad').disabled = false;
             environmentChanged();
         }
 
+        function envFraction() {
+            const p = envLoading.parts;
+            const b = envLoading.overpass ? 0.55 * (1 - Math.exp(-(Date.now() - envLoading.overpass) / 20000)) : p.b;
+            const parts = [p.b === null ? null : b, p.t].filter(x => x !== null);
+            return parts.length ? parts.reduce((a, x) => a + x, 0) / parts.length : 0;
+        }
+
         function renderEnvironmentStatus() {
+            const box = document.getElementById('envProgressBox');
+            box.hidden = !envLoading;
+            if (envLoading) {
+                document.getElementById('envProgress').value = envFraction();
+                document.getElementById('envElapsed').textContent = `${Math.round((Date.now() - envLoading.started) / 1000)} s`;
+            }
             const env = state.environment;
             const parts = [];
             const date = iso => new Date(iso).toLocaleDateString('de-DE');
@@ -1676,7 +1707,7 @@
             document.getElementById('envStatus').textContent = parts.join(' ');
             const usable = buildingsUsable() || terrainUsable();
             const load = document.getElementById('envLoad');
-            load.textContent = env.buildings || env.terrain ? 'Umgebung neu laden' : 'Umgebung laden';
+            load.textContent = envLoading ? 'Lädt …' : env.buildings || env.terrain ? 'Umgebung neu laden' : 'Umgebung laden';
             load.classList.toggle('primary', !usable);     // hervorheben, solange nichts Brauchbares geladen ist
             document.getElementById('heightLegend').style.display = buildingList.length ? '' : 'none';
             renderSteps();
@@ -3301,8 +3332,8 @@
         <div class="bar">
             <span class="brand">Sonne und Mond vom Balkon</span>
             <div class="tabs">
-                <button id="tabResult" type="button" onclick="setView('result')">Ergebnis</button>
                 <button id="tabSetup" type="button" onclick="setView('setup')">Einrichten</button>
+                <button id="tabResult" type="button" onclick="setView('result')">Ergebnis</button>
             </div>
             <details class="menu" id="menu">
                 <summary title="Standpunkte, Export, Optionen">⋯</summary>
@@ -3344,7 +3375,15 @@
             <div class="step-body">
                 <p class="hint">Den Marker in der Karte auf das eigene Haus ziehen. „Umgebung laden“ holt die Nachbarhäuser aus
                     OpenStreetMap und die Geländehöhen. Danach das eigene Haus anklicken – es zählt dann nicht als Hindernis.</p>
-                <div class="controls"><button type="button" id="envLoad" onclick="loadEnvironment()">Umgebung laden</button></div>
+                <div class="controls">
+                    <button type="button" id="envLoad" onclick="loadEnvironment()">Umgebung laden</button>
+                    <span class="env-progress" id="envProgressBox" hidden>
+                        <progress id="envProgress" max="1" value="0"></progress>
+                        <span class="value" id="envElapsed"></span>
+                    </span>
+                </div>
+                <p class="hint">Das Laden dauert meist 10 bis 60 Sekunden. Bei großem Umkreis oder überlastetem Server kann es auch
+                    ein paar Minuten dauern – die Seite versucht es dann nacheinander bei bis zu drei Servern.</p>
                 <p class="hint" id="envStatus"></p>
                 <div id="mapSlot1"></div>
                 <details class="more" data-more="house">
