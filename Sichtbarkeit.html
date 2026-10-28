@@ -166,7 +166,7 @@
         .step.done .step-num { background: var(--accent); color: #fff; font-size: 0; }
         .step.done .step-num::after { content: "✓"; font-size: 15px; }
         .step.skipped { opacity: 0.65; }
-        .step-title { font-weight: 700; font-size: 1.05em; min-width: 6.5em; }
+        .step-title { font-weight: 700; font-size: 1.05em; min-width: 8.5em; }
         .step-summary { flex: 1; color: var(--text-2); font-size: 0.92em; }
         .step-body { display: none; padding: 0 14px 14px; }
         .step.open .step-body { display: block; }
@@ -231,8 +231,7 @@
         details.more.inline > summary { margin: 0; }
         details.note { margin: 4px 0 12px; }
         details.note > summary { cursor: pointer; color: var(--text-2); font-size: 0.9em; }
-        #glance p { margin: 4px 0; font-size: 1.05em; }
-        #glance a { color: var(--accent); cursor: pointer; }
+        #resultSetupHint a { color: var(--accent); }
         footer { margin-top: 40px; }
         canvas {
             display: block;
@@ -276,6 +275,7 @@
             width: 12px;
             height: 12px;
             border-radius: 2px;
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--axis) 70%, transparent);
         }
         .figure { position: relative; margin-bottom: 6px; }
         .tooltip {
@@ -3261,10 +3261,189 @@
         }
 
     /////////////////////////////////////////////////////////////////
+    //                  Jahresübersicht Mond                       //
+    /////////////////////////////////////////////////////////////////
+
+        const MOON_STEP = 4;            // Raster der Mond-Heatmap [min]
+        const DARK_SUN = -6;            // dunkel: Sonne unter −6° (bürgerliche Dämmerung vorbei)
+        const MOON_FULL_COLOR = '#f6f3e8';
+        let moonYearCache = { key: null };
+        let moonYearGeom = null;
+
+        // Jahr: je Zelle Sichtbarkeit des Mondes und ob es dunkel ist; je Tag Beleuchtung; Hauptphasen
+        function computeMoonYear() {
+            const year = selectedYear();
+            const key = [latitude, longitude, year, useLocalTime, maskVersion, state.selected].join('|');
+            if (moonYearCache.key === key) return moonYearCache;
+            const loc = getLocation();
+            const starts = yearDayStarts(year), days = starts.length, slots = 1440 / MOON_STEP;
+            const eph = createMoonEphemeris(starts[0] - 1, starts[days - 1] + 2);
+            const grid = computeLevelGrid('moon', starts, MOON_STEP, loc, activeCompiled(), { ephemeris: eph });
+            const dark = new Uint8Array(days * slots);
+            const darkHours = new Float32Array(days), brightHours = new Float32Array(days), illumination = new Float32Array(days);
+            for (let d = 0; d < days; d++) {
+                illumination[d] = moonDirection(starts[d] + 0.5, loc, eph).illuminatedFraction;
+                for (let k = 0; k < slots; k++) {
+                    const i = d * slots + k;
+                    dark[i] = sunDirection(starts[d] + (k + 0.5) * MOON_STEP / 1440, loc).trueAltitude < DARK_SUN ? 1 : 0;
+                    if (grid.levels[i] >= VisibilityLevel.Partial) {
+                        if (dark[i]) darkHours[d] += MOON_STEP / 60; else brightHours[d] += MOON_STEP / 60;
+                    }
+                }
+            }
+            const phases = findMoonPhases(eph).filter(p => p.jd >= starts[0] && p.jd < starts[days - 1] + 1);
+            const dstChanges = [];
+            if (useLocalTime) {
+                for (let d = 1; d < days; d++) {
+                    if (julianDayToDate(starts[d - 1] + 0.5).getTimezoneOffset() !== julianDayToDate(starts[d] + 0.5).getTimezoneOffset()) dstChanges.push(d);
+                }
+            }
+            moonYearCache = { key, year, starts, grid, dark, darkHours, brightHours, illumination, phases, eph, dstChanges };
+            return moonYearCache;
+        }
+
+        // Mondsymbol: Neumond dunkel, Vollmond hell, Viertel halb (Nordhalbkugel: zunehmend rechts hell)
+        function drawPhaseSymbol(ctx, x, y, r, phase) {
+            const dark = css('--night'), outline = css('--text-2');
+            ctx.fillStyle = phase === 2 ? MOON_FULL_COLOR : dark;
+            ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill();
+            if (phase === 1 || phase === 3) {
+                ctx.fillStyle = MOON_FULL_COLOR;
+                ctx.beginPath();
+                ctx.arc(x, y, r, -Math.PI / 2, Math.PI / 2, phase === 3);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.strokeStyle = outline;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.stroke();
+        }
+
+        function drawMoonYear() {
+            if (!shown('moonYearChart')) return;
+            const data = computeMoonYear();
+            const canvas = document.getElementById('moonYearChart');
+            const { ctx, w, h } = setupCanvas(canvas, 330);
+            const left = 38, pw = w - 38 - 10, bandTop = 4, bandH = 20, top = bandTop + bandH + 6, ph = h - top - 22;
+            moonYearGeom = { left, top, pw, ph };
+            const days = data.starts.length, slots = data.grid.slots;
+            const xOfJd = jd => left + (jd - data.starts[0]) / days * pw;
+            ctx.fillStyle = css('--surface');
+            ctx.fillRect(0, 0, w, h);
+
+            // Phasenleiste: Beleuchtung je Tag als Helligkeit, Hauptphasen als Symbole
+            const night = cssColor('--night'), full = [246, 243, 232];     // = MOON_FULL_COLOR
+            const mix = (a, b, t) => [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t));
+            for (let d = 0; d < days; d++) {
+                const c = mix(night, full, data.illumination[d]);
+                ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+                ctx.fillRect(left + d / days * pw, bandTop, pw / days + 0.6, bandH);
+            }
+            const withQuarters = pw / days * 7.4 >= 16;
+            for (const p of data.phases) {
+                if (!withQuarters && (p.phase === 1 || p.phase === 3)) continue;
+                drawPhaseSymbol(ctx, xOfJd(p.jd), bandTop + bandH / 2, 6, p.phase);
+            }
+            ctx.strokeStyle = css('--axis');
+            ctx.strokeRect(left + 0.5, bandTop + 0.5, pw - 1, bandH - 1);
+
+            // Raster: Spalte = Tag, Zeile = Uhrzeit
+            const visDark = cssColor('--moon'), dayBg = cssColor('--surface-2'), hidden = cssColor('--hidden');
+            const visBright = mix(dayBg, visDark, 0.45), nightBg = night;
+            const img = new ImageData(days, slots);
+            for (let d = 0; d < days; d++) {
+                for (let k = 0; k < slots; k++) {
+                    const i = d * slots + k, l = data.grid.levels[i];
+                    const c = l >= VisibilityLevel.Partial ? (data.dark[i] ? visDark : visBright)
+                            : l === VisibilityLevel.Hidden ? hidden : data.dark[i] ? nightBg : dayBg;
+                    const o = (k * days + d) * 4;
+                    img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+                }
+            }
+            const off = document.createElement('canvas');
+            off.width = days;
+            off.height = slots;
+            off.getContext('2d').putImageData(img, 0, 0);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(off, left, top, pw, ph);
+            ctx.strokeStyle = css('--text');
+            ctx.setLineDash([3, 3]);
+            for (const d of data.dstChanges) {
+                const x = left + d / days * pw;
+                ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + ph); ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            const sel = selectedYearPosition(data, moonYearGeom);
+            if (sel) {
+                ctx.strokeStyle = css('--accent');
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(sel.x, bandTop); ctx.lineTo(sel.x, top + ph);
+                ctx.moveTo(left, sel.y); ctx.lineTo(left + pw, sel.y);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
+            ctx.fillStyle = css('--text-2');
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Phase', left - 5, bandTop + bandH / 2);
+            for (let hr = 0; hr <= 24; hr += 3) ctx.fillText(hr + ' h', left - 5, top + hr / 24 * ph);
+            drawMonthAxis(ctx, data, left, pw, top + ph + 4);
+            ctx.strokeStyle = css('--axis');
+            ctx.strokeRect(left + 0.5, top + 0.5, pw - 1, ph - 1);
+
+            const sum = a => a.reduce((s, v) => s + v, 0);
+            const nights = data.darkHours.filter(v => v > 0).length;
+            document.getElementById('moonYearSummary').textContent =
+                `Im Jahr ${data.year} ist der Mond an ${nights} von ${days} Tagen bei Dunkelheit zu sehen, zusammen etwa ` +
+                `${Math.round(sum(data.darkHours))} Stunden; dazu etwa ${Math.round(sum(data.brightHours))} Stunden am hellen Himmel.`;
+        }
+
+        function setupMoonYearInteraction() {
+            const canvas = document.getElementById('moonYearChart');
+            const tip = document.getElementById('moonYearTooltip');
+            const cell = ev => {
+                const r = canvas.getBoundingClientRect();
+                const x = ev.clientX - r.left, y = ev.clientY - r.top;
+                const g = moonYearGeom, data = moonYearCache;
+                if (!g || !data.starts || x < g.left || x > g.left + g.pw || y < 0 || y > g.top + g.ph) return null;
+                const d = Math.min(data.starts.length - 1, Math.floor((x - g.left) / g.pw * data.starts.length));
+                // Über dem Raster (Phasenleiste): Mittag des Tages
+                const k = y < g.top ? data.grid.slots / 2 : Math.min(data.grid.slots - 1, Math.floor((y - g.top) / g.ph * data.grid.slots));
+                const i = d * data.grid.slots + k;
+                return { x, y, d, band: y < g.top, jd: data.starts[d] + (k + 0.5) * MOON_STEP / 1440, level: data.grid.levels[i], dark: data.dark[i] };
+            };
+            canvas.addEventListener('pointermove', ev => {
+                const c = cell(ev);
+                if (!c) { tip.style.display = 'none'; return; }
+                const data = moonYearCache;
+                const dir = moonDirection(c.jd, getLocation(), data.eph);
+                const phase = `${phaseSymbol(dir.illuminatedFraction, dir.waxing)} ${Math.round(dir.illuminatedFraction * 100)} % beleuchtet`;
+                const near = data.phases.find(p => Math.abs(p.jd - c.jd) < 0.6);
+                const names = ['Neumond', 'erstes Viertel', 'Vollmond', 'letztes Viertel'];
+                if (c.band) {
+                    showTooltip(tip, c.x, c.y, `${fmtDate(c.jd)} – ${phase}` + (near ? ` · ${names[near.phase]} ${fmtDate(near.jd, false)} ${fmtTime(near.jd)}` : ''));
+                    return;
+                }
+                const what = c.level >= VisibilityLevel.Partial ? (c.dark ? 'Mond sichtbar' : 'Mond sichtbar, Himmel hell')
+                    : c.level === VisibilityLevel.Hidden ? 'Mond verdeckt' : 'Mond unter dem Horizont';
+                showTooltip(tip, c.x, c.y, `${fmtDate(c.jd)} ${fmtTime(c.jd)} – ${what} · ${phase}`);
+            });
+            canvas.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+            canvas.addEventListener('click', ev => {
+                const c = cell(ev);
+                if (c) setDatetime(julianDayToDate(c.jd));
+            });
+        }
+
+    /////////////////////////////////////////////////////////////////
     //                  Mond-Termine                               //
     /////////////////////////////////////////////////////////////////
 
         let moonCache = { key: null };
+        const MOON_LIST_SHORT = 8;      // so viele Termine ohne „Alle zeigen“
+        let moonListExpanded = false;
 
         function computeMoonList() {
             const s = state.settings;
@@ -3298,7 +3477,8 @@
             const multi = activeIndices().length > 1;
             const table = el('table', { className: 'data' }, [el('tr', {}, ['Datum', 'von', 'bis', 'Dauer', 'Richtung', 'max. Höhe', 'Phase']
                 .concat(multi ? ['Standpunkte'] : []).map(t => el('th', { textContent: t })))]);
-            for (const iv of list) {
+            const rows = moonListExpanded ? list : list.slice(0, MOON_LIST_SHORT);
+            for (const iv of rows) {
                 const mid = (iv.start + iv.end) / 2;
                 const nearFull = data.fullMoons.some(f => Math.abs(f - mid) <= 2);
                 const tr = el('tr', { className: 'clickable' + (nearFull ? ' full' : ''), title: 'Tag anzeigen' }, [
@@ -3315,6 +3495,10 @@
             }
             if (!list.length) table.append(el('tr', {}, [el('td', { colSpan: 7, className: 'empty', textContent: 'Keine Termine im Zeitraum.' })]));
             document.getElementById('moonList').replaceChildren(table);
+            const more = document.getElementById('moonListMore');
+            more.replaceChildren(...(list.length > MOON_LIST_SHORT ? [el('button', { type: 'button',
+                textContent: moonListExpanded ? `Nur die nächsten ${MOON_LIST_SHORT} zeigen` : `Alle ${list.length} Termine zeigen`,
+                onclick: () => { moonListExpanded = !moonListExpanded; drawMoonList(); } })] : []));
             document.getElementById('moonSummary').textContent =
                 `${list.length} Termine in ${s.moonListMonths} Monaten ab ${fmtDate(dayWindow(currentJd()).start + 0.25, false)}${timeParts(dayWindow(currentJd()).start + 0.25).y}` +
                 (data.intervals.length !== list.length ? ` (${data.intervals.length - list.length} ausgefiltert)` : '') + '.';
@@ -3566,42 +3750,19 @@
 
         function showDay(jd) {
             setDatetime(julianDayToDate(jd));
+            scrollToDay();
+        }
+
+        function scrollToDay() {
             document.getElementById('daySection').scrollIntoView({ behavior: 'smooth' });
         }
 
-        // „Auf einen Blick“: Sonne am eingestellten Tag, nächster Mond-Termin
-        function drawGlance() {
-            if (!shown('glance')) return;
-            const loc = getLocation(), vps = activeCompiled(), jd = currentJd(), day = dayWindow(jd);
-            const isToday = Math.abs(day.start - dayWindow(julianDayFromDate(new Date())).start) < 1e-6;
-            const lines = [];
-            if (!isConfigured()) {
-                lines.push(el('p', { className: 'hint' }, ['Noch nichts eingerichtet – ohne Sichtmaske gilt der ganze Himmel. ',
-                    link('Jetzt einrichten', () => setView('setup'))]));
-            }
-            const when = isToday ? `Heute (${fmtDate(day.start + 0.25)})` : `Am ${fmtDate(day.start + 0.25)}`;
-            const sun = findVisibilityIntervals('sun', day.start, day.end, loc, vps);
-            const total = sun.reduce((t, iv) => t + iv.duration, 0);
-            let text = sun.length
-                ? `${when} ist die Sonne ${sun.map(iv => `von ${fmtTime(iv.start)} bis ${fmtTime(iv.end)}`).join(' und ')} zu sehen, zusammen ${fmtDuration(total)}.`
-                : `${when} ist die Sonne vom Standpunkt aus nicht zu sehen.`;
-            const sunNow = sunDirection(jd, loc);
-            if (Math.max(...vps.map(vp => visibilityLevel(sunNow, vp))) >= VisibilityLevel.Partial) text += ` Um ${fmtTime(jd)} ist sie zu sehen.`;
-            lines.push(el('p', { textContent: text }));
-
-            const s = state.settings;
-            const { data, list } = filteredMoonList();
-            const next = list.find(iv => iv.end > jd);
-            if (next) {
-                lines.push(el('p', {}, [next.start <= jd ? 'Mond gerade zu sehen: ' : 'Nächster Mond: ',
-                    link(`${fmtDate(next.start)} ${fmtTime(next.start)}–${fmtTime(next.end)}`, () => showDay(next.start)),
-                    `, ${phaseSymbol(next.illuminatedFraction, next.waxing)} ${Math.round(next.illuminatedFraction * 100)} % beleuchtet, ` +
-                    `bis ${fmtNum(next.maxAltitude, 0)}° hoch.`]));
-            } else {
-                lines.push(el('p', { textContent: `In den nächsten ${s.moonListMonths} Monaten ist der Mond nicht zu sehen` +
-                    (data.intervals.length ? ' (mit den Filtern der Mond-Termine)' : '') + '.' }));
-            }
-            document.getElementById('glance').replaceChildren(...lines);
+        // Ohne Einrichtung: Hinweis oben in „Ergebnis“
+        function renderResultHint() {
+            const box = document.getElementById('resultSetupHint');
+            if (isConfigured()) { box.replaceChildren(); return; }
+            box.replaceChildren('Noch nichts eingerichtet – ohne Sichtmaske gilt der ganze Himmel. ',
+                                link('Jetzt einrichten', () => setView('setup')));
         }
 
         // Taste gedrückt halten: wiederholen
@@ -3653,8 +3814,8 @@
 
         // Jeder Teil für sich: ein Fehler in einem Teil lässt die übrigen nicht leer
         function redrawAll() {
-            for (const draw of [renderRoomSection, drawHorizonChart, drawScene, drawMap, drawGlance, drawYearChart, drawDay,
-                                drawRoomYear, drawRoomDay, drawMoonList]) {
+            for (const draw of [renderResultHint, renderRoomSection, drawHorizonChart, drawScene, drawMap, drawYearChart, drawDay,
+                                drawRoomYear, drawRoomDay, drawMoonYear, drawMoonList]) {
                 try {
                     draw();
                 } catch (e) {
@@ -3665,7 +3826,7 @@
 
         // Neuere Funktionen aus visibility.js, die die Seite braucht. Fehlen sie, kommt die Datei in einer älteren
         // Fassung aus dem Browser-Cache (der einfache Python-Server schickt keine Cache-Vorgaben).
-        const REQUIRED_VISIBILITY_API = ['sunPatchTable', 'sunPatchArea', 'sceneObstacle', 'sunPatch', 'compileScene'];
+        const REQUIRED_VISIBILITY_API = ['sunPatchTable', 'sunPatchArea', 'findMoonPhases', 'sceneObstacle', 'sunPatch', 'compileScene'];
         function checkScriptVersions() {
             const missing = REQUIRED_VISIBILITY_API.filter(name => typeof window[name] !== 'function');
             if (!missing.length) return;
@@ -3721,6 +3882,7 @@
             setupSceneInteraction();
             setupYearInteraction();
             setupRoomInteraction();
+            setupMoonYearInteraction();
             setupMoonControls();
             initMap();
             for (const d of document.querySelectorAll('details.more[data-more]')) initMore(d);
@@ -3817,7 +3979,7 @@
 
         <section class="step" id="step1">
             <button class="step-head" type="button" onclick="toggleStep(1)">
-                <span class="step-num">1</span><span class="step-title">Haus</span><span class="step-summary" id="step1Summary"></span>
+                <span class="step-num">1</span><span class="step-title">Haus/Umgebung</span><span class="step-summary" id="step1Summary"></span>
             </button>
             <div class="step-body">
                 <p class="hint">Den Marker in der Karte auf das eigene Haus ziehen. „Umgebung laden“ holt die Nachbarhäuser aus
@@ -3883,7 +4045,7 @@
 
         <section class="step" id="step3">
             <button class="step-head" type="button" onclick="toggleStep(3)">
-                <span class="step-num">3</span><span class="step-title">Maße</span><span class="step-summary" id="step3Summary"></span>
+                <span class="step-num">3</span><span class="step-title">Raum/Balkon</span><span class="step-summary" id="step3Summary"></span>
             </button>
             <div class="step-body">
                 <p class="hint">Maße in Metern. „Links“ und „rechts“ gelten mit Blick nach draußen. Fenster in der Fensterwand und der
@@ -3900,7 +4062,7 @@
 
         <section class="step" id="step4">
             <button class="step-head" type="button" onclick="toggleStep(4)">
-                <span class="step-num">4</span><span class="step-title">Prüfen</span><span class="step-summary" id="step4Summary"></span>
+                <span class="step-num">4</span><span class="step-title">Sichtbereich</span><span class="step-summary" id="step4Summary"></span>
             </button>
             <div class="step-body">
                 <p class="hint">Grau ist verdeckt. Passt das zu dem, was man vom Platz aus sieht? Fehlen Bäume oder Dachformen,
@@ -3948,8 +4110,7 @@
 
     <!-- ================================= Ergebnis ================================= -->
     <main id="viewResult" class="view" hidden>
-        <h2>Auf einen Blick</h2>
-        <div id="glance"></div>
+        <p class="callout" id="resultSetupHint"></p>
 
         <h2>Jahresübersicht Sonne</h2>
         <p class="hint">Jede Spalte ist ein Tag des Jahres, von oben nach unten die Uhrzeit. Gelb heißt: Die Sonne ist vom Standpunkt
@@ -3970,14 +4131,7 @@
             <span class="dashed" style="--c: var(--muted)">Tageslänge</span>
         </div>
         <canvas id="sunHoursChart"></canvas>
-        <p class="hint"><span id="yearSummary"></span></p>
-
-        <h2 id="daySection">Tag: <span id="dayTitle"></span></h2>
-        <p class="hint">Wann Sonne und Mond an diesem Tag zu sehen sind. Den Tag oben einstellen oder in der Jahresübersicht bzw.
-            bei den Mond-Terminen anklicken.</p>
-        <canvas id="dayChart"></canvas>
-        <p class="hint" id="dayFree"></p>
-        <div id="dayTable" class="scroll"></div>
+        <p class="hint"><span id="yearSummary"></span> <a href="#" onclick="event.preventDefault(); scrollToDay()">→ Tag ansehen</a></p>
 
         <section id="roomSection">
             <h2 id="roomTitle">Sonne im Raum</h2>
@@ -4009,6 +4163,24 @@
             </div>
         </section>
 
+        <h2>Jahresübersicht Mond</h2>
+        <p class="hint">Jede Spalte ist ein Tag des Jahres, von oben nach unten die Uhrzeit. Lila heißt: Der Mond ist vom
+            Standpunkt aus zu sehen. Die Leiste oben zeigt die Mondphase – hell bei Vollmond, dunkel bei Neumond. Klick wählt
+            Tag und Uhrzeit.</p>
+        <div class="legend">
+            <span class="swatch" style="--c: var(--moon)">sichtbar bei Dunkelheit</span>
+            <span class="swatch" style="--c: color-mix(in srgb, var(--moon) 45%, var(--surface-2))">sichtbar am hellen Himmel</span>
+            <span class="swatch" style="--c: var(--hidden)">über dem Horizont, verdeckt</span>
+            <span class="swatch" style="--c: var(--night)">unter dem Horizont, dunkel</span>
+            <span class="swatch" style="--c: var(--surface-2)">unter dem Horizont, hell</span>
+            <span class="dashed" style="--c: var(--text)">Zeitumstellung</span>
+        </div>
+        <div class="figure">
+            <canvas id="moonYearChart" style="cursor:crosshair"></canvas>
+            <div class="tooltip" id="moonYearTooltip"></div>
+        </div>
+        <p class="hint"><span id="moonYearSummary"></span> <a href="#" onclick="event.preventDefault(); scrollToDay()">→ Tag ansehen</a></p>
+
         <h2>Mond-Termine</h2>
         <details class="more" data-more="moonFilter">
             <summary id="moonFilterSummary">Filter</summary>
@@ -4021,7 +4193,15 @@
         </details>
         <p class="hint" id="moonSummary"></p>
         <div id="moonList" class="scroll"></div>
+        <div id="moonListMore"></div>
         <p class="hint">Hervorgehoben: bis zu zwei Tage um Vollmond. Klick auf einen Termin zeigt den Tag.</p>
+
+        <h2 id="daySection">Tag: <span id="dayTitle"></span></h2>
+        <p class="hint">Wann Sonne und Mond an diesem Tag zu sehen sind. Den Tag oben einstellen oder in der Jahresübersicht bzw.
+            bei den Mond-Terminen anklicken.</p>
+        <canvas id="dayChart"></canvas>
+        <p class="hint" id="dayFree"></p>
+        <div id="dayTable" class="scroll"></div>
 
         <h2>Rundumblick</h2>
         <p class="hint">Der Himmel vom Standpunkt aus, mit den Sonnenbahnen des Jahres.

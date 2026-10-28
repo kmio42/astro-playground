@@ -484,5 +484,19 @@ console.log('17. Szene in der Maske und Sonnenfleck');
           'Tabelle: kein Fleck hinter der Fassade und unter dem Horizont');
 }
 
+// Mondphasen: Reihenfolge, Abstände, Vollmonde wie findFullMoons
+{
+    const start = astro.julianDayFromCalendar(2026, 1, 1, 0);
+    const eph = vis.createMoonEphemeris(start, start + 365);
+    const phases = vis.findMoonPhases(eph);
+    const order = phases.every((p, i) => i === 0 || p.phase === (phases[i - 1].phase + 1) % 4);
+    const news = phases.filter(p => p.phase === 0).map(p => p.jd);
+    const months = news.slice(1).map((jd, i) => jd - news[i]);
+    check(order && months.length >= 11 && months.every(m => m > 29.2 && m < 29.9),
+          `Mondphasen 2026: ${phases.length} Hauptphasen in Folge, synodischer Monat ${Math.min(...months).toFixed(2)}–${Math.max(...months).toFixed(2)} d`);
+    const fulls = phases.filter(p => p.phase === 2).map(p => p.jd), ref = vis.findFullMoons(eph);
+    check(fulls.length === ref.length && fulls.every((jd, i) => Math.abs(jd - ref[i]) < 1e-9), 'Vollmonde wie findFullMoons');
+}
+
 console.log(failures ? `\n${failures} Fehler` : '\nAlle Tests bestanden');
 process.exit(failures ? 1 : 0);

@@ -917,6 +917,28 @@
         return result;
     }
 
+    /**
+     * Hauptphasen im Bereich der Stützstellen: Neumond (0), erstes Viertel (1), Vollmond (2), letztes Viertel (3)
+     * bei Elongation 0°, 90°, 180°, 270°, linear zwischen den Stunden.
+     * @return [{ jd, phase }] zeitlich sortiert
+     */
+    function findMoonPhases(eph) {
+        const result = [];
+        for (let k = 1; k < eph.n; k++) {
+            const e0 = eph.elongation[k - 1];
+            let e1 = eph.elongation[k];
+            if (e1 < e0 - 180) e1 += 360;           // Neumond: Sprung von 360° auf 0°
+            for (let p = 0; p < 4; p++) {
+                for (const target of [p * 90, p * 90 + 360]) {
+                    if (e0 < target && e1 >= target) {
+                        result.push({ jd: eph.t0 + (k - 1 + (target - e0) / (e1 - e0)) * eph.step, phase: p });
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
     // ---------------------------------------------------------------
     //  Sichtbarkeit der Scheibe
     // ---------------------------------------------------------------
@@ -1136,7 +1158,7 @@
         terrainProfile, horizonFromTerrain, combineProfiles,
         SCENE_ALT_MIN, SCENE_ALT_MAX, normalizeScene, sceneRectangles, compileScene, sceneDirectionFree, sceneVisible,
         sceneObstacle, sunPatch, sunPatchTable, sunPatchArea,
-        apparentAltitude, sunDirection, moonDirection, createMoonEphemeris, findFullMoons,
+        apparentAltitude, sunDirection, moonDirection, createMoonEphemeris, findFullMoons, findMoonPhases,
         visibilityLevel, findVisibilityIntervals, computeLevelGrid, computeLevelSeries, observationDirection,
     };
 

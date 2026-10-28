@@ -3,7 +3,7 @@
 Ergänzt [Konzept-Sichtbarkeit.md](Konzept-Sichtbarkeit.md). Rechnung und Datenmodell bleiben gleich, es geht
 nur um Reihenfolge, Führung und Ausblenden. Alle Funktionen bleiben erhalten (Inventar am Ende).
 
-**Stand 28.10.2026:** umgesetzt, Stufen 1–4. Entscheidungen zu den offenen Fragen: zwei Ansichten, Umgebung vom
+**Stand 28.10.2026:** umgesetzt, Stufen 1–4. Die Schritte heißen inzwischen ① Haus/Umgebung, ② Standpunkt, ③ Raum/Balkon, ④ Sichtbereich. Entscheidungen zu den offenen Fragen: zwei Ansichten, Umgebung vom
 Auge aus, Laden weiter per Knopf. Abweichungen vom ersten Entwurf sind unten vermerkt.
 
 ## Was heute stört
@@ -86,19 +86,19 @@ Satz Einführung. Sonst öffnet sich „Ergebnis“.
 ## Ansicht „Einrichten“
 
 ```
-① Haus                ✓ Musterstraße 3, Umgebung geladen (412 Gebäude, Gelände 50 km)      [ändern]
+① Haus/Umgebung       ✓ Musterstraße 3, Umgebung geladen (412 Gebäude, Gelände 50 km)      [ändern]
 ② Standpunkt          ✓ Wohnzimmer · 3. OG · Fenster hinter Balkon · Fassade 205° SSW      [ändern]
-③ Maße                ┌──────────────────────────────────────────────────────────────────┐
+③ Raum/Balkon         ┌──────────────────────────────────────────────────────────────────┐
                       │ Raum  Breite [4,2] Tiefe [5,0] Höhe [2,6]                        │
                       │ Fenster  [Fensterwand ▾] von [1,0] bis [2,4]  Brüstung … Sturz … │
                       │ Balkon …                                     [Draufsicht][Wand]  │
                       │ ▸ Mehr: Wandstärke, weitere Fenster, Trennwände, Glas, …         │
                       │                                                     [Weiter]     │
                       └──────────────────────────────────────────────────────────────────┘
-④ Prüfen              offen
+④ Sichtbereich        offen
 ```
 
-### ① Haus
+### ① Haus/Umgebung
 
 Wo steht das Haus, und was ist ringsum?
 
@@ -138,7 +138,7 @@ Von wo aus schaut man?
 Die Wahl wird nicht gespeichert, sondern aus den Daten abgelesen (`scene.room`, `scene.balcony`, `eye.place`).
 Wer später umschaltet, ändert die Szene über dieselben Funktionen wie heute die Häkchen „Raum“ und „Balkon“.
 
-### ③ Maße
+### ③ Raum/Balkon
 
 Nur bei Fenster/Balkon. Formular und Zeichnungen stehen nebeneinander (schmal: untereinander).
 
@@ -152,7 +152,7 @@ Nur bei Fenster/Balkon. Formular und Zeichnungen stehen nebeneinander (schmal: u
 
 Das Auge lässt sich in der Draufsicht mit der Maus verschieben; x/y als Zahlen stehen unter „Mehr“.
 
-### ④ Prüfen und ergänzen
+### ④ Sichtbereich (prüfen und ergänzen)
 
 Stimmt die Sichtmaske? Hier steht das Horizontdiagramm mit allen Bearbeitungswerkzeugen.
 
@@ -173,14 +173,17 @@ eigentliche Weg sind.
 
 ## Ansicht „Ergebnis“
 
-Reihenfolge nach der Frage, die man hat:
+Erst die Sonne, dann der Mond, jeweils vom Groben (Jahr) zum Feinen; „Tag“ zeigt beide Gestirne und steht deshalb
+hinter beiden Blöcken, der Rundumblick zum Nachschlagen am Ende. Ein Klick in eine Jahresübersicht setzt nur den
+Zeitpunkt (die Seite springt nicht, damit man vergleichen kann) und wirkt direkt auf den Abschnitt darunter: die
+Sonnen-Übersicht auf „Sonne im Raum“, die Mond-Übersicht auf die Mond-Termine, die am gewählten Tag beginnen.
+Unter beiden Übersichten führt „→ Tag ansehen“ zum Tagesdetail; ein Klick auf einen Mond-Termin ebenso.
 
-1. **Auf einen Blick** (neu, zwei, drei Zeilen): „Heute scheint die Sonne von 14:20 bis 16:05 herein (1 h 45 min).
-   Nächster Mond: Do 30.10., 21:10–22:40, 68 % beleuchtet.“ Die Zahlen gibt es schon (`findVisibilityIntervals`,
-   Mondliste), sie werden nur zusammengefasst.
-2. **Jahresübersicht Sonne** mit Sonnenstunden. Klick wählt Tag und Uhrzeit wie heute.
-3. **Tag** mit Zeitleiste und Tabelle.
-4. **Sonne im Raum** (bzw. „auf dem Balkon“), nur bei einem Standpunkt mit Raum oder Balkon. Wann Sonne auf den
+Solange nichts eingerichtet ist, steht oben ein Hinweis „Noch nichts eingerichtet – ohne Sichtmaske gilt der ganze
+Himmel. Jetzt einrichten“.
+
+1. **Jahresübersicht Sonne** mit Sonnenstunden. Klick wählt Tag und Uhrzeit.
+2. **Sonne im Raum** (bzw. „auf dem Balkon“), nur bei einem Standpunkt mit Raum oder Balkon. Wann Sonne auf den
    Boden fällt, ist etwas anderes als die Jahresübersicht (Sonne vom Auge aus): Der Sturz kann die Sonne fürs Auge
    verdecken, während auf dem Boden ein Fleck liegt.
    - Grobe Orientierung: ein Satz („Sonne fällt auf den Boden etwa vom 12.10. bis 28.2., je nach Tag zwischen 9:40
@@ -194,10 +197,19 @@ Reihenfolge nach der Frage, die man hat:
    - Die Fleckgröße hängt nur von der Richtung zur Sonne ab. Sie wird je Szene einmal im 2°-Raster vorgerechnet
      (`sunPatchTable`, ≈ 0,25 s), Jahr und Tag lesen nur noch aus der Tabelle.
    - Bei „Alle Standpunkte“ ein Hinweis, einen einzelnen zu wählen.
-5. **Mond-Termine.** Die Filter (Zeitraum, Mindestdauer, Beleuchtung, nur bei Dunkelheit) liegen eingeklappt
-   hinter „Filter“. Die Kopfzeile nennt die aktiven Filter („3 Monate · ab 10 min“).
+3. **Jahresübersicht Mond** wie die der Sonne: Tag × Uhrzeit (4-min-Schritte), lila = sichtbar bei Dunkelheit (Sonne
+   unter −6°), blasslila = sichtbar am hellen Himmel, grau = verdeckt, dunkel/hell = unter dem Horizont bei Nacht/Tag.
+   Darüber eine Phasenleiste: Helligkeit = Beleuchtung je Tag, Symbole für Neumond, Viertel und Vollmond (Viertel
+   nur, wenn Platz ist). Tooltip mit Phase, Klick wählt Tag und Uhrzeit; darunter ein Satz mit Tagen und Stunden.
+4. **Mond-Termine.** Die Filter (Zeitraum, Mindestdauer, Beleuchtung, nur bei Dunkelheit) liegen eingeklappt
+   hinter „Filter“. Die Kopfzeile nennt die aktiven Filter („3 Monate · ab 10 min“). Die Liste zeigt zunächst die
+   nächsten 8 Termine, „Alle … Termine zeigen“ klappt den Rest auf – die Übersicht darüber ersetzt das Durchblättern.
+5. **Tag** mit Zeitleiste und Tabelle.
 6. **Rundumblick**: das Horizontdiagramm, nur zum Ansehen (Zoom, Tooltip mit Hindernis, Sonnenbahnen), ohne
    Bearbeitungswerkzeuge. Daneben ein Link „bearbeiten“, der zu ④ springt.
+
+„Auf einen Blick“ (heute Sonne von–bis, nächster Mond) stand zuerst ganz oben und ist entfallen: Die Sonnenzeiten
+des Tages stehen in „Tag“, den nächsten Mond zeigen die Mond-Termine.
 
 Am Ende steht ein eingeklappter Kasten „Karte mit der Richtung zu Sonne und Mond“; erst beim Aufklappen wird die
 Karte dorthin gehängt.
@@ -220,7 +232,7 @@ Karte dorthin gehängt.
 
 | offener Schritt | Popup bietet an |
 |---|---|
-| ① Haus | „Das ist mein Haus“ / „Doch nicht mein Haus“; unter „Mehr“: Höhe ändern, OSM-Wert |
+| ① Haus/Umgebung | „Das ist mein Haus“ / „Doch nicht mein Haus“; unter „Mehr“: Höhe ändern, OSM-Wert |
 | ② Standpunkt, Szene | „Hier ist das Fenster“ bzw. „Hier ist der Balkon“ (Fassade markiert) |
 | ② Standpunkt, von Hand | „Halbraum vor dieser Wand als Sichtbereich“ |
 | sonst / Alle Optionen | alles wie heute |
@@ -315,7 +327,7 @@ Jede Stufe ist für sich benutzbar.
 2. **Ausblenden.** „Mehr“-Bereiche, „Alle Optionen zeigen“, kürzere Hinweise mit ⓘ, Legenden nach Inhalt,
    Gebäude-Popup je nach Schritt, die Wahl in ② ersetzt „Raum/Balkon anlegen“.
 3. **Führung.** Schrittstatus und zugeklappte Zusammenfassungen, „Weiter“, Startansicht je nach Stand,
-   „Auf einen Blick“.
+   „Auf einen Blick“ (später wieder entfallen, siehe „Ergebnis“).
 4. **Logik (optional).** Umgebung vom Auge aus, Auge in der Draufsicht ziehen.
 
 Prüfen: `node testVisibility.js` (unverändert grün) und ein Durchlauf im Headless-Browser, einmal mit leerem
