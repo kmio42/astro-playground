@@ -10,6 +10,13 @@ gegen die NASA-Tabellen: γ auf ±0,001, Zeiten auf 1,5 min); Schattenkegel in w
 gestaucht, nicht vergrößert), Hinweis dazu auf der Seite; Finsternis-Saison als Hinweis im Bild und kräftigere
 Knotenlinie; Tabelle mit laufender und nächster Mond-/Sonnenfinsternis; Sprünge zur vorigen/nächsten
 Finsternis. Die optionalen Punkte (Blue Marble je Monat, Relief-Überhöhung) sind nicht umgesetzt.
+Danach ergänzt: Abschnitt „Einstellungen“ mit der Erklärung aller Bedienelemente, Äquatorebene (mit Deklination und
+Kulminationshöhe am Beobachtungsort in der Tabelle), Ränder der Ebenen zusätzlich als Linien (auch genau von der
+Kante sichtbar) und drei geführte Rundgänge mit je 7 Schritten: „Wie hoch steht der Mond?“ (Deklination,
+Monatsgang, große/kleine Mondwende, 18,6 Jahre, Vollmond im Winter/Sommer), „Knoten und Finsternisse“
+(Drachenmonat, Rückwanderung, Finsternis-Saisons, Saros) und „Apsiden“ (anomalistischer Monat, Vorwanderung in
+8,85 Jahren, Supermond/Minimond, totale/ringförmige Finsternis). Jeder Schritt setzt Zeitpunkt, Anzeigen, Maßstab,
+Kamera und Zeitraffer; am Ende kommen Anzeigen und Maßstab wieder wie vorher.
 
 ## Ziel
 

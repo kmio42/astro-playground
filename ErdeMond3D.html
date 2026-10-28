@@ -98,6 +98,40 @@
         }
         .message code { background: #222; padding: 1px 4px; border-radius: 3px; }
 
+        /* Geführte Rundgänge */
+        .tours { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 0 0 8px; }
+        .tours button[aria-pressed="true"] { font-weight: 600; outline: 2px solid #5999ff; outline-offset: -1px; }
+        .stage { position: relative; }
+        .tour {
+            margin-top: 8px;
+            padding: 10px 14px 12px;
+            background: var(--surface-2);
+            border-left: 4px solid #5999ff;
+            border-radius: 6px;
+        }
+        .tour[hidden] { display: none; }
+        .tour .head { font-size: 0.85em; color: var(--text-2); display: flex; justify-content: space-between; gap: 8px; }
+        .tour .head button { border: none; background: none; color: inherit; font-size: 1.2em; padding: 0 4px; cursor: pointer; }
+        .tour h3 { margin: 4px 0 6px; font-size: 1.1em; }
+        .tour p { margin: 0 0 10px; }
+        .tour nav { display: flex; flex-wrap: wrap; gap: 6px; }
+        /* breite Bildschirme: Erklärung rechts oben über der Ansicht */
+        @media (min-width: 900px) {
+            .tour {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                width: 360px;
+                max-height: calc(100% - 20px);
+                overflow-y: auto;
+                margin: 0;
+                box-sizing: border-box;
+                color: #ececec;
+                background: rgba(14, 14, 20, 0.88);
+                --text-2: #b8b8c0;
+            }
+        }
+
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -138,7 +172,7 @@
         #timeButtons button { float: none !important; margin: 0 !important; }
         #timeButtons br { display: none; }
         details { margin-top: 12px; }
-        .glossary { border-collapse: collapse; max-width: 900px; }
+        .glossary { border-collapse: collapse; max-width: 900px; margin-bottom: 8px; }
         .glossary td { padding: 4px 12px 4px 0; vertical-align: top; }
         .glossary td:first-child { font-weight: 600; white-space: nowrap; }
         @media (max-width: 600px) {
@@ -535,6 +569,7 @@
             axis: [0.82, 0.82, 0.82, 1],
             dayTick: [0.6, 0.8, 1.0, 0.9],
             location: [1.0, 0.35, 0.55, 1],
+            equator: [0.72, 0.5, 1.0],
             umbra: [0.75, 0.16, 0.12],
             penumbra: [0.45, 0.45, 0.52],
         };
@@ -581,6 +616,25 @@
         function earthBrightness() {
             const a = earthPhaseAngle();
             return (Math.sin(a) + (Math.PI - a) * Math.cos(a)) / Math.PI;
+        }
+
+        /** Nordpol der Erde (Einheitsvektor in Ekliptik-Koordinaten) */
+        const earthPole = () => [scene.earth.rotation[2], scene.earth.rotation[5], scene.earth.rotation[8]];
+
+        /** Deklination eines Ortes (Vektor) über dem Himmelsäquator */
+        const declinationOf = p => Math.asin(gl3d.vec3.dot(gl3d.vec3.normalize(p), earthPole()));
+
+        /** Höhe bei der Kulmination (Meridiandurchgang) am Beobachtungsort, geozentrisch, ohne Refraktion */
+        const culmination = dec => Math.PI / 2 - Math.abs(getLocation().latitude - dec);
+
+        /** Kleinste und größte Deklination des Mondes auf der wahren Bahn ±14 Tage (mehr als ein Umlauf) */
+        function declinationRange() {
+            let min = Infinity, max = -Infinity;
+            for (const p of pathCache.points) {
+                const d = declinationOf(p.position);
+                min = Math.min(min, d); max = Math.max(max, d);
+            }
+            return { min, max };
         }
 
         /** Winkel zwischen Sonne und Knotenlinie (0°–90°): klein → Finsternis-Saison */
@@ -674,6 +728,24 @@
             meshes.moonAxis.update([gl3d.vec3.add(mp, gl3d.vec3.scale(moonPole, -1.6 * rM)),
                                     gl3d.vec3.add(mp, gl3d.vec3.scale(moonPole, 1.6 * rM))], { colors: COLORS.axis });
 
+            // Ränder der Ebenen zusätzlich als Linien: bleiben sichtbar, wenn man genau auf die Kante schaut
+            const circle = (x, y, r) => {
+                const pts = [];
+                for (let k = 0; k <= 256; k++) {
+                    const a = 2 * Math.PI * k / 256;
+                    pts.push(gl3d.vec3.add(gl3d.vec3.scale(x, r * Math.cos(a)), gl3d.vec3.scale(y, r * Math.sin(a))));
+                }
+                return pts;
+            };
+            const withAlpha = (c, a) => [c[0], c[1], c[2], a];
+            meshes.eclipticRim.update(circle([1, 0, 0], [0, 1, 0], ECLIPTIC_RADIUS * s), { colors: withAlpha(COLORS.ecliptic, 0.8) });
+            const nx = [Math.cos(events.orbit.node), Math.sin(events.orbit.node), 0];
+            meshes.moonPlaneRim.update(circle(nx, gl3d.vec3.cross(events.orbit.normal, nx), MOON_PLANE_RADIUS * s),
+                                       { colors: withAlpha(COLORS.moonPlane, 0.8) });
+            const er = scene.earth.rotation;
+            meshes.equatorRim.update(circle([er[0], er[3], er[6]], [er[1], er[4], er[7]], MOON_PLANE_RADIUS * s),
+                                     { colors: withAlpha(COLORS.equator, 0.8) });
+
             // Standort-Nadel: senkrecht auf der Erde am Ort aus dem Formular
             const loc = getLocation();
             const up = applyRotation(scene.earth.rotation, sphericalToVector(loc.longitude, loc.latitude, 1));
@@ -711,6 +783,7 @@
                 { id: 'perigee', text: 'Perigäum', color: COLORS.apsis, layer: 'apsides' },
                 { id: 'apogee', text: 'Apogäum', color: COLORS.apsis, layer: 'apsides' },
                 { id: 'location', text: 'Standort', color: COLORS.location, layer: 'location' },
+                { id: 'equator', text: 'Äquatorebene (Deklination 0°)', color: COLORS.equator, layer: 'equator' },
                 { id: 'ecl0', text: '♈\uFE0E 0°', color: COLORS.ecliptic, layer: 'ecliptic' },
                 { id: 'ecl90', text: '90°', color: COLORS.ecliptic, layer: 'ecliptic' },
                 { id: 'ecl180', text: '180°', color: COLORS.ecliptic, layer: 'ecliptic' },
@@ -737,6 +810,10 @@
             set('moon', [mp[0], mp[1], mp[2] + moonRadius()]);
             set('sun', gl3d.vec3.scale(scene.sun.direction, SUN_LINE_LENGTH * s));
             set('location', pinTip);
+            // höchster Punkt am Rand der Äquatorebene
+            const pole = earthPole();
+            const high = gl3d.vec3.normalize(gl3d.vec3.sub([0, 0, 1], gl3d.vec3.scale(pole, pole[2])));
+            set('equator', gl3d.vec3.scale(high, MOON_PLANE_RADIUS * s));
             set('ascending', toDisplay(events.ascending.position), '☊ aufsteigender Knoten ' + shortDate(events.ascending.time));
             set('descending', toDisplay(events.descending.position), '☋ absteigender Knoten ' + shortDate(events.descending.time));
             set('perigee', toDisplay(events.perigee.position),
@@ -806,7 +883,8 @@
             meshes.cone = coneMesh(96);
             const disc = gl3d.discGeometry(0, 256);
             meshes.disc = gl3d.createMesh(gl, { position: { data: disc.positions, size: 3 } }, disc.indices);
-            for (const name of ['path', 'meanOrbit', 'nodeLine', 'apsisLine', 'sunLine', 'earthAxis', 'moonAxis', 'pin']) {
+            for (const name of ['path', 'meanOrbit', 'nodeLine', 'apsisLine', 'sunLine', 'earthAxis', 'moonAxis', 'pin',
+                                'eclipticRim', 'moonPlaneRim', 'equatorRim']) {
                 meshes[name] = gl3d.createLineMesh(gl, [], {});
             }
             for (const name of ['dayTicks', 'nodeMarks', 'apsisMarks', 'sunMark', 'pinMark']) {
@@ -950,6 +1028,13 @@
                     .set('uColor', COLORS.moonPlane).set('uFill', 0.05).set('uRings', 0).set('uSpokes', 0);
                 meshes.disc.draw();
             }
+            if (layers.equator) {
+                // Äquatorebene der Erde (Himmelsäquator), in Körperachsen der Erde die xy-Ebene
+                programs.plane.use()
+                    .set('uModel', gl3d.mat4.fromRotation3(scene.earth.rotation, rel([0, 0, 0]), MOON_PLANE_RADIUS * distScale))
+                    .set('uColor', COLORS.equator).set('uFill', 0.04).set('uRings', 0).set('uSpokes', 0);
+                meshes.disc.draw();
+            }
             if (layers.air) {
                 programs.air.use()
                     .set('uViewProj', viewProj)
@@ -984,6 +1069,9 @@
                 programs.line.set('uWidth', width * dpr);
                 meshes[name].draw();
             };
+            line('eclipticRim', 1.2, 'ecliptic');
+            line('moonPlaneRim', 1.2, 'moonPlane');
+            line('equatorRim', 1.2, 'equator');
             line('path', 2, 'path');
             line('meanOrbit', 1.2, 'meanOrbit');
             line('nodeLine', sunNodeAngle() < ECLIPSE_SEASON ? 3 : 1.5, 'nodes');
@@ -1181,6 +1269,13 @@
         };
         const formatNumber = (x, digits) => x.toFixed(digits).replace('.', ',');
 
+        /** Scheinbarer Durchmesser des Mondes von der Erdmitte in Bogenminuten */
+        const apparentDiameterText = () =>
+            formatNumber(2 * Math.asin(MOON_RADIUS / scene.moon.distance) * RAD2DEG * 60, 1) + '′';
+
+        /** Höhe über dem Horizont; negativ = bleibt unter dem Horizont */
+        const altitudeText = h => h >= 0 ? formatDeg(h, 0) : `${formatDeg(h, 0)} (unter dem Horizont)`;
+
         /** Finsternis, die gerade stattfindet (Text), sonst leer */
         function currentEclipseText() {
             const parts = [];
@@ -1210,6 +1305,7 @@
             const m = scene.moon;
             const tz = timeZoneLabel();
             const sunNode = sunNodeAngle();
+            const decRange = declinationRange();
             const subSolar = subPoint(scene.earth.rotation, scene.sun.direction);
             const subEarth = subPoint(m.rotation, m.position.map(x => -x));
             const lonString = r => formatDeg(Math.abs(r)) + (r >= 0 ? ' O' : ' W');
@@ -1220,8 +1316,13 @@
                 { type: 'row', key: 'Ekliptikale Länge λ', value: formatDeg(m.longitude, 2) },
                 { type: 'row', key: 'Ekliptikale Breite β', value: formatDeg(m.latitude, 2) + (m.latitude >= 0 ? ' (oberhalb der Ekliptik)' : ' (unterhalb der Ekliptik)') },
                 { type: 'row', key: 'Entfernung (Mittelpunkte)', value: formatKm(m.distance) },
+                { type: 'row', key: 'Scheinbarer Durchmesser', value: apparentDiameterText() },
                 { type: 'row', key: 'Elongation', value: formatDeg(m.elongation) },
                 { type: 'row', key: 'Beleuchteter Anteil', value: (m.illuminatedFraction * 100).toFixed(1).replace('.', ',') + ' %, ' + phaseName(m.phaseAngle) },
+                { type: 'row', key: 'Deklination δ (über dem Himmelsäquator)', value: formatDeg(declinationOf(m.position), 1) },
+                { type: 'row', key: 'Höhe bei der Kulmination am Ort', value: altitudeText(culmination(declinationOf(m.position))) },
+                { type: 'row', key: 'Deklination im Monat (±14 Tage)', value: `${formatDeg(decRange.min)} bis ${formatDeg(decRange.max)}` },
+                { type: 'row', key: 'Kulmination im Monat am Ort', value: `${altitudeText(culmination(decRange.min))} bis ${altitudeText(culmination(decRange.max))}` },
                 { type: 'row', key: 'Libration Länge / Breite', value: `${formatDeg(m.libration.longitude, 2)} / ${formatDeg(m.libration.latitude, 2)}` },
                 { type: 'category', text: 'Mondbahn' },
                 { type: 'row', key: 'Mittlerer aufsteigender Knoten Ω', value: formatDeg(scene.meanNode) },
@@ -1243,12 +1344,391 @@
                 { type: 'row', key: 'Erde im Zenit über (Mond)', value: `${latString(subEarth.latitude)}, ${lonString(subEarth.longitude)}` },
             ];
             renderOutputTable('outputTable', rows);
+            updateTourText();
 
             const notes = [`${phaseName(m.phaseAngle)}, ${(m.illuminatedFraction * 100).toFixed(0)} % beleuchtet`];
             if (sunNode < ECLIPSE_SEASON) notes.push('Finsternis-Saison');
             const now = currentEclipseText();
             if (now) notes.push(`<b>${now}</b>`);
             document.getElementById('overlayDate').innerHTML = `${longDate(jd)} ${tz}<br><small>${notes.join(' · ')}</small>`;
+        }
+
+
+    /////////////////////////////////////////////////////////////////
+    //                      Geführte Rundgänge                     //
+    /////////////////////////////////////////////////////////////////
+
+        // Jeder Schritt stellt Zeitpunkt, Anzeigen, Maßstab, Kamera und Zeitraffer ein und erklärt, was zu sehen ist.
+        // Felder: title, text (HTML oder Funktion für Werte zum aktuellen Zeitpunkt), time() → JD, layers,
+        // scale [Körper, Abstand], view (Name aus VIEWS) oder camera() → { focus, azimuth, elevation, distance },
+        // play (Tage pro Sekunde).
+
+        const utcJd = (y, mo, d, h = 0, mi = 0) => julianDayFromDate(new Date(Date.UTC(y, mo - 1, d, h, mi)));
+        const deg = x => x * DEG2RAD;
+        const systemDistance = k => ECLIPTIC_RADIUS * distScale * k;
+        const fullMoonAfter = (y, mo, d) => nextMoonPhase(utcJd(y, mo, d), Math.PI);
+        const degText = (rad, digits = 1) => formatDeg(rad, digits);
+        const kmText = km => formatKm(km);
+
+        /** Kamera auf einen Punkt der Erde (Richtung in Ekliptik-Koordinaten) */
+        const cameraToward = (dir, focus, distance) =>
+            ({ focus, azimuth: Math.atan2(dir[1], dir[0]), elevation: Math.asin(dir[2]), distance });
+
+        /**
+         * Richtung von der Erdmitte zum Mondschatten: Punkt, an dem die Schattenachse die Erde trifft; verfehlt
+         * sie die Erde, der erdnächste Punkt der Achse
+         */
+        function shadowDirection() {
+            const S = scene.sun.position, M = scene.moon.position;
+            const b = gl3d.vec3.normalize(gl3d.vec3.sub(M, S));
+            const xe = -gl3d.vec3.dot(M, b);                            // Mond → erdnächster Punkt
+            const closest = gl3d.vec3.add(M, gl3d.vec3.scale(b, xe));
+            const gamma = gl3d.vec3.length(closest);
+            const t = gamma < 1 ? xe - Math.sqrt(1 - gamma * gamma) : xe;
+            return gl3d.vec3.normalize(gl3d.vec3.add(M, gl3d.vec3.scale(b, t)));
+        }
+
+        /** Kulminationshöhen im Monat am Ort als Text */
+        function culminationRangeText() {
+            const r = declinationRange();
+            return `Deklination ${degText(r.min)} bis ${degText(r.max)}, am eingestellten Ort `
+                 + `(Breite ${degText(getLocation().latitude)}) steht der Mond bei der Kulmination `
+                 + `zwischen ${altitudeText(culmination(r.min))} und ${altitudeText(culmination(r.max))} hoch`;
+        }
+        const locationHint = () => latitude === 0
+            ? ' <i>Der Beobachtungsort steht auf 0° Breite; eigenen Ort unter „Beobachtungsort“ eintragen.</i>' : '';
+
+        const TOUR_LAYERS = {
+            ecliptic: true, moonPlane: true, equator: false, path: true, meanOrbit: false, nodes: true,
+            apsides: true, sun: true, axes: true, location: true, air: true, earthshine: true, shadows: true,
+            cones: false, labels: true,
+        };
+
+        const TOURS = {
+            height: {
+                title: 'Wie hoch steht der Mond?',
+                layers: { equator: true, apsides: false },
+                steps: [
+                    {
+                        title: 'Die Höhe hängt von der Deklination ab',
+                        time: () => utcJd(2026, 11, 1),
+                        camera: () => ({ focus: 'system', azimuth: deg(-30), elevation: deg(14), distance: systemDistance(1.7) }),
+                        text: () => `Wie hoch der Mond am Himmel steigt, hängt von seiner <b>Deklination</b> ab: dem Winkel
+                            über oder unter dem <b>Himmelsäquator</b>. Das ist die Äquatorebene der Erde (violett); sie ist
+                            um 23,4° gegen die Ekliptik (gelb) geneigt. Im Süden erreicht der Mond die Höhe
+                            90° − geographische Breite + Deklination.<br><br>Jetzt: Deklination
+                            ${degText(declinationOf(scene.moon.position))}, Höhe bei der Kulmination etwa
+                            ${altitudeText(culmination(declinationOf(scene.moon.position)))}.${locationHint()}`,
+                    },
+                    {
+                        title: 'Einmal im Monat hoch, einmal tief',
+                        time: () => utcJd(2026, 11, 1),
+                        camera: () => ({ focus: 'system', azimuth: deg(-30), elevation: deg(14), distance: systemDistance(1.7) }),
+                        play: 1,
+                        text: () => `In 27,32 Tagen (tropischer Monat) läuft der Mond einmal um die Erde und kreuzt dabei
+                            zweimal die Äquatorebene. Etwa zwei Wochen steht er nördlich davon: Auf der Nordhalbkugel
+                            steigt er dann hoch und ist lange über dem Horizont. Zwei Wochen später steht er südlich,
+                            tief und nur kurz sichtbar. Die Sonne macht dasselbe in einem Jahr.<br><br>Zeitraffer 1 Tag pro
+                            Sekunde. In diesem Monat: ${culminationRangeText()}.`,
+                    },
+                    {
+                        title: 'Große Mondwende: bis ±28,6°',
+                        time: () => utcJd(2025, 1, 29),
+                        layers: { path: false },
+                        camera: () => ({ focus: 'system', azimuth: deg(0), elevation: deg(0), distance: systemDistance(1.45) }),
+                        text: () => `Der Blick geht in der Ekliptik entlang der Linie zum Frühlingspunkt ♈︎, so erscheinen
+                            alle drei Ebenen als Linien durch die Erde. Die Mondbahn (blau) ist 5,1° gegen die Ekliptik geneigt, die Ekliptik
+                            23,4° gegen den Äquator. Liegt der aufsteigende Knoten ☊ bei 0°, kippen beide in dieselbe
+                            Richtung: 23,4° + 5,1° = <b>28,6°</b>. Der Mond schwankt dann zwischen −28,6° und +28,6°
+                            Deklination, so weit wie nie sonst. Das war zuletzt Anfang 2025 so (große Mondwende).<br><br>
+                            ${culminationRangeText()}.`,
+                    },
+                    {
+                        title: 'Kleine Mondwende: nur ±18,3°',
+                        time: () => utcJd(2034, 5, 21),
+                        layers: { path: false },
+                        camera: () => ({ focus: 'system', azimuth: deg(0), elevation: deg(0), distance: systemDistance(1.45) }),
+                        text: () => `9,3 Jahre später liegt der aufsteigende Knoten gegenüber, bei 180°. Jetzt ist die
+                            Mondbahn zur anderen Seite gekippt und die Neigungen ziehen sich ab:
+                            23,4° − 5,1° = <b>18,3°</b>. Der Mond steigt nie so hoch und sinkt nie so tief wie bei der
+                            großen Mondwende. Die nächste kleine Mondwende ist im Jahr 2034.<br><br>
+                            ${culminationRangeText()}.`,
+                    },
+                    {
+                        title: 'Der Zyklus von 18,6 Jahren',
+                        time: () => utcJd(2025, 1, 29),
+                        layers: { path: false },
+                        camera: () => ({ focus: 'system', azimuth: deg(0), elevation: deg(0), distance: systemDistance(1.45) }),
+                        play: 365.25,
+                        text: () => `Die Knotenlinie wandert rückwärts um die Ekliptik, 19,4° pro Jahr, einmal herum in
+                            <b>18,6 Jahren</b>. Dadurch schwankt die blaue Mondbahnebene gegenüber der violetten
+                            Äquatorebene: Die Neigung pendelt zwischen 28,6° und 18,3° hin und her. Am größten ist sie, wenn die
+                            blaue Ebene auf der anderen Seite der gelben liegt als die violette.<br><br>Zeitraffer 1 Jahr
+                            pro Sekunde, jetzt ${dateParts(scene.jd).y}, Knoten ☊ bei ${degText(scene.meanNode, 0)}.
+                            Große Mondwenden: 2006, 2025, 2043; kleine: 2015, 2034, 2052.`,
+                    },
+                    {
+                        title: 'Vollmond im Winter hoch …',
+                        time: () => fullMoonAfter(2026, 12, 15),
+                        camera: () => ({ focus: 'system', azimuth: scene.sun.longitude + deg(90), elevation: deg(4), distance: systemDistance(1.6) }),
+                        text: () => `Der Vollmond steht der Sonne gegenüber. Im Dezember steht die Sonne 23,4° südlich des
+                            Äquators, der Vollmond also etwa so weit nördlich. Er läuft hoch über den Himmel und ist die
+                            ganze lange Nacht zu sehen, so wie die Sonne im Sommer. Am 24.12.2026 kommt er sogar auf
+                            ${degText(declinationOf(scene.moon.position))}, weil wir noch nahe der großen Mondwende sind.<br><br>
+                            Kulmination am eingestellten Ort: ${altitudeText(culmination(declinationOf(scene.moon.position)))}.`,
+                    },
+                    {
+                        title: '… und im Sommer tief',
+                        time: () => fullMoonAfter(2027, 6, 10),
+                        camera: () => ({ focus: 'system', azimuth: scene.sun.longitude + deg(90), elevation: deg(4), distance: systemDistance(1.6) }),
+                        text: () => `Im Juni ist es umgekehrt: Die Sonne steht hoch im Norden, der Vollmond tief im Süden.
+                            Am 19.06.2027 erreicht er nur ${degText(declinationOf(scene.moon.position))} Deklination, Kulmination
+                            am eingestellten Ort ${altitudeText(culmination(declinationOf(scene.moon.position)))}. Nahe einer großen
+                            Mondwende ist dieser Unterschied am größten, nahe einer kleinen am kleinsten. Auf der
+                            Südhalbkugel ist alles umgekehrt.`,
+                    },
+                ],
+            },
+
+            nodes: {
+                title: 'Knoten und Finsternisse',
+                layers: { apsides: false, axes: false, location: false },
+                steps: [
+                    {
+                        title: 'Zwei Schnittpunkte mit der Ekliptik',
+                        time: () => utcJd(2026, 11, 10),
+                        view: 'edge',
+                        text: `Die Mondbahn ist um 5,1° gegen die Ekliptik geneigt. Auf der einen Hälfte des Umlaufs läuft der
+                            Mond nördlich der Ekliptik (helle Linie), auf der anderen südlich (gestrichelt). Die beiden
+                            Schnittpunkte heißen <b>Knoten</b>: Im aufsteigenden Knoten ☊ wechselt der Mond nach Norden,
+                            im absteigenden ☋ nach Süden. Ihre Verbindung ist die Knotenlinie (orange).<br><br>Die Ansicht
+                            „Kante“ schaut quer auf die Knotenlinie, dort ist die Neigung am besten zu sehen.`,
+                    },
+                    {
+                        title: 'Drachenmonat: 27,21 Tage',
+                        time: () => moonNodePassages(utcJd(2026, 11, 10)).ascending.next.time,
+                        view: 'edge',
+                        play: 1,
+                        text: () => `Von einem aufsteigenden Knoten zum nächsten braucht der Mond im Mittel 27,21 Tage, den
+                            <b>Drachenmonat</b>. Er ist kürzer als ein Umlauf gegenüber den Sternen (27,32 Tage), weil die
+                            Knoten dem Mond entgegenlaufen. Am weitesten entfernt sich der Mond 5,1° von der Ekliptik, das
+                            sind rund 34 000 km.<br><br>Zeitraffer 1 Tag pro Sekunde. Jetzt: ekliptikale Breite
+                            ${degText(scene.moon.latitude, 2)}.`,
+                    },
+                    {
+                        title: 'Die Knotenlinie wandert rückwärts',
+                        time: () => utcJd(2026, 11, 1),
+                        view: 'top',
+                        play: 365.25,
+                        text: () => `Die Sonne zerrt an der geneigten Mondbahn. Dadurch dreht sich die Knotenlinie
+                            <b>rückwärts</b>, also gegen die Bewegung des Mondes: 19,4° pro Jahr, einmal ganz herum in
+                            <b>18,61 Jahren</b>. Von oben gesehen läuft der Mond gegen den Uhrzeigersinn, die Knotenlinie
+                            im Uhrzeigersinn.<br><br>Zeitraffer 1 Jahr pro Sekunde, jetzt ${dateParts(scene.jd).y}, Knoten ☊ bei
+                            ${degText(scene.meanNode, 0)}. Derselbe Zyklus bestimmt, wie hoch der Mond steigt (Rundgang
+                            „Wie hoch steht der Mond?“).`,
+                    },
+                    {
+                        title: 'Finsternisse nur in Knotennähe',
+                        time: () => findEclipse(utcJd(2026, 1, 1), 'lunar').time,
+                        view: 'earthToMoon',
+                        layers: { cones: true },
+                        text: () => {
+                            const hours = Math.min(Math.abs(scene.jd - events.ascending.time), Math.abs(scene.jd - events.descending.time)) * 24;
+                            return `Neu- und Vollmond gibt es jeden Monat, Finsternisse nicht: Meist läuft der Mond über oder
+                                unter dem Schatten vorbei, weil seine Bahn geneigt ist. Nur wenn Neu- oder Vollmond nahe einem
+                                Knoten stattfinden, stehen Sonne, Erde und Mond genau in einer Linie.<br><br>Hier die totale
+                                Mondfinsternis vom 3.3.2026: Der Vollmond war nur ${Math.round(hours)} Stunden vom Knoten
+                                entfernt. Im Kernschatten leuchtet der Mond rötlich, weil die Erdatmosphäre etwas rotes
+                                Sonnenlicht hineinlenkt.`;
+                        },
+                    },
+                    {
+                        title: 'Vollmond ohne Finsternis',
+                        time: () => fullMoonAfter(2026, 10, 20),
+                        scale: [1, 1],
+                        layers: { cones: true },
+                        camera: () => ({ focus: 'moon', azimuth: scene.sun.longitude + deg(90), elevation: deg(0), distance: 22 }),
+                        text: () => `Zum Vergleich der Vollmond vom 26.10.2026, hier maßstäblich: Er steht
+                            ${formatNumber(eclipse.lunar.axisDistance, 1)} Erdradien neben der Achse des Erdschattens und
+                            läuft am Schatten vorbei (rot: Kernschatten, grau: Halbschatten). Am Ort des Mondes hat der
+                            Kernschatten etwa ${formatNumber(eclipse.lunar.umbraRadius, 2)} Erdradien Radius, der Mond selbst
+                            0,27.`,
+                    },
+                    {
+                        title: 'Finsternis-Saisons',
+                        time: () => findEclipse(utcJd(2026, 7, 1), 'solar').time,
+                        camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
+                        layers: { axes: false },
+                        text: () => `Zweimal im Jahr zeigt die Sonnenrichtung fast entlang der Knotenlinie. In diesen gut fünf
+                            Wochen (Winkel Sonne – Knotenlinie unter etwa 17°, jetzt ${degText(sunNodeAngle())}) gibt es
+                            mindestens eine Sonnenfinsternis und meist auch eine Mondfinsternis. Weil die Knotenlinie
+                            zurückwandert, kommen die Saisons jedes Jahr etwa 19 Tage früher (Finsternisjahr 346,6 Tage):
+                            2026 im Februar/März und August, 2027 im Februar und Juli/August.<br><br>Hier die totale
+                            Sonnenfinsternis vom 12.8.2026: Der dunkle Fleck ist der Mondschatten bei Island.`,
+                    },
+                    {
+                        title: 'Saros: 18 Jahre und 11 Tage',
+                        time: () => findEclipse(utcJd(2044, 8, 1), 'solar').time,
+                        camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
+                        text: `223 Neumonde (18 Jahre, 11 Tage, 8 Stunden) sind fast genau 242 Drachenmonate und 239
+                            anomalistische Monate. Nach dieser Zeit, dem <b>Saros</b>, stehen Sonne, Mond, Knoten und
+                            Perigäum fast wieder gleich, und eine Finsternis wiederholt sich sehr ähnlich, um 8 Stunden
+                            später, also ein Drittel der Erde weiter westlich.<br><br>Die Finsternis vom 12.8.2026 folgt auf
+                            die vom 1.8.2008 und kehrt am 23.8.2044 wieder: hier, über Kanada und den USA.`,
+                    },
+                ],
+            },
+
+            apsides: {
+                title: 'Apsiden: erdnah und erdfern',
+                layers: { nodes: false, meanOrbit: true, axes: false, location: false },
+                steps: [
+                    {
+                        title: 'Eine Ellipse mit der Erde im Brennpunkt',
+                        time: () => utcJd(2026, 11, 1),
+                        view: 'top',
+                        text: `Die Mondbahn ist eine Ellipse, die Erde steht in einem Brennpunkt (Exzentrizität im Mittel
+                            0,055). Der erdnächste Punkt heißt <b>Perigäum</b>, der erdfernste <b>Apogäum</b> (grün), ihre
+                            Verbindung Apsidenlinie. Im Mittel ist der Mond im Perigäum 363 300 km entfernt, im Apogäum
+                            405 500 km; die Extremwerte liegen bei 356 400 und 406 700 km.<br><br>Grau gestrichelt: die
+                            mittlere Ellipse. Die wahre Bahn (hellblau) weicht davon ab, weil die Sonne mitzieht.`,
+                    },
+                    {
+                        title: 'Anomalistischer Monat: 27,55 Tage',
+                        time: () => moonApsides(utcJd(2026, 11, 1)).perigee.next.time,
+                        view: 'top',
+                        play: 1,
+                        text: () => `Von einem Perigäum zum nächsten vergehen im Mittel 27,55 Tage, der <b>anomalistische
+                            Monat</b>. Er ist länger als ein Umlauf gegenüber den Sternen (27,32 Tage), weil die Apsidenlinie
+                            dem Mond ein Stück vorauswandert.<br><br>Zeitraffer 1 Tag pro Sekunde. Jetzt:
+                            ${kmText(scene.moon.distance)}.`,
+                    },
+                    {
+                        title: 'Die Apsidenlinie wandert vorwärts',
+                        time: () => utcJd(2026, 11, 1),
+                        view: 'top',
+                        layers: { path: false },
+                        play: 365.25,
+                        text: () => `Auch die Ellipse dreht sich, aber <b>vorwärts</b>, in Bewegungsrichtung des Mondes:
+                            40,7° pro Jahr, einmal herum in <b>8,85 Jahren</b>. Von oben gesehen dreht sich die mittlere
+                            Ellipse gegen den Uhrzeigersinn. Knoten (18,6 Jahre, rückwärts) und Apsiden (8,85 Jahre,
+                            vorwärts) wandern unabhängig voneinander.<br><br>Zeitraffer 1 Jahr pro Sekunde, jetzt
+                            ${dateParts(scene.jd).y}. Die grünen Marken springen, weil das wahre Perigäum von Monat zu
+                            Monat schwankt.`,
+                    },
+                    {
+                        title: 'Supermond',
+                        time: () => fullMoonAfter(2026, 12, 15),
+                        view: 'top',
+                        text: () => `Fällt der Vollmond in die Nähe des Perigäums, erscheint er etwa 14 % größer und rund
+                            30 % heller als im Apogäum. Am 24.12.2026 ist er nur ${kmText(scene.moon.distance)} entfernt,
+                            scheinbarer Durchmesser ${apparentDiameterText()}. Besonders nahe kommt der Mond, wenn die
+                            Apsidenlinie zur Sonne zeigt: Dann zieht die Sonne die Ellipse in die Länge, und Perigäum und
+                            Neu- oder Vollmond fallen zusammen.`,
+                    },
+                    {
+                        title: 'Minimond und der Rhythmus von 13,9 Monaten',
+                        time: () => fullMoonAfter(2027, 7, 10),
+                        view: 'top',
+                        text: () => `Sieben Monate später, am 18.7.2027, steht der Vollmond nahe dem Apogäum:
+                            ${kmText(scene.moon.distance)}, scheinbarer Durchmesser nur ${apparentDiameterText()}.<br><br>Weil die
+                            Apsidenlinie mitwandert, kommt der nächste Supermond nicht nach einem Jahr, sondern nach etwa
+                            13,9 Monaten (411,8 Tage): am 10.2.2028.`,
+                    },
+                    {
+                        title: 'Total oder ringförmig',
+                        time: () => findEclipse(utcJd(2027, 7, 1), 'solar').time,
+                        camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
+                        layers: { meanOrbit: false },
+                        text: () => `Auch bei Sonnenfinsternissen zählt die Entfernung. Die Sonne erscheint 31,6′ bis 32,7′
+                            groß, der Mond 29,4′ bis 33,5′. Nahe dem Perigäum deckt er die Sonne ganz ab: Am 2.8.2027
+                            (${kmText(scene.moon.distance)}) dauert die totale Finsternis über Ägypten bis zu 6 Minuten
+                            23 Sekunden. Der dunkle Fleck ist der Kernschatten.`,
+                    },
+                    {
+                        title: '… und nahe dem Apogäum ringförmig',
+                        time: () => findEclipse(utcJd(2027, 1, 20), 'solar').time,
+                        camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
+                        layers: { meanOrbit: false },
+                        text: () => `Am 6.2.2027 ist der Mond ${kmText(scene.moon.distance)} entfernt und erscheint kleiner
+                            als die Sonne. Sein Kernschatten endet vor der Erde; wer in der Mitte steht, sieht einen hellen
+                            Ring um den Mond (ringförmige Finsternis). Auf der Erde bleibt es deshalb heller als bei
+                            einer totalen Finsternis.`,
+                    },
+                ],
+            },
+        };
+
+        let tour = null;                   // { id, index, saved }
+
+        function startTour(id) {
+            // Anzeigen und Maßstab von vor dem Rundgang merken (ein Wechsel zwischen Rundgängen behält den ersten Stand)
+            const saved = tour ? tour.saved : { layers: Object.assign({}, layers), scale: [bodyScale, distScale] };
+            tour = { id, index: 0, saved };
+            document.getElementById('tour').hidden = false;
+            showTourStep();
+        }
+
+        /** Rundgang beenden; Anzeigen und Maßstab wie vorher, Zeitpunkt und Kamera bleiben */
+        function endTour() {
+            const saved = tour.saved;
+            tour = null;
+            setPlaying(false);
+            setLayers(saved.layers);
+            setScale(...saved.scale);
+            document.getElementById('tour').hidden = true;
+            for (const b of document.querySelectorAll('[data-tour]')) b.setAttribute('aria-pressed', 'false');
+        }
+
+        function tourStep() { return TOURS[tour.id].steps[tour.index]; }
+
+        /** Text des Schritts neu schreiben (Werte ändern sich im Zeitraffer) */
+        function updateTourText() {
+            if (!tour) return;
+            const step = tourStep();
+            document.getElementById('tourText').innerHTML = typeof step.text === 'function' ? step.text() : step.text;
+        }
+
+        function showTourStep() {
+            const def = TOURS[tour.id], step = tourStep(), n = def.steps.length;
+            for (const b of document.querySelectorAll('[data-tour]')) b.setAttribute('aria-pressed', b.dataset.tour === tour.id);
+            document.getElementById('tourHead').textContent = `${def.title} · Schritt ${tour.index + 1} von ${n}`;
+            document.getElementById('tourTitle').textContent = step.title;
+            document.getElementById('tourBack').disabled = tour.index === 0;
+            document.getElementById('tourNext').textContent = tour.index === n - 1 ? 'Fertig' : 'Weiter ▶';
+            applyTourStep(step, def);
+            updateTourText();
+        }
+
+        function applyTourStep(step, def) {
+            setPlaying(false);
+            setScale(...(step.scale || def.scale || [4, 1]));
+            setLayers(Object.assign({}, TOUR_LAYERS, def.layers, step.layers));
+            if (step.time) {
+                datetime = julianDayToDate(step.time());
+                changeTime(0);
+            }
+            setViewLock(null);
+            if (step.view) applyView(step.view);
+            else if (step.camera) {
+                const c = step.camera();
+                setFocus(c.focus, true, { azimuth: c.azimuth, elevation: c.elevation, distance: c.distance });
+            }
+            if (step.play) {
+                setSpeed(step.play);
+                setPlaying(true);
+            }
+        }
+
+        function initTour() {
+            for (const b of document.querySelectorAll('[data-tour]')) b.addEventListener('click', () => startTour(b.dataset.tour));
+            document.getElementById('tourBack').addEventListener('click', () => { tour.index--; showTourStep(); });
+            document.getElementById('tourNext').addEventListener('click', () => {
+                if (tour.index === TOURS[tour.id].steps.length - 1) endTour();
+                else { tour.index++; showTourStep(); }
+            });
+            document.getElementById('tourRepeat').addEventListener('click', () => showTourStep());
+            document.getElementById('tourClose').addEventListener('click', endTour);
         }
 
     /////////////////////////////////////////////////////////////////
@@ -1301,6 +1781,50 @@
             el.style.display = 'flex';
         }
 
+        /** Maßstab aus den Schiebern übernehmen; die Kamera bleibt beim Ziel */
+        function applyScale() {
+            const oldFocusPos = focusPosition();
+            bodyScale = parseFloat(document.getElementById('bodyScale').value);
+            distScale = parseFloat(document.getElementById('distScale').value);
+            document.getElementById('bodyScaleOut').value = '×' + bodyScale.toString().replace('.', ',');
+            document.getElementById('distScaleOut').value = '×' + distScale.toString().replace('.', ',');
+            const shift = gl3d.vec3.sub(focusPosition(), oldFocusPos);
+            camera.target = gl3d.vec3.add(camera.target, shift);
+            updateCameraLimits();
+            camera.clamp();
+            needsGeometry = true;
+            needsRender = true;
+        }
+
+        function setScale(body, dist) {
+            document.getElementById('bodyScale').value = body;
+            document.getElementById('distScale').value = dist;
+            applyScale();
+        }
+
+        /** Ebenen ein-/ausschalten (Objekt { name: true/false }), Checkboxen nachziehen */
+        function setLayers(values) {
+            for (const cb of document.querySelectorAll('[data-layer]')) {
+                if (cb.dataset.layer in values) cb.checked = layers[cb.dataset.layer] = values[cb.dataset.layer];
+            }
+            needsRender = true;
+        }
+
+        function setPlaying(on) {
+            if (playing === on) return;
+            playing = on;
+            document.getElementById('play').textContent = playing ? '⏸ Pause' : '▶ Abspielen';
+            if (!playing) update();
+        }
+
+        /** Geschwindigkeit in Tagen pro Sekunde (vorwärts); wählt die passende Stufe im Auswahlfeld */
+        function setSpeed(daysPerSecond) {
+            const select = document.getElementById('speed');
+            for (const o of select.options) if (Math.abs(parseFloat(o.value) / daysPerSecond - 1) < 1e-3) select.value = o.value;
+            document.getElementById('reverse').checked = false;
+            playSpeed = daysPerSecond;
+        }
+
         function initControls() {
             // Ebenen
             for (const cb of document.querySelectorAll('[data-layer]')) {
@@ -1308,28 +1832,9 @@
                 cb.addEventListener('change', () => { layers[cb.dataset.layer] = cb.checked; needsRender = true; });
             }
             // Maßstab
-            const bodyInput = document.getElementById('bodyScale'), distInput = document.getElementById('distScale');
-            const applyScale = () => {
-                const oldFocusPos = focusPosition();
-                bodyScale = parseFloat(bodyInput.value);
-                distScale = parseFloat(distInput.value);
-                document.getElementById('bodyScaleOut').value = '×' + bodyScale.toString().replace('.', ',');
-                document.getElementById('distScaleOut').value = '×' + distScale.toString().replace('.', ',');
-                // Kamera beim Ziel halten
-                const shift = gl3d.vec3.sub(focusPosition(), oldFocusPos);
-                camera.target = gl3d.vec3.add(camera.target, shift);
-                updateCameraLimits();
-                camera.clamp();
-                needsGeometry = true;
-                needsRender = true;
-            };
-            bodyInput.addEventListener('input', applyScale);
-            distInput.addEventListener('input', applyScale);
-            document.getElementById('trueScale').addEventListener('click', () => {
-                bodyInput.value = 1;
-                distInput.value = 1;
-                applyScale();
-            });
+            document.getElementById('bodyScale').addEventListener('input', applyScale);
+            document.getElementById('distScale').addEventListener('input', applyScale);
+            document.getElementById('trueScale').addEventListener('click', () => setScale(1, 1));
             applyScale();
             // Kamera-Ziel
             for (const b of document.querySelectorAll('[data-focus]')) {
@@ -1345,12 +1850,7 @@
                 if (follow) setFocus(focus, true);
             });
             // Abspielen
-            const playButton = document.getElementById('play');
-            playButton.addEventListener('click', () => {
-                playing = !playing;
-                playButton.textContent = playing ? '⏸ Pause' : '▶ Abspielen';
-                if (!playing) update();
-            });
+            document.getElementById('play').addEventListener('click', () => setPlaying(!playing));
             const speedSelect = document.getElementById('speed'), reverse = document.getElementById('reverse');
             const applySpeed = () => { playSpeed = parseFloat(speedSelect.value) * (reverse.checked ? -1 : 1); };
             speedSelect.addEventListener('change', applySpeed);
@@ -1393,6 +1893,7 @@
                 { label: '1 synod. Monat', step: SYNODIC_MONTH * 86400000 },
             ]);
             initControls();
+            initTour();
             update();
             // Anfangsansicht: schräg, Sonne von rechts hinten, damit Phasen und Bahnneigung sichtbar sind
             setFocus('system', false, VIEWS.overview.angles());
@@ -1407,13 +1908,34 @@
         der Richtung des gelben Pfeils.
         <b>Ziehen</b> dreht die Ansicht, <b>Mausrad</b> oder zwei Finger zoomen, <b>rechte Maustaste</b> oder
         <b>Umschalt+Ziehen</b> verschiebt, <b>Doppelklick</b> auf Erde oder Mond setzt das Ziel.
+        Die Rundgänge führen Schritt für Schritt durch Besonderheiten der Mondbahn; alle Einstellungen sind
+        <a href="#einstellungen">unten erklärt</a>.
     </p>
 
-    <div class="viewport">
-        <canvas id="view"></canvas>
-        <div class="labels" id="labels"></div>
-        <div class="overlay-date" id="overlayDate"></div>
-        <div class="message" id="message"></div>
+    <div class="tours">
+        <b>Geführte Rundgänge:</b>
+        <button data-tour="height">Wie hoch steht der Mond?</button>
+        <button data-tour="nodes">Knoten und Finsternisse</button>
+        <button data-tour="apsides">Apsiden: erdnah und erdfern</button>
+    </div>
+
+    <div class="stage">
+        <div class="viewport">
+            <canvas id="view"></canvas>
+            <div class="labels" id="labels"></div>
+            <div class="overlay-date" id="overlayDate"></div>
+            <div class="message" id="message"></div>
+        </div>
+        <div class="tour" id="tour" hidden>
+            <div class="head"><span id="tourHead"></span><button id="tourClose" title="Rundgang beenden" aria-label="Rundgang beenden">✕</button></div>
+            <h3 id="tourTitle"></h3>
+            <p id="tourText"></p>
+            <nav>
+                <button id="tourBack">◀ Zurück</button>
+                <button id="tourNext">Weiter ▶</button>
+                <button id="tourRepeat" title="Zeitpunkt und Ansicht dieses Schritts wieder einstellen">↺ Noch einmal</button>
+            </nav>
+        </div>
     </div>
 
     <div class="controls">
@@ -1475,6 +1997,7 @@
             <b>Anzeigen</b>
             <label><input type="checkbox" data-layer="ecliptic" checked> Ekliptik</label>
             <label><input type="checkbox" data-layer="moonPlane" checked> Mondbahnebene</label>
+            <label><input type="checkbox" data-layer="equator"> Äquatorebene</label>
             <label><input type="checkbox" data-layer="path" checked> wahre Bahn</label>
             <label><input type="checkbox" data-layer="meanOrbit"> mittlere Ellipse</label>
             <label><input type="checkbox" data-layer="nodes" checked> Knoten</label>
@@ -1493,6 +2016,7 @@
     <div class="legend">
         <span class="area" style="--c:#f2bf4d">Ekliptik (Ringe alle 10 Erdradien, Speichen alle 30°)</span>
         <span class="area" style="--c:#5999ff">Mondbahnebene (mittlere, 5,1° geneigt)</span>
+        <span class="area" style="--c:#b880ff">Äquatorebene (Himmelsäquator, 23,4° geneigt)</span>
         <span style="--c:#99ccff">Mondbahn ±14 Tage, oberhalb der Ekliptik</span>
         <span class="dashed" style="--c:#6180b8">unterhalb der Ekliptik</span>
         <span style="--c:#ff8c40">Knotenlinie</span>
@@ -1527,16 +2051,56 @@
         </div>
     </div>
 
+    <h2 id="einstellungen">Einstellungen</h2>
+    <table class="glossary">
+        <tr><td>Maus und Finger</td><td>Ziehen dreht die Ansicht um das Ziel, Mausrad oder zwei Finger zoomen, rechte
+            Maustaste, Umschalt+Ziehen oder zwei Finger verschieben. Doppelklick auf Erde oder Mond macht ihn zum Ziel.
+            „Oben“ ist immer der Nordpol der Ekliptik, so verliert man die Orientierung nicht.</td></tr>
+        <tr><td>Abspielen</td><td>Zeitraffer von Echtzeit bis 1 Jahr pro Sekunde, „rückwärts“ lässt die Zeit
+            zurücklaufen, „Jetzt“ springt zur aktuellen Zeit. Unter <i>Zeit</i> lässt sich ein Zeitpunkt eintippen oder in
+            Schritten (Stunde, Tag, Woche, synodischer Monat) verstellen; „Lokalzeit“ schaltet zwischen Ortszeit und
+            UTC um.</td></tr>
+        <tr><td>Ziel</td><td>Der Punkt, um den sich die Kamera dreht: Mitte des Systems (Erde), Erde aus der Nähe oder
+            Mond. Mit „mitführen“ folgt die Kamera dem Mond im Zeitraffer. Verschieben schaltet das Mitführen ab.</td></tr>
+        <tr><td>Ansicht</td><td><i>Übersicht</i>: schräg von oben. <i>von oben</i>: Bahnform, Knoten- und Apsidenlinie
+            als Draufsicht. <i>Kante</i>: in der Ekliptik, quer zur Knotenlinie, zeigt die Neigung der Mondbahn.
+            <i>von der Sonne</i>: Erde und Mond voll beleuchtet. <i>Erde → Mond</i>: der Mond wie am Himmel, mit Phase
+            und Libration. <i>Mond → Erde</i>: die Erde vom Mond aus. Die letzten vier halten ihre Blickrichtung im
+            Zeitraffer, bis man selbst dreht.</td></tr>
+        <tr><td>Springen</td><td>◀ und ▶ springen zum vorigen oder nächsten Ereignis der gewählten Art: Mondphasen,
+            Knoten, Perigäum, Apogäum, Mond- oder Sonnenfinsternis (zur Mitte der Finsternis).</td></tr>
+        <tr><td>Körper und Abstand</td><td>„Körper“ vergrößert Erde und Mond (×1 bis ×8), „Abstand“ staucht die
+            Entfernungen (×0,25 bis ×1). „maßstäblich“ stellt beides auf ×1: Dann ist der Mond ein winziger Punkt in
+            60 Erdradien Abstand, wie in Wirklichkeit. Gerechnet wird immer mit den wahren Orten.</td></tr>
+        <tr><td>Anzeigen</td><td><i>Ekliptik</i>: Ebene der Erdbahn mit Ringen alle 10 Erdradien und Speichen alle 30°
+            ab dem Frühlingspunkt ♈︎. <i>Mondbahnebene</i>: mittlere Ebene der Mondbahn. <i>Äquatorebene</i>:
+            Himmelsäquator, über ihm zählt die Deklination. <i>wahre Bahn</i>: der Weg des Mondes ±14 Tage, Punkte im
+            Tagesabstand. <i>mittlere Ellipse</i>: die Bahn ohne Störungen durch die Sonne. <i>Knoten</i>, <i>Apsiden</i>:
+            Linien und Marken mit Datum. <i>Sonnenrichtung</i>, <i>Achsen</i> von Erde und Mond, <i>Standort</i>-Nadel.
+            <i>Atmosphäre</i>, <i>Erdschein</i>, <i>Schatten</i> und <i>Schattenkegel</i> schalten diese Effekte ein
+            und aus. <i>Namen</i>: Beschriftungen.</td></tr>
+        <tr><td>Beobachtungsort</td><td>Breite und Länge für die Standort-Nadel und die Kulminationshöhe in der Tabelle.
+            Der Ort wird im Browser gespeichert und gilt auch auf den anderen Seiten.</td></tr>
+        <tr><td>Geführte Rundgänge</td><td>Jeder Schritt stellt Zeitpunkt, Ansicht und Anzeigen passend ein und startet
+            bei Bedarf den Zeitraffer. Danach kann man frei weiterdrehen; „↺ Noch einmal“ stellt den Schritt wieder
+            her. Am Ende (oder mit ✕) kommen Anzeigen und Maßstab wieder wie vorher.</td></tr>
+    </table>
+
     <h2>Begriffe</h2>
     <table class="glossary">
         <tr><td>Ekliptik</td><td>Die Ebene, in der die Erde um die Sonne läuft. Von der Erde aus gesehen wandert die Sonne
             im Lauf eines Jahres einmal entlang der Ekliptik um den Himmel. Die Längen werden ab dem Frühlingspunkt ♈︎
             gezählt, dort steht die Sonne zu Frühlingsbeginn.</td></tr>
+        <tr><td>Deklination</td><td>Winkel eines Gestirns nördlich (+) oder südlich (−) des Himmelsäquators, also der
+            Äquatorebene der Erde. Sie bestimmt, wie hoch ein Gestirn im Süden steht: 90° − geographische Breite +
+            Deklination.</td></tr>
         <tr><td>Mondbahnebene</td><td>Die Ebene, in der der Mond um die Erde läuft. Sie ist um etwa 5,1° gegen die Ekliptik
             geneigt, deshalb steht der Mond meist etwas über oder unter der Ekliptik.</td></tr>
         <tr><td>Knoten</td><td>Die beiden Punkte, an denen der Mond die Ekliptik kreuzt: im aufsteigenden Knoten ☊ nach
             Norden, im absteigenden ☋ nach Süden. Die Verbindung heißt Knotenlinie. Sie dreht sich in 18,6 Jahren einmal
             rückwärts herum.</td></tr>
+        <tr><td>Mondwende</td><td>Die größte Deklination des Mondes schwankt in 18,6 Jahren zwischen 28,6° (große
+            Mondwende, zuletzt 2025) und 18,3° (kleine Mondwende, 2034). Grund ist die wandernde Knotenlinie.</td></tr>
         <tr><td>Drachenmonat</td><td>Die Zeit von einem aufsteigenden Knoten zum nächsten, im Mittel 27,21 Tage.</td></tr>
         <tr><td>Apsiden</td><td>Der erdnächste (Perigäum) und der erdfernste Punkt (Apogäum) der Mondbahn. Die Entfernung
             schwankt zwischen etwa 356 000 und 407 000 km. Die Apsidenlinie dreht sich in 8,85 Jahren einmal vorwärts.</td></tr>
@@ -1549,6 +2113,8 @@
             59 % der Mondoberfläche, nicht nur die Hälfte.</td></tr>
         <tr><td>Erdschein</td><td>Sonnenlicht, das die Erde auf die Nachtseite des Mondes wirft. Kurz vor und nach Neumond ist
             er am hellsten, weil man dann vom Mond aus eine fast volle Erde sieht.</td></tr>
+        <tr><td>Saros</td><td>Nach 18 Jahren und 11 Tagen wiederholt sich eine Finsternis fast gleich, weil dann
+            Phasen, Knoten und Perigäum wieder fast genauso zueinander stehen.</td></tr>
         <tr><td>Kern- und Halbschatten</td><td>Im Kernschatten ist die Sonne ganz verdeckt, im Halbschatten nur zum Teil.
             Der Kernschatten der Erde reicht weit über die Mondbahn hinaus. Im Kernschatten leuchtet der Mond rötlich, weil
             die Erdatmosphäre etwas rotes Sonnenlicht hineinlenkt. Der Kernschatten des Mondes reicht gerade bis zur Erde;
