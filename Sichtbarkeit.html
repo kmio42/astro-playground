@@ -203,6 +203,10 @@
         .callout.stale { border-left-color: #d03b3b; }
         /* Unter „Einrichten“ zählt der Zeitpunkt nicht: keine Zeitleiste, keine Sonnen-/Mond-Legenden */
         body.view-setup #timeBar, #viewSetup .sun-only { display: none; }
+        body.view-intro #contextBar { display: none; }      /* Einführung: weder Standpunkt noch Zeit */
+        .intro-nav { justify-content: flex-start; }
+        .imprint { margin-top: 24px; font-size: 0.9em; }
+        .imprint a { color: var(--text-2); }
         .map-label-anchor { overflow: visible; }
         .map-label {
             display: inline-block;
@@ -317,6 +321,8 @@
         details.help dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 8px 0; }
         details.help dt { font-weight: 600; }
         details.help dd { margin: 0; }
+        .scene-fig { margin: 0; }
+        .scene-fig figcaption { color: var(--text-2); font-size: 0.9em; margin-bottom: 4px; }
         .scene-views { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
         #sceneForm h3 { margin: 10px 0 4px; }
         #map { height: 420px; border-radius: 6px; margin-bottom: 6px; background: var(--surface-2); }
@@ -388,7 +394,8 @@
             const settings = { ...DEFAULT_SETTINGS, ...(s.settings || {}) };
             settings.open = { ...(s.settings && typeof s.settings.open === 'object' ? s.settings.open : {}) };
             const step = s.ui && Number.isInteger(s.ui.step) && s.ui.step >= 0 && s.ui.step <= 4 ? s.ui.step : null;
-            return { viewpoints, selected, settings, ui: { step },
+            const finished = !!(s.ui && s.ui.finished);    // „Fertig – zum Ergebnis“ gedrückt
+            return { viewpoints, selected, settings, ui: { step, finished },
                      environment: normalizeEnvironment(s.environment || {}) };
         }
 
@@ -459,7 +466,7 @@
             recompile();
             saveState();
             if (rebuildTables) renderTables(); else renderSteps();
-            redrawAll();
+            if (!syncLocationToEye()) redrawAll();      // setLocation zeichnet selbst neu
         }
 
         // Für Eingaben in den Tabellen: erst nach einer kurzen Pause neu rechnen
@@ -1244,6 +1251,7 @@
         function selectViewpoint(index) {
             state.selected = index;
             if (index >= 0) lastEditable = index;
+            syncLocationToEye();
             saveState();
             renderViewpointSelect();
             renderTables();
@@ -1259,6 +1267,7 @@
                                     floor: like.floor, floorHeight: like.floorHeight, eyeHeight: like.eyeHeight,
                                     scene: like.scene ? JSON.parse(JSON.stringify(like.scene)) : null });
             recompile();
+            state.ui.finished = false;      // der neue Standpunkt ist noch nicht eingerichtet
             selectViewpoint(state.viewpoints.length - 1);
             openStep(2);
             setView('setup');
@@ -1910,6 +1919,42 @@
             return destination(p[0], p[1], sc.facade, y);
         }
 
+        // Punkt der Szene (x entlang der Fassade, y nach außen) [m] → Augenangabe { place, x, y }, eingeschränkt auf Raum
+        // bzw. Balkon (10 cm Abstand zu den Wänden, auf 5 cm gerundet). Gibt es beides, entscheidet die Seite der Hauswand.
+        function eyeFromScenePoint(sc, x, y) {
+            const m = 0.1, clamp = (v, a, b) => Math.min(b, Math.max(a, v)), r5 = v => Math.round(v * 20) / 20;
+            const place = sc.room && sc.balcony ? (y > 0 ? 'balcony' : 'room') : sc.room ? 'room' : 'balcony';
+            if (place === 'room') {
+                return { place, x: r5(clamp(x, m, sc.room.width - m)), y: r5(clamp(-sc.wall - y, m, sc.room.depth - m)) };
+            }
+            return { place, x: r5(clamp(x, sc.balcony.from + m, sc.balcony.to - m)), y: r5(clamp(y, m, sc.balcony.depth - m)) };
+        }
+
+        // Kartenpunkt → Szenenpunkt [x, y] in m (Umkehrung von sceneLatLng, ebene Näherung um den Ankerpunkt)
+        function sceneFromLatLng(sc, lat, lon) {
+            const [e, n] = localProjection(sc.anchor)(lat, lon);
+            const f = sc.facade * DEG2RAD;
+            // x zeigt nach Azimut facade + 90°, y nach Azimut facade (nach außen)
+            return [e * Math.cos(f) - n * Math.sin(f), e * Math.sin(f) + n * Math.cos(f)];
+        }
+
+        // Standpunkt, dessen Raum/Balkon in der Karte eingerastet ist (nur bei einem einzelnen gewählten Standpunkt)
+        function anchoredViewpoint() {
+            const vp = editableViewpoint();
+            return vp && vp.scene && vp.scene.anchor ? vp : null;
+        }
+
+        // Standort auf das Auge setzen, wenn Raum/Balkon eingerastet ist; true, wenn er sich bewegt hat
+        function syncLocationToEye() {
+            const vp = anchoredViewpoint();
+            if (!vp) return false;
+            const eye = eyePosition(vp);
+            const [dx, dy] = localProjection({ latitude, longitude })(eye.latitude, eye.longitude);
+            if (Math.hypot(dx, dy) < 0.05) return false;
+            setLocation(eye.latitude, eye.longitude);
+            return true;
+        }
+
         // Lotfußpunkt von p auf die Strecke a–b (alle [lat, lon], ebene Näherung)
         function footOnEdge(a, b, p) {
             const k = Math.cos(p[0] * DEG2RAD);
@@ -2044,17 +2089,8 @@
                 const t = sceneTopView;
                 return currentView === 'setup' && t && Math.hypot(px - t.v.X(t.cs.eye[0]), py - t.v.Y(t.cs.eye[1])) <= 14;
             };
-            // Position in Szenenkoordinaten → Augenangabe (x von links, y vor der Fensterwand bzw. Hauswand)
-            const eyeAt = (px, py) => {
-                const t = sceneTopView, sc = t.cs.scene, m = 0.1;
-                const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-                const r5 = v => Math.round(v * 20) / 20;
-                let x = t.v.toX(px), y = t.v.toY(py);
-                if (sc.eye.place === 'room') {
-                    return { x: r5(clamp(x, m, sc.room.width - m)), y: r5(clamp(-sc.wall - y, m, sc.room.depth - m)) };
-                }
-                return { x: r5(clamp(x, sc.balcony.from + m, sc.balcony.to - m)), y: r5(clamp(y, m, sc.balcony.depth - m)) };
-            };
+            // Position in der Draufsicht → Augenangabe
+            const eyeAt = (px, py) => eyeFromScenePoint(sceneTopView.cs.scene, sceneTopView.v.toX(px), sceneTopView.v.toY(py));
             canvas.addEventListener('pointerdown', ev => {
                 const [px, py] = pos(ev);
                 if (!nearEye(px, py)) return;
@@ -2067,10 +2103,9 @@
                 const vp = editableViewpoint(), t = sceneTopView;
                 if (!vp || !vp.scene || !t) return;
                 const e = eyeAt(px, py);
-                vp.scene.eye.x = e.x;
-                vp.scene.eye.y = e.y;
+                vp.scene.eye = e;
                 // Vorschau ohne Neuberechnung der Maske
-                const ex = e.x, ey = t.cs.scene.eye.place === 'room' ? -t.cs.scene.wall - e.y : e.y;
+                const ex = e.x, ey = e.place === 'room' ? -t.cs.scene.wall - e.y : e.y;
                 const preview = { ...t.cs, eye: [ex, ey, t.cs.eye[2]] };
                 drawSceneTop(canvas, preview, null, null, null);
                 canvas.style.cursor = 'grabbing';
@@ -2106,6 +2141,12 @@
             if (!vpc || !vpc.scene) { info.textContent = ''; return; }
             if (!shown('sceneTop')) return;
             const cs = vpc.scene, sc = cs.scene;
+            document.getElementById('sceneTopCaption').textContent = 'Draufsicht von oben: oben ist außen, unten ' +
+                (sc.room ? 'die Rückwand' : 'die Hauswand') + '; links und rechts mit Blick nach draußen.';
+            document.getElementById('sceneFrontCaption').textContent = sc.room
+                ? 'Fensterwand von innen gesehen: oben die Decke, unten der Fußboden; links und rechts wie in der Draufsicht' +
+                  (sc.balcony ? ', dahinter der Balkon.' : '.')
+                : 'Blick vom Balkon nach außen: oben die Balkonplatte, unten der Boden; links und rechts wie in der Draufsicht.';
             if (currentView === 'setup') {
                 // Beim Einrichten nur die Maße; Sonne und Sonnenfleck zeigt „Ergebnis“ → „Sonne im Raum“
                 drawSceneTop(document.getElementById('sceneTop'), cs, null, null, null);
@@ -2218,6 +2259,14 @@
             ctx.stroke();
             ctx.textBaseline = 'middle';
             haloText(ctx, 'N', cx + 20 * Math.sin(na), cy - 20 * Math.cos(na), css('--text-2'));
+            // Übrige Ränder: innen, links, rechts (mit Blick nach draußen)
+            ctx.textBaseline = 'bottom';
+            haloText(ctx, R ? 'innen · Rückwand' : 'Haus', w / 2, h - 4, css('--text-2'));
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            haloText(ctx, 'links', 4, h / 2, css('--text-2'));
+            ctx.textAlign = 'right';
+            haloText(ctx, 'rechts', w - 4, h / 2, css('--text-2'));
         }
 
         // Fensterwand von innen gesehen (gleiche Seiten wie die Draufsicht): Fenster, dahinter Balkon, Auge
@@ -2272,10 +2321,40 @@
             ctx.beginPath();
             ctx.arc(v.X(cs.eye[0]), v.Y(cs.eye[2]), 5, 0, 2 * Math.PI);
             ctx.fill();
+
+            const label = css('--text-2'), xm = v.X((x0 + x1) / 2);
             ctx.font = '12px Arial';
             ctx.textAlign = 'center';
+            // Oben und unten
+            ctx.textBaseline = 'bottom';
+            // über Decke bzw. Balkonplatte, je nachdem was höher reicht (die Platte liegt dahinter)
+            const slabTop = B && B.slab ? B.ceiling + 0.2 : null;
+            const topZ = R ? Math.max(R.height, slabTop ?? 0) : slabTop;
+            if (topZ !== null) haloText(ctx, R ? `Decke (${fmtNum(R.height)} m)` : `Balkonplatte (${fmtNum(B.ceiling)} m)`, xm, v.Y(topZ) - 3, label);
             ctx.textBaseline = 'top';
-            haloText(ctx, R ? 'Fensterwand von innen' : 'Blick vom Balkon nach außen', w / 2, 6, css('--text-2'));
+            haloText(ctx, 'Fußboden', xm, v.Y(0) + 2, label);
+            // Links und rechts wie in der Draufsicht
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            haloText(ctx, 'links', 4, v.Y(z1 / 2), label);
+            ctx.textAlign = 'right';
+            haloText(ctx, 'rechts', w - 4, v.Y(z1 / 2), label);
+            // Höhenskala links neben der Wand
+            ctx.font = '10px Arial';
+            ctx.strokeStyle = css('--muted');
+            for (let z = 0; z <= z1 + 1e-6; z += 0.5) {
+                const y = v.Y(z), xs = v.X(x0) - 4;
+                ctx.beginPath(); ctx.moveTo(xs - (z % 1 ? 3 : 6), y); ctx.lineTo(xs, y); ctx.stroke();
+                if (z % 1 === 0) haloText(ctx, `${fmtNum(z, 0)} m`, xs - 8, y, label);
+            }
+            // Brüstung und Sturz der Fenster, Augenhöhe
+            ctx.textAlign = 'left';
+            for (const win of R ? R.windows.filter(x => x.wall === 'front') : []) {
+                haloText(ctx, `${fmtNum(win.top)} m`, v.X(win.to) + 4, v.Y(win.top), css('--accent'));
+                haloText(ctx, `${fmtNum(win.sill)} m`, v.X(win.to) + 4, v.Y(win.sill), css('--accent'));
+            }
+            ctx.font = '11px Arial';
+            haloText(ctx, `Auge ${fmtNum(cs.eye[2])} m`, v.X(cs.eye[0]) + 9, v.Y(cs.eye[2]), css('--accent'));
         }
 
         // Raum und Balkon der aktiven Standpunkte in der Karte
@@ -2347,9 +2426,32 @@
             edgeLayer = L.layerGroup().addTo(leafletMap);
             leafletMap.on('popupclose', () => edgeLayer.clearLayers());
             locationMarker = L.marker([latitude, longitude], { draggable: true, title: 'Standort (ziehen zum Verschieben)' }).addTo(leafletMap);
+            // Mit eingerastetem Raum/Balkon steht der Marker auf dem Auge und bleibt beim Ziehen darin
+            const constrained = latlng => {
+                const vp = anchoredViewpoint();
+                if (!vp) return null;
+                const sc = normalizeScene(vp.scene);
+                const e = eyeFromScenePoint(sc, ...sceneFromLatLng(sc, latlng.lat, latlng.lng));
+                return { vp, eye: e };
+            };
+            locationMarker.on('drag', ev => {
+                const c = constrained(ev.latlng);
+                if (!c) return;
+                // Augenposition direkt aus dem Ankerpunkt, ohne die Szene neu zu rechnen
+                const sc = normalizeScene(c.vp.scene), a = sc.anchor;
+                const y = c.eye.place === 'room' ? -sc.wall - c.eye.y : c.eye.y;
+                const q = destination(a.latitude, a.longitude, sc.facade + 90, c.eye.x);
+                locationMarker.setLatLng(destination(q[0], q[1], sc.facade, y));
+            });
             locationMarker.on('dragend', () => {
                 const p = locationMarker.getLatLng();
-                setLocation(p.lat, p.lng);
+                const c = constrained(p);
+                if (c) {
+                    c.vp.scene.eye = c.eye;
+                    maskChanged();
+                } else {
+                    setLocation(p.lat, p.lng);
+                }
             });
             drawBuildings();
         }
@@ -2599,6 +2701,12 @@
             if (!leafletMap || !shown('map')) return;
             const here = [latitude, longitude];
             locationMarker.setLatLng(here);
+            const anchored = anchoredViewpoint();
+            locationMarker.getElement()?.setAttribute('title', anchored
+                ? `Auge in „${anchored.name}“ – nur innerhalb von Raum bzw. Balkon verschiebbar` : 'Standort (ziehen zum Verschieben)');
+            const note = document.getElementById('markerNote');
+            note.textContent = anchored ? `Der Marker steht auf dem Auge in „${anchored.name}“. Er lässt sich nur innerhalb von ` +
+                `Raum bzw. Balkon verschieben; genauer geht es im Schritt Raum/Balkon (blauen Punkt in der Draufsicht ziehen).` : '';
             if (!leafletMap.getBounds().pad(-0.1).contains(here)) leafletMap.panTo(here);
             overlayLayer.clearLayers();
             directionLayer.clearLayers();
@@ -3531,7 +3639,7 @@
         let lastEditable = 0;           // zuletzt gewählter einzelner Standpunkt
         let mapShown = false;           // Karte schon einmal sichtbar gewesen (Ausschnitt setzen)
         let lastMapSlot = null;         // wo die Karte zuletzt hing
-        const VIEW_HASH = { setup: 'einrichten', result: 'ergebnis' };
+        const VIEW_HASH = { intro: 'einfuehrung', setup: 'einrichten', result: 'ergebnis' };
 
         // Element sichtbar (nicht in einer ausgeblendeten Ansicht, einem zugeklappten Schritt oder geparkt)?
         function shown(id) {
@@ -3544,9 +3652,23 @@
             return !!(env.buildings || env.terrain) || state.viewpoints.some(vp => vp.scene || vp.sectors.length || vp.horizon.length);
         }
 
+        // Ansicht beim Aufruf ohne Angabe in der Adresse: nichts eingerichtet → Einführung, Einrichten begonnen →
+        // Einrichten beim ersten offenen Schritt, fertig (Schritte 1–3 erledigt oder „Fertig“ gedrückt) → Ergebnis
+        function defaultView() {
+            if (!isConfigured()) return 'intro';
+            if (state.ui.finished || state.selected === -1) return 'result';
+            return firstOpenStep() === 4 ? 'result' : 'setup';
+        }
+
+        function finishSetup() {
+            state.ui.finished = true;
+            saveState();
+            setView('result');
+        }
+
         function viewFromHash() {
             const h = location.hash.slice(1);
-            return h === VIEW_HASH.setup ? 'setup' : h === VIEW_HASH.result ? 'result' : null;
+            return Object.keys(VIEW_HASH).find(v => VIEW_HASH[v] === h) || null;
         }
 
         // Ansicht wechseln; die Adresse merkt sie sich, damit „Zurück“ im Browser funktioniert
@@ -3563,11 +3685,11 @@
                 state.selected = Math.min(lastEditable, state.viewpoints.length - 1);
                 saveState();
             }
-            document.getElementById('viewSetup').hidden = view !== 'setup';
-            document.body.classList.toggle('view-setup', view === 'setup');
-            document.getElementById('viewResult').hidden = view !== 'result';
-            document.getElementById('tabSetup').setAttribute('aria-pressed', String(view === 'setup'));
-            document.getElementById('tabResult').setAttribute('aria-pressed', String(view === 'result'));
+            for (const [v, name] of [['intro', 'Intro'], ['setup', 'Setup'], ['result', 'Result']]) {
+                document.getElementById('view' + name).hidden = view !== v;
+                document.getElementById('tab' + name).setAttribute('aria-pressed', String(view === v));
+                document.body.classList.toggle('view-' + v, view === v);
+            }
             renderViewpointSelect();
             renderTables();
             placeMovables();
@@ -3869,7 +3991,8 @@
             rebuildBuildingList();
             recompile();
             if (state.selected >= 0) lastEditable = state.selected;
-            currentView = viewFromHash() || (isConfigured() ? 'result' : 'setup');
+            currentView = viewFromHash() || defaultView();
+            if (!viewFromHash() && currentView === 'setup') state.ui.step = firstOpenStep();
             // Ansicht in die Adresse schreiben, damit „Zurück“ auch zur ersten Ansicht findet
             if (!viewFromHash()) history.replaceState(null, '', '#' + VIEW_HASH[currentView]);
             if (currentView === 'setup' && state.selected === -1) state.selected = 0;
@@ -3931,6 +4054,7 @@
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
 
             ready = true;
+            syncLocationToEye();
             checkScriptVersions();
             applyView(currentView);
         };
@@ -3941,6 +4065,7 @@
         <div class="bar">
             <span class="brand">Sonne und Mond vom Balkon</span>
             <div class="tabs">
+                <button id="tabIntro" type="button" onclick="setView('intro')">Einführung</button>
                 <button id="tabSetup" type="button" onclick="setView('setup')">Einrichten</button>
                 <button id="tabResult" type="button" onclick="setView('result')">Ergebnis</button>
             </div>
@@ -3962,11 +4087,31 @@
                 </div>
             </details>
         </div>
-        <div class="bar">
+        <div class="bar" id="contextBar">
             <label>Standpunkt <select id="viewpointSelect"></select></label>
             <span class="timebar" id="timeBar"></span>
         </div>
     </header>
+
+    <!-- ================================ Einführung ================================ -->
+    <main id="viewIntro" class="view" hidden>
+        <h2>Worum geht es?</h2>
+        <p>Wann ist die Sonne auf dem Balkon, wann sieht man den Mond vom Fenster aus? Für jeden Standpunkt beschreibt eine
+            <b>Sichtmaske</b>, welche Richtungen am Himmel frei sind: ein oder mehrere Sichtbereiche (Azimut und Höhe von–bis)
+            und eine Horizontlinie für Hindernisse wie Nachbarhäuser oder Bäume. Die Horizontlinie lässt sich von Hand zeichnen
+            oder aus den Gebäuden in OpenStreetMap und den Geländehöhen berechnen. Wer es genauer will, beschreibt Zimmer und
+            Balkon mit Fenstern, Balkonplatte und Brüstung. Daraus ermittelt die Seite, wann Sonne und Mond in einem freien
+            Bereich stehen.</p>
+        <p>Alle Eingaben werden im Browser gespeichert; „Exportieren“ (Menü ⋯) sichert sie als Datei. Mehrere Standpunkte
+            (z. B. „Balkon“ und „Küchenfenster“) legt man über das Menü an; „Alle Standpunkte“ in der Ansicht „Ergebnis“
+            zeigt, wann man von irgendeinem aus etwas sieht.</p>
+        <p class="callout">Dies ist ein Hobbyprojekt, entstanden mit Hilfe von Claude Code. Es erhebt keinen Anspruch auf
+            Funktion und Vollständigkeit.</p>
+        <div class="step-nav intro-nav">
+            <button type="button" class="primary" onclick="setView('setup')">Einrichten</button>
+            <button type="button" onclick="setView('result')">Zum Ergebnis</button>
+        </div>
+    </main>
 
     <!-- ================================ Einrichten ================================ -->
     <main id="viewSetup" class="view" hidden>
@@ -4099,7 +4244,7 @@
                         </div>
                     </div>
                 </details>
-                <div class="step-nav"><button type="button" class="primary" onclick="setView('result')">Fertig – zum Ergebnis</button></div>
+                <div class="step-nav"><button type="button" class="primary" onclick="finishSetup()">Fertig – zum Ergebnis</button></div>
             </div>
         </section>
     </main>
@@ -4217,8 +4362,8 @@
         <div id="timeControls"></div>
         <div id="sceneViews">
             <div class="scene-views">
-                <canvas id="sceneTop"></canvas>
-                <canvas id="sceneFront"></canvas>
+                <figure class="scene-fig"><figcaption id="sceneTopCaption"></figcaption><canvas id="sceneTop"></canvas></figure>
+                <figure class="scene-fig"><figcaption id="sceneFrontCaption"></figcaption><canvas id="sceneFront"></canvas></figure>
             </div>
             <div class="legend">
                 <span class="swatch" style="--c: var(--axis)">Wand</span>
@@ -4234,6 +4379,7 @@
             <p id="mapFileHint" class="hint" style="display:none">Die Seite ist als Datei geöffnet. OpenStreetMap liefert dann
                 keine Kartenkacheln („Access blocked“), weil die Nutzungsregeln einen Referer verlangen. Abhilfe: im Ordner
                 <code>python3 -m http.server 8000</code> starten und <code>http://localhost:8000/Sichtbarkeit.html</code> öffnen.</p>
+            <p class="callout" id="markerNote"></p>
             <div id="map"></div>
             <div class="legend">
                 <span style="--c: var(--accent)">Sichtbereich, Horizontpunkte</span>
@@ -4290,19 +4436,6 @@
     <footer id="about">
         <h2>Hilfe</h2>
         <details class="help">
-            <summary>Worum geht es?</summary>
-            <p>Wann ist die Sonne auf dem Balkon, wann sieht man den Mond vom Fenster aus? Für jeden Standpunkt beschreibt eine
-                <b>Sichtmaske</b>, welche Richtungen am Himmel frei sind: ein oder mehrere Sichtbereiche (Azimut und Höhe von–bis)
-                und eine Horizontlinie für Hindernisse wie Nachbarhäuser oder Bäume. Die Horizontlinie lässt sich von Hand zeichnen
-                oder aus den Gebäuden in OpenStreetMap und den Geländehöhen berechnen. Wer es genauer will, beschreibt Zimmer und
-                Balkon mit Fenstern, Balkonplatte und Brüstung. Daraus ermittelt die Seite, wann Sonne und Mond in einem freien
-                Bereich stehen. Grundlage ist das <a href="Konzept-Sichtbarkeit.md">Konzept</a> (Stufen 1 bis 3), die Bedienung
-                beschreibt <a href="Konzept-Sichtbarkeit-Bedienung.md">Konzept-Sichtbarkeit-Bedienung.md</a>.</p>
-            <p>Alle Eingaben werden im Browser gespeichert; „Exportieren“ (Menü ⋯) sichert sie als Datei. Mehrere Standpunkte
-                (z. B. „Balkon“ und „Küchenfenster“) legt man über das Menü an; „Alle Standpunkte“ in der Ansicht „Ergebnis“
-                zeigt, wann man von irgendeinem aus etwas sieht.</p>
-        </details>
-        <details class="help">
             <summary>Begriffe</summary>
             <dl>
                 <dt>Azimut</dt><dd>Himmelsrichtung in Grad: 0° Norden, 90° Osten, 180° Süden, 270° Westen.</dd>
@@ -4321,6 +4454,7 @@
                 EU/ESA), ersatzweise aus den <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a>
                 (Mapzen, AWS Open Data; u. a. SRTM, EU-DEM © Copernicus).</p>
         </details>
+        <p class="imprint"><a href="https://kmio.de/impressum.html">Impressum</a></p>
     </footer>
 </body>
 </html>

@@ -75,13 +75,26 @@ Dazu kommen:
   7 Tage), „Jetzt“, Lokalzeit – nur unter „Ergebnis“. Zum Einrichten ist der Zeitpunkt nicht nötig; dort zeigen
   Karte (Schritte 1–3), Draufsicht und Horizontdiagramm auch keine Sonne und keinen Mond zu einem Zeitpunkt (die
   Sonnenbahnen am 21. jedes Monats bleiben).
-- Umschalter zwischen den Ansichten. Die gewählte Ansicht steht in der Adresse (`#ergebnis`, `#einrichten`),
-  damit Zurück im Browser funktioniert und man Lesezeichen setzen kann.
+- Umschalter zwischen den Ansichten „Einführung“, „Einrichten“, „Ergebnis“. Die gewählte Ansicht steht in der
+  Adresse (`#einfuehrung`, `#einrichten`, `#ergebnis`), damit Zurück im Browser funktioniert und man Lesezeichen
+  setzen kann. In der Einführung ist die zweite Zeile (Standpunkt, Zeit) ausgeblendet.
 - Menü ⋯: Neuer Standpunkt, Umbenennen, Löschen, Exportieren, Importieren, Alle Eingaben löschen (mit Rückfrage; der Ort
   bleibt, weil `ui.js` ihn für alle Seiten speichert), Alle Optionen zeigen, Hilfe.
 
-**Beim Öffnen:** Gibt es noch keinen eingerichteten Standpunkt, öffnet sich „Einrichten“ bei Schritt 1, mit einem
-Satz Einführung. Sonst öffnet sich „Ergebnis“.
+**Beim Öffnen** (Adresse ohne `#`) hängt die Ansicht vom Stand ab (`defaultView()`):
+
+- nichts eingerichtet (keine Umgebung, kein Raum, kein Sichtbereich, kein Horizontpunkt) → **Einführung**,
+- Einrichten begonnen → **Einrichten** beim ersten offenen Schritt,
+- fertig → **Ergebnis**. Fertig heißt: Schritte 1–3 erledigt (③ entfällt bei „Von Hand“, ④ ist optional) oder
+  „Fertig – zum Ergebnis“ gedrückt (`state.ui.finished`, damit bewusst Ausgelassenes, z. B. keine Umgebung, nicht
+  jedes Mal wieder zu Schritt 1 führt). Ein neuer Standpunkt setzt das zurück; bei „Alle Standpunkte“ gilt Ergebnis.
+
+Die **Einführung** zeigt den Text „Worum geht es?“ (früher eingeklappt in der
+Hilfe, jetzt ohne Verweise auf die Konzepte), der Hinweis „Dies ist ein Hobbyprojekt, entstanden mit Hilfe von Claude
+Code. Es erhebt keinen Anspruch auf Funktion und Vollständigkeit.“ und die Knöpfe „Einrichten“ und „Zum Ergebnis“.
+
+Am Seitenende, in allen Ansichten: Hilfe (Begriffe, Datenquellen) und ein Link zum Impressum
+(https://kmio.de/impressum.html).
 
 ## Ansicht „Einrichten“
 
@@ -150,7 +163,19 @@ Nur bei Fenster/Balkon. Formular und Zeichnungen stehen nebeneinander (schmal: u
   „Raum und Balkon entfernen“, Legende der Zeichnungen.
 - **Fertig, wenn** mindestens ein Fenster existiert bzw. ein Balkon da ist.
 
-Das Auge lässt sich in der Draufsicht mit der Maus verschieben; x/y als Zahlen stehen unter „Mehr“.
+Das Auge lässt sich in der Draufsicht mit der Maus verschieben; x/y als Zahlen stehen unter „Mehr“. Gibt es Raum
+und Balkon, wechselt es beim Ziehen über die Hauswand zwischen beiden.
+
+Beschriftung der Zeichnungen: über jeder ein Satz, wie sie zu lesen ist („Draufsicht von oben: oben ist außen, unten die
+Rückwand; links und rechts mit Blick nach draußen“, „Fensterwand von innen gesehen: oben die Decke, unten der
+Fußboden; links und rechts wie in der Draufsicht“). In der Draufsicht stehen außen/Fassade, innen/Rückwand, links,
+rechts und ein Nordpfeil an den Rändern; in der Wandansicht Decke (mit Höhe) bzw. Balkonplatte, Fußboden, links,
+rechts, eine Höhenskala in Metern, Brüstung und Sturz jedes Fensters und die Augenhöhe.
+
+**Marker und Auge:** Ist Raum oder Balkon in der Karte eingerastet, steht der Standort-Marker auf dem Auge und der
+Standort für Sonne, Mond und Umgebung folgt ihm (`syncLocationToEye()`). Den Marker kann man dann nur innerhalb von
+Raum bzw. Balkon ziehen; ein Hinweis über der Karte sagt das und verweist auf die Draufsicht für genaues Verschieben.
+Ohne eingerastete Szene (z. B. „Von Hand“) ist der Marker frei.
 
 ### ④ Sichtmaske (prüfen und ergänzen)
 
