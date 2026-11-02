@@ -5,26 +5,190 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sternzeit und Erdposition</title>
     <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --canvas: #ffffff;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --link: #1a5fb4;
+            --sun: #f5c800;
+            --sun-rays: #f2d200;
+            --earth: #2459c9;
+            --orbit: #8a8984;
+            --indicator: #d0362b;
+            --moon: #8a8984;
+            --node: #2e8b3a;
+            --night: #dddddd;
+            --grid: #bbbbbb;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --canvas: #202020;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --link: #8ab4f8;
+                --sun: #f2c21e;
+                --sun-rays: #b8961a;
+                --earth: #4a93ea;
+                --orbit: #8f8e86;
+                --indicator: #f0564a;
+                --moon: #a3a29a;
+                --node: #6cc070;
+                --night: #3a3b40;
+                --grid: #55554f;
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --canvas: #202020;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --link: #8ab4f8;
+            --sun: #f2c21e;
+            --sun-rays: #b8961a;
+            --earth: #4a93ea;
+            --orbit: #8f8e86;
+            --indicator: #f0564a;
+            --moon: #a3a29a;
+            --node: #6cc070;
+            --night: #3a3b40;
+            --grid: #55554f;
+        }
         body {
             max-width: 1000px;
             margin: 0 auto;
-            padding: 0 10px;
+            padding: 0 16px 40px;
             box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
         }
+        a { color: var(--link); }
+
+        /* Formulare aus ui.js haben einen festen hellen Hintergrund per style-Attribut */
+        #locationControls > div, #timeControls > div {
+            background-color: var(--surface-2) !important;
+            border-radius: 6px;
+            padding: 8px 10px !important;
+            margin-bottom: 10px;
+            overflow-x: auto;
+        }
+
+        /* Bilder links, Zeitknöpfe rechts daneben mitlaufend */
+        .workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) max-content;
+            gap: 12px 24px;
+            align-items: start;
+        }
+        .figures { display: grid; gap: 16px; max-width: 680px; }
+        figure { margin: 0; }
+        figcaption { color: var(--text-2); font-size: 0.9em; margin-top: 4px; }
         canvas {
-            background-color: white;
             display: block;
-            max-width: 100%;
+            width: 100%;
+            background: var(--canvas);
+            border-radius: 6px;
         }
-        button {
-            width: 100px;
+        #solarSystem { aspect-ratio: 620 / 620; }
+        #earth { aspect-ratio: 550 / 410; }
+        .time-panel { position: sticky; top: 12px; }
+        /* createTimeButtons (ui.js) setzt float und Breite per style-Attribut; hier als Raster mit −/+ nebeneinander */
+        #timeButtons { display: grid; grid-template-columns: repeat(2, max-content); gap: 4px; }
+        #timeButtons button { float: none !important; margin: 0 !important; }
+        #timeButtons br { display: none; }
+        @media (max-width: 720px) {
+            .workspace { grid-template-columns: minmax(0, 1fr); }
+            .time-panel { grid-row: 1; top: 0; z-index: 1; background: var(--surface); padding: 6px 0; }
+            #timeButtons { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            #timeButtons button { width: auto !important; padding: 4px 2px; font-size: 0.85em; }
+        }
+
+        #outputTable { margin-top: 20px; }
+        #outputTable table { border-collapse: collapse; }
+        #outputTable td { padding: 1px 10px 1px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+
+        .glossary { border-collapse: collapse; }
+        .glossary td { padding: 4px 12px 4px 0; vertical-align: top; }
+        .glossary td:first-child { font-weight: 600; }
+        @media (max-width: 600px) {
+            .glossary td { display: block; padding: 0; }
+            .glossary td:last-child { padding-bottom: 10px; }
         }
     </style>
     <script src="astro.js"></script>
     <script src="render.js"></script>
     <script src="ui.js"></script>
     <script>
-        // Grafik-Ausgabe
+
+    /////////////////////////////////////////////////////////////////
+    ////                      Zeichenflächen                       //
+    /////////////////////////////////////////////////////////////////
+
+        // Logische Größe der Bilder: gezeichnet wird in diesen Einheiten, die Zeichenfläche passt sich der
+        // Breite der Seite an und wird für hochauflösende Bildschirme (devicePixelRatio) scharf gerechnet
+        const FIGURES = {
+            solarSystem: { width: 620, height: 620 },
+            earth: { width: 550, height: 410 },
+        };
+
+        let lastScene = null;      // letzte Berechnung, zum Neuzeichnen bei Größen- oder Farbwechsel
+        let colors = {};
+
+        function readColors() {
+            const cs = getComputedStyle(document.documentElement);
+            for (const name of ['text', 'text-2', 'sun', 'sun-rays', 'earth', 'orbit', 'indicator', 'moon', 'node', 'night', 'grid']) {
+                colors[name] = cs.getPropertyValue('--' + name).trim();
+            }
+        }
+
+        /** Zeichenfläche an die angezeigte Größe anpassen; Ursprung in der Bildmitte, Einheiten wie FIGURES */
+        function prepareCanvas(id) {
+            const canvas = document.getElementById(id);
+            const { width, height } = FIGURES[id];
+            const dpr = window.devicePixelRatio || 1;
+            const cssWidth = canvas.clientWidth || width;
+            const pixelWidth = Math.round(cssWidth * dpr);
+            const pixelHeight = Math.round(cssWidth * height / width * dpr);
+            if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+            if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+            const ctx = canvas.getContext('2d');
+            const scale = pixelWidth / width;
+            ctx.setTransform(scale, 0, 0, scale, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+            ctx.translate(width / 2, height / 2);
+            return { ctx, width, height, cssScale: cssWidth / width };
+        }
+
+        /** Schrift in logischen Einheiten, auf kleinen Bildschirmen mindestens 11 px groß angezeigt */
+        function canvasFont(size, cssScale) {
+            return `${Math.max(size, 11 / cssScale)}px Arial, sans-serif`;
+        }
+
+        let drawPending = false;
+        function requestDraw() {
+            if (drawPending) return;
+            drawPending = true;
+            requestAnimationFrame(() => {
+                drawPending = false;
+                drawFigures();
+            });
+        }
+
+        function drawFigures() {
+            if (!lastScene) return;
+            readColors();
+            drawSolarSystem(lastScene.solarSystem);
+            drawEarthView(lastScene.earthView);
+        }
 
         // Exzentrizität der Erdbahn zum eingestellten Datum (Formel 24.4)
         function earthEccentricity() {
@@ -37,363 +201,249 @@
             return EARTH_SEMI_MAJOR_AXIS * (1 - e * e) / (1 + e * Math.cos(nu));
         }
 
-
-
     /////////////////////////////////////////////////////////////////
     ////                      Grafikausgabe                        //
     /////////////////////////////////////////////////////////////////
-        
-    
+
         // Zeichne Bild 1 "Erdposition"
         function drawSolarSystem({ springEquinoxLength, summerSolsticeAnomaly, autumnEquinoxAnomaly, winterSolsticeAnomaly,
                                    orbitRadiusEarth, orbitLengthEarth, siderealTime, moonLongitude, ascendingNodeMoon }) {
 
             //Darstellungsparameter
-            const sun = {
-                x: 0,
-                y: 0,
-                radius: 20,
-                color: 'yellow'
-            }
-
+            const sun = { x: 0, y: 0, radius: 20 };
             const earth = {
                 radius: 10,
-                color: 'blue',
-                orbit: {
-                    radius: 280,
-                    color: 'gray'
-                },
-                indicator: {
-                    width: 2,
-                    length: 30,
-                    color: 'red'
-                }
-            }
+                orbit: { radius: 280 },
+                indicator: { width: 2, length: 30 },
+            };
+            const moon = { radius: 5, orbit: { radius: 20 } };
 
-            const moon = {
-                radius: 5,
-                color: 'gray',
-                orbit: {
-                    radius: 20
-                }
-            }
-            
             function drawSun(ctx) {
                 ctx.beginPath();
                 ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2, false);
-                ctx.fillStyle = sun.color;
+                ctx.fillStyle = colors.sun;
                 ctx.fill();
-                ctx.closePath();
             }
 
             function drawMoon(ctx, eclipticalLongitude, ascendingNodeMoon) {
-                const moonX = moon.orbit.radius*Math.cos(eclipticalLongitude);
-                const moonY = moon.orbit.radius*Math.sin(eclipticalLongitude);
+                const moonX = moon.orbit.radius * Math.cos(eclipticalLongitude);
+                const moonY = moon.orbit.radius * Math.sin(eclipticalLongitude);
                 ctx.beginPath();
                 ctx.arc(moonX, moonY, moon.radius, 0, Math.PI * 2, false);
-                ctx.fillStyle = moon.color;
+                ctx.fillStyle = colors.moon;
                 ctx.fill();
-                ctx.closePath();
 
-                //Indikator
-                IndicatorXStart = -moon.orbit.radius*Math.cos(ascendingNodeMoon);
-                IndicatorYStart = moon.orbit.radius*Math.sin(ascendingNodeMoon);
-                IndicatorXEnd = -(moon.orbit.radius+10)*Math.cos(ascendingNodeMoon);
-                IndicatorYEnd = (moon.orbit.radius+10)*Math.sin(ascendingNodeMoon);
+                //Indikator aufsteigender Knoten
                 ctx.beginPath();
-                ctx.moveTo(IndicatorXStart, IndicatorYStart);
-                ctx.lineTo(IndicatorXEnd, IndicatorYEnd);
-                ctx.strokeStyle = 'green';
+                ctx.moveTo(-moon.orbit.radius * Math.cos(ascendingNodeMoon), moon.orbit.radius * Math.sin(ascendingNodeMoon));
+                ctx.lineTo(-(moon.orbit.radius + 10) * Math.cos(ascendingNodeMoon), (moon.orbit.radius + 10) * Math.sin(ascendingNodeMoon));
+                ctx.strokeStyle = colors.node;
                 ctx.lineWidth = 2;
                 ctx.stroke();
-                ctx.closePath();
             }
 
             function drawOrbit(ctx) {
-                //sun is in one focal point, so calculating center:
+                //Sonne steht in einem Brennpunkt, daraus den Mittelpunkt berechnen
                 const e = earthEccentricity();
                 const centerX = sun.x - e * earth.orbit.radius;
                 const centerY = sun.y;
 
-                //ecliptic axis:
+                //Halbachsen
                 const a = earth.orbit.radius;
-                const b = Math.sqrt(1-e*e)*a;
+                const b = Math.sqrt(1 - e * e) * a;
 
                 ctx.beginPath();
                 ctx.ellipse(centerX, centerY, a, b, 0, 0, Math.PI * 2);
-                ctx.strokeStyle = earth.orbit.color;
+                ctx.strokeStyle = colors.orbit;
+                ctx.lineWidth = 1;
                 ctx.stroke();
-                ctx.closePath();
 
-                //draw focal points
-                ctx.beginPath();
-                ctx.arc(sun.x, centerY, 1, 0, Math.PI * 2,false);
-                ctx.arc(2*centerX, centerY, 1, 0, Math.PI * 2,false);
-                ctx.fillStyle = earth.orbit.color;
-                ctx.fill();
-                ctx.closePath();
+                //Brennpunkte
+                ctx.fillStyle = colors.orbit;
+                for (const x of [sun.x, 2 * centerX]) {
+                    ctx.beginPath();
+                    ctx.arc(x, centerY, 1, 0, Math.PI * 2, false);
+                    ctx.fill();
+                }
             }
 
             function siderealDirectionCorrection(sideRealTime) {
-                const alpha = sideRealTime+Math.PI/2;
-                const lambda = Math.atan2(Math.sin(alpha)*Math.cos(OBLIQUITY_J2000),Math.cos(alpha));
-                return lambda-Math.PI/2;
+                const alpha = sideRealTime + Math.PI / 2;
+                const lambda = Math.atan2(Math.sin(alpha) * Math.cos(OBLIQUITY_J2000), Math.cos(alpha));
+                return lambda - Math.PI / 2;
             }
 
             function drawEarthWithIndicatorAndMoon(ctx, radius, eclipticalLength, vernalPoint, indicatorDirection, moonLongitude, ascendingNodeMoon) {
                 // Position der Erde um die Umlaufbahn
-                const earthX = sun.x + radius*earth.orbit.radius * Math.cos(eclipticalLength);
-                const earthY = sun.y - radius*earth.orbit.radius * Math.sin(eclipticalLength);
+                const earthX = sun.x + radius * earth.orbit.radius * Math.cos(eclipticalLength);
+                const earthY = sun.y - radius * earth.orbit.radius * Math.sin(eclipticalLength);
 
                 ctx.save();
                 ctx.translate(earthX, earthY);
                 ctx.rotate(-vernalPoint);
                 ctx.beginPath();
-                ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(OBLIQUITY_J2000), Math.PI/2, 0, Math.PI * 2);
-                ctx.fillStyle = earth.color;
+                ctx.ellipse(0, 0, earth.radius, earth.radius * Math.cos(OBLIQUITY_J2000), Math.PI / 2, 0, Math.PI * 2);
+                ctx.fillStyle = colors.earth;
                 ctx.fill();
-                ctx.closePath();
 
-                drawMoon(ctx, -moonLongitude+Math.PI, ascendingNodeMoon);
+                drawMoon(ctx, -moonLongitude + Math.PI, ascendingNodeMoon);
 
-                //Indikator
-                indicatorDirection = siderealDirectionCorrection(indicatorDirection);
-                IndicatorX = -earth.indicator.length*Math.cos(indicatorDirection);
-                IndicatorY = earth.indicator.length*Math.sin(indicatorDirection);
+                //Indikator: Richtung des Meridians
+                const direction = siderealDirectionCorrection(indicatorDirection);
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
-                ctx.lineTo(IndicatorX, IndicatorY);
-                ctx.strokeStyle = earth.indicator.color;
+                ctx.lineTo(-earth.indicator.length * Math.cos(direction), earth.indicator.length * Math.sin(direction));
+                ctx.strokeStyle = colors.indicator;
                 ctx.lineWidth = earth.indicator.width;
                 ctx.stroke();
-                ctx.closePath();
 
-
-                if(Math.abs(normalizeAngleSigned(vernalPoint+indicatorDirection-eclipticalLength)) < 10*DEG2RAD) {
+                //Zeigt der Meridian ungefähr zur Sonne, die Linie bis zur Sonne verlängern
+                if (Math.abs(normalizeAngleSigned(vernalPoint + direction - eclipticalLength)) < 10 * DEG2RAD) {
+                    const length = radius * earth.orbit.radius + 30;
                     ctx.beginPath();
-                    const endSunIndicatorX = -(radius*earth.orbit.radius+30)*Math.cos(indicatorDirection);
-                    const endSunIndicatorY = (radius*earth.orbit.radius+30)*Math.sin(indicatorDirection);
                     ctx.moveTo(0, 0);
-                    ctx.lineTo(endSunIndicatorX, endSunIndicatorY);
-                    ctx.strokeStyle = earth.indicator.color;
-                    ctx.lineWidth = earth.indicator.width;
+                    ctx.lineTo(-length * Math.cos(direction), length * Math.sin(direction));
                     ctx.stroke();
-                    ctx.closePath();
                 }
                 ctx.restore();
             }
 
+            const { ctx, cssScale } = prepareCanvas('solarSystem');
+            const font = canvasFont(15, cssScale);
+
             function drawFullLineWithText(ctx, eclipticalLength, text) {
                 const radius = orbitRadiusAU(eclipticalLength);
-
-                // Position der Erde basierend auf dem Orbit um die Sonne
-                const startx = sun.x;
-                const starty = sun.y;
                 const endx = sun.x + radius * earth.orbit.radius * Math.cos(eclipticalLength);
                 const endy = sun.y - radius * earth.orbit.radius * Math.sin(eclipticalLength);
 
                 ctx.save();
                 ctx.rotate(-eclipticalLength);
-                ctx.font= "15px arial";
-                ctx.fillStyle="black";
-                ctx.textAlign = "center";
-                ctx.fillText(text, radius * earth.orbit.radius/2,-8);
+                ctx.font = font;
+                ctx.fillStyle = colors.text;
+                ctx.textAlign = 'center';
+                ctx.fillText(text, radius * earth.orbit.radius / 2, -8);
                 ctx.restore();
 
                 ctx.beginPath();
-                ctx.moveTo(startx, starty);
+                ctx.moveTo(sun.x, sun.y);
                 ctx.lineTo(endx, endy);
-                ctx.strokeStyle = 'gray';
+                ctx.strokeStyle = colors.orbit;
                 ctx.lineWidth = 1;
                 ctx.stroke();
-                ctx.closePath();
             }
 
             function drawMarker(ctx, phi) {
                 const size = 10;
-                const radius = orbitRadiusAU(phi);
-
-                // Position der Erde basierend auf dem Orbit um die Sonne
-                const startx = sun.x + (radius * earth.orbit.radius - size/2) * Math.cos(phi);
-                const starty = sun.y - (radius * earth.orbit.radius - size/2) * Math.sin(phi);
-                const endx = sun.x + (radius * earth.orbit.radius + size/2) * Math.cos(phi);
-                const endy = sun.y - (radius * earth.orbit.radius - size/2) * Math.sin(phi);
-
+                const radius = orbitRadiusAU(phi) * earth.orbit.radius;
                 ctx.beginPath();
-                ctx.moveTo(startx, starty);
-                ctx.lineTo(endx, endy);
-                ctx.strokeStyle = 'black';
+                ctx.moveTo(sun.x + (radius - size / 2) * Math.cos(phi), sun.y - (radius - size / 2) * Math.sin(phi));
+                ctx.lineTo(sun.x + (radius + size / 2) * Math.cos(phi), sun.y - (radius + size / 2) * Math.sin(phi));
+                ctx.strokeStyle = colors.text;
                 ctx.lineWidth = 1;
                 ctx.stroke();
-                ctx.closePath();
             }
 
             function drawPerihelAphel(ctx) {
                 drawMarker(ctx, 0);
                 drawMarker(ctx, Math.PI);
 
-                ctx.font= "15px arial";
-                ctx.fillStyle="black";
-                ctx.textAlign = "left";
-                let radius = orbitRadiusAU(Math.PI);
-                ctx.fillText("Aphel", sun.x - radius * earth.orbit.radius+8,5);
-
-                radius = orbitRadiusAU(0);
-                ctx.textAlign = "right";
-                ctx.fillText("Perihel", sun.x + radius * earth.orbit.radius-8,5);
+                ctx.font = font;
+                ctx.fillStyle = colors.text;
+                ctx.textBaseline = 'alphabetic';
+                ctx.textAlign = 'left';
+                ctx.fillText('Aphel', sun.x - orbitRadiusAU(Math.PI) * earth.orbit.radius + 8, 5);
+                ctx.textAlign = 'right';
+                ctx.fillText('Perihel', sun.x + orbitRadiusAU(0) * earth.orbit.radius - 8, 5);
             }
 
-            const canvas = document.getElementById('solarSystem');
-            const ctx = canvas.getContext('2d');
-            ctx.resetTransform();
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
-            ctx.translate(canvas.width/2, canvas.height/2);
-
-            drawFullLineWithText(ctx, springEquinoxLength, "Frühlings Tag- und Nachtgleiche");
-            drawFullLineWithText(ctx, summerSolsticeAnomaly, "Sommersonnenwende");
-            drawFullLineWithText(ctx, autumnEquinoxAnomaly, "Herbst Tag- und Nachtgleiche");
-            drawFullLineWithText(ctx, winterSolsticeAnomaly, "Wintersonnenwende");
-
+            drawFullLineWithText(ctx, springEquinoxLength, 'Frühlings Tag- und Nachtgleiche');
+            drawFullLineWithText(ctx, summerSolsticeAnomaly, 'Sommersonnenwende');
+            drawFullLineWithText(ctx, autumnEquinoxAnomaly, 'Herbst Tag- und Nachtgleiche');
+            drawFullLineWithText(ctx, winterSolsticeAnomaly, 'Wintersonnenwende');
             drawSun(ctx);
-
             drawOrbit(ctx);
-
             drawEarthWithIndicatorAndMoon(ctx, orbitRadiusEarth, orbitLengthEarth, springEquinoxLength,
-                siderealTime/12*Math.PI+longitude*DEG2RAD, moonLongitude, ascendingNodeMoon);
-            drawOrbit(ctx);
+                siderealTime / 12 * Math.PI + longitude * DEG2RAD, moonLongitude, ascendingNodeMoon);
             drawPerihelAphel(ctx);
         }
 
-        //Zeichne Erde in Bild 2 "Ausrichtung Erde"
-        function drawEarthSingleWithMoon(eclipticalLength,vernalPoint,indicatorDirection,moonLength,moonWidth,moonDistance) {
-            const canvas = document.getElementById('earth');
-            const ctx = canvas.getContext('2d');
-            ctx.resetTransform();
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Bildschirm leeren
-            ctx.translate(canvas.width/2, canvas.height/2);
-
+        //Zeichne Erde in Bild 2 "Ausrichtung Erde": Sonne von links, Erdachse geneigt, Meridian des Orts rot
+        function drawEarthView({ eclipticalLength, vernalPoint, indicatorDirection }) {
+            const { ctx, width, cssScale } = prepareCanvas('earth');
             const earthRadiusGraphic = 200;
 
             const phase = eclipticalLength - vernalPoint;
 
-            const rotationMatrixEpsilon = createRotationMatrix({x:0,y:1,z:0},-OBLIQUITY_J2000);
-            const rotationMatrxEcliptic = createRotationMatrix({x:0,y:0,z:1},phase-Math.PI/2);
-
-            let rotationMatrix = multiplyMatrix(rotationMatrxEcliptic,rotationMatrixEpsilon);
-            const axleDirectionRaw = applyMatrix({x:0,y:0,z:1},rotationMatrix);
-            const axleAngleY = Math.asin(Math.sin(phase-Math.PI/2)*Math.sin(-OBLIQUITY_J2000));//Math.asin(axleDirectionRaw.y);
-            const rotationMatrixPlain = createRotationMatrix({x:1,y:0,z:0},axleAngleY);
-            rotationMatrix = multiplyMatrix(rotationMatrixPlain,rotationMatrix);
-            //console.log("rotation",applyMatrix({x:0,y:0,z:1},rotationMatrix));
-            //rotationMatrix = createRotationMatrix({x:0,y:1,z:0},axleAngleY);
-
-            /*const rotationMatrixMoonWidth = createRotationMatrix({x:0,y:1,z:0}, moonWidth);
-            const rotationMatrixMoonLength = createRotationMatrix({x:0,y:0,z:1}, );
-
-            const moonY = earthRadiusGraphic/EARTH_RADIUS * moonDistance * Math.sin(-moonWidth);
-            const moonX = 260 * Math.cos(phase - moonLength + Math.PI);
-            const moonZ = Math.sin(phase - moonLength + Math.PI);
-
-            console.log("Mond Grafik ",moonY, moonX, moonZ);*/
-           // let rotationMatrixMoon = multiplyMatrix(rotationMatrixMoonWidth,rotationMatrixMoonLength);
-           // const moonPos = applyMatrix({x:260,y:0,z:0},rotationMatrixMoon);
-
+            const rotationMatrixEpsilon = createRotationMatrix({ x: 0, y: 1, z: 0 }, -OBLIQUITY_J2000);
+            const rotationMatrixEcliptic = createRotationMatrix({ x: 0, y: 0, z: 1 }, phase - Math.PI / 2);
+            let rotationMatrix = multiplyMatrix(rotationMatrixEcliptic, rotationMatrixEpsilon);
+            const axleAngleY = Math.asin(Math.sin(phase - Math.PI / 2) * Math.sin(-OBLIQUITY_J2000));
+            const rotationMatrixPlain = createRotationMatrix({ x: 1, y: 0, z: 0 }, axleAngleY);
+            rotationMatrix = multiplyMatrix(rotationMatrixPlain, rotationMatrix);
 
             //Halbkugel Nacht
             ctx.beginPath();
-            ctx.arc(0,0,earthRadiusGraphic,-90*DEG2RAD,90*DEG2RAD,false);
-            ctx.fillStyle = "#dddddd";
+            ctx.arc(0, 0, earthRadiusGraphic, -90 * DEG2RAD, 90 * DEG2RAD, false);
+            ctx.fillStyle = colors.night;
             ctx.fill();
-            ctx.closePath();
-
-           // if(moonPos.y < 0) {
-            /*ctx.beginPath();
-            ctx.arc(moonX, moonY, 0.27*earthRadiusGraphic, 0, Math.PI * 2, false);
-            ctx.fillStyle = (moonZ < 0)?'blue':'cyan';
-            ctx.fill();
-            ctx.closePath();*/
-            //}
 
             //Sonnenstrahlen
-            ctx.font= "15px arial";
-            ctx.fillStyle="black";
-            ctx.textAlign = "left";
-            ctx.fillText("Sonne", -canvas.width/2 ,-5);
+            ctx.font = canvasFont(15, cssScale);
+            ctx.fillStyle = colors.text;
+            ctx.textAlign = 'left';
+            ctx.fillText('Sonne', -width / 2 + 4, -5);
 
             ctx.setLineDash([]);
-
-            for(let y = -earthRadiusGraphic; y < earthRadiusGraphic+1; y+=earthRadiusGraphic/10) {
+            ctx.strokeStyle = colors['sun-rays'];
+            ctx.lineWidth = 3;
+            for (let y = -earthRadiusGraphic; y < earthRadiusGraphic + 1; y += earthRadiusGraphic / 10) {
+                const xEnd = Math.sqrt(Math.max(0, earthRadiusGraphic ** 2 - y ** 2)) + 3;
                 ctx.beginPath();
-                ctx.moveTo(-canvas.width/2,y);
-                const xEnd = Math.sqrt(earthRadiusGraphic**2-y**2)+3;
-                ctx.lineTo(-xEnd,y);
-                ctx.strokeStyle = "yellow";
-                ctx.lineWidth = 3;
+                ctx.moveTo(-width / 2, y);
+                ctx.lineTo(-xEnd, y);
                 ctx.stroke();
-                ctx.closePath();
             }
-
             ctx.lineWidth = 1;
 
-
-             // Breitengrade (horizontale Ellipsen)
-            const latSteps = 5; // Anzahl der Breitengrade
+            // Breitengrade
+            const latSteps = 5;
             for (let lat = -latSteps; lat < latSteps; lat++) {
-                const theta = (lat / latSteps) * Math.PI / 2; // Breitengradwinkel
-                const polygonLine = calculateLatitudePoints(earthRadiusGraphic,theta, rotationMatrix);
-                drawPolygonLine(ctx,polygonLine,'#bbbbbb',true);
+                const theta = (lat / latSteps) * Math.PI / 2;
+                drawPolygonLine(ctx, calculateLatitudePoints(earthRadiusGraphic, theta, rotationMatrix), colors.grid, true);
             }
 
-            //Längengrade
-            const lonSteps = 12; // Anzahl der Längengrade
+            // Längengrade
+            const lonSteps = 12;
             for (let lon = 0; lon < lonSteps; lon++) {
-                const phi = (lon / lonSteps) *2*Math.PI; // Breitengradwinkel
-                const polygonLine = calculateLongitudePoints(earthRadiusGraphic,phi, rotationMatrix);
-                drawPolygonLine(ctx,polygonLine,'#bbbbbb',true);
+                const phi = (lon / lonSteps) * 2 * Math.PI;
+                drawPolygonLine(ctx, calculateLongitudePoints(earthRadiusGraphic, phi, rotationMatrix), colors.grid, true);
             }
-
-
 
             //Erdachse
-            const northpole = applyMatrix({x:0,y:0,z:earthRadiusGraphic},rotationMatrix);
-            const southpole = applyMatrix({x:0,y:0,z:-earthRadiusGraphic},rotationMatrix);
-            const center = {x:0,y:0,z:0};
-            drawPolygonLine(ctx,[northpole,center,southpole],'#000000');
+            const northpole = applyMatrix({ x: 0, y: 0, z: earthRadiusGraphic }, rotationMatrix);
+            const southpole = applyMatrix({ x: 0, y: 0, z: -earthRadiusGraphic }, rotationMatrix);
+            drawPolygonLine(ctx, [northpole, { x: 0, y: 0, z: 0 }, southpole], colors.text);
 
             //Kontur Erde
             ctx.beginPath();
             ctx.setLineDash([]);
-            ctx.arc(0, 0, earthRadiusGraphic, 0, Math.PI*2,false);
-            ctx.strokeStyle = "black";
+            ctx.arc(0, 0, earthRadiusGraphic, 0, Math.PI * 2, false);
+            ctx.strokeStyle = colors.text;
             ctx.stroke();
-            ctx.closePath();
 
-            // for(let i = 0; i < 5; i++) {
-            // ctx.beginPath();
-            // ctx.setLineDash([]);
-            // ctx.arc(0, 0, EARTH_RADIUS/5*i, 0, Math.PI*2,false);
-            // ctx.strokeStyle = "blue";
-            // ctx.stroke();
-            // ctx.closePath();
-            // }
-
-            const polygonLineLatitude = calculateLatitudePoints(earthRadiusGraphic,latitude*DEG2RAD, rotationMatrix);
-            drawPolygonLine(ctx,polygonLineLatitude,'#000000');
-
+            //Breitenkreis und Meridian des Beobachtungsorts
+            drawPolygonLine(ctx, calculateLatitudePoints(earthRadiusGraphic, latitude * DEG2RAD, rotationMatrix), colors.text);
             ctx.lineWidth = 2;
-            const longitude = 90*Math.PI/180;
-            const polygonLineLongitude = calculateLongitudePoints(earthRadiusGraphic,-indicatorDirection-Math.PI/2, rotationMatrix);
-            drawPolygonLine(ctx,polygonLineLongitude,'#FF0000');
+            drawPolygonLine(ctx, calculateLongitudePoints(earthRadiusGraphic, -indicatorDirection - Math.PI / 2, rotationMatrix), colors.indicator);
             ctx.lineWidth = 1;
-
+            ctx.setLineDash([]);
         }
-
-
 
     /////////////////////////////////////////////////////////////////
     //          Berechnungen und Tabellarische Ausgabe             //
     /////////////////////////////////////////////////////////////////
 
+        // Wird von ui.js bei jeder Änderung von Zeit oder Ort aufgerufen
         function update() {
 
             //Julianisches Datum und Beobachtungsort
@@ -401,8 +451,8 @@
             const location = getLocation();
 
             //Zeitgleichung
-            const equationOfTimeFull = calculateEquationOfTime(julianDate,true);
-            const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDate,false);
+            const equationOfTimeFull = calculateEquationOfTime(julianDate, true);
+            const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDate, false);
             const equationOfTimeWithoutExcentric = equationOfTimeFull - equatonOfTimeWithoutTilt;
 
             //Sternzeit: Greenwich in Stunden, lokal in Radiant
@@ -442,10 +492,6 @@
             const moonRaDec = calculateEquatorial(moon, obliquity);
             const moonAzimuthAltitude = calculateHorizontal(moonRaDec, localSiderealTime, location);
             const moonPhase = calculateMoonIlluminatedFraction(sunRaDec, sunPosition.distance, moonRaDec, moon.distance);
-
-            //console.log("Mond Länge, Breite, Radius", moon.length*RAD2DEG, moon.width*RAD2DEG, moon.r);
-
-            //console.log(springEquinoxLength*RAD2DEG,orbitLengthEarth*RAD2DEG,(springEquinoxLength-orbitLengthEarth)*RAD2DEG);
 
             //Sonnenauf- und Untergang
             const sunriseSet = calculateSunRiseSet(julianDate, location, dayUtcOffset());
@@ -490,62 +536,42 @@
             ];
             renderOutputTable('outputTable', tableData);
 
-
-            //Grafik-Ausgabe
-            drawSolarSystem({
-                springEquinoxLength,
-                summerSolsticeAnomaly: calculateEarthTrueAnomaly(summerSolsticeDate),
-                autumnEquinoxAnomaly: calculateEarthTrueAnomaly(autumnEquinoxDate),
-                winterSolsticeAnomaly: calculateEarthTrueAnomaly(winterSolsticeDate),
-                orbitRadiusEarth,
-                orbitLengthEarth,
-                siderealTime,
-                moonLongitude: moon.longitude,
-                ascendingNodeMoon
-            });
-
-            drawEarthSingleWithMoon(orbitLengthEarth,springEquinoxLength,localSiderealTime,moon.latitude,moon.longitude,moon.distance);
-            //fillTable();
-
-           /* let str = "";
-            for(let stunde = 0; stunde < 365*24; stunde++) {
-                const moon = calculateMoonPosition(julianDate+stunde/24);
-
-                str += moon.length + " " + moon.width + " " + moon.r + "\n";
-                //console.log("Mond Länge, Breite, Radius", moon.length*RAD2DEG, moon.width*RAD2DEG, moon.r);
-            }
-            document.getElementById("table").value = str;*/
-
+            //Grafik-Ausgabe: Werte merken, gezeichnet wird im nächsten Bild (auch bei Größenänderung)
+            lastScene = {
+                solarSystem: {
+                    springEquinoxLength,
+                    summerSolsticeAnomaly: calculateEarthTrueAnomaly(summerSolsticeDate),
+                    autumnEquinoxAnomaly: calculateEarthTrueAnomaly(autumnEquinoxDate),
+                    winterSolsticeAnomaly: calculateEarthTrueAnomaly(winterSolsticeDate),
+                    orbitRadiusEarth,
+                    orbitLengthEarth,
+                    siderealTime,
+                    moonLongitude: moon.longitude,
+                    ascendingNodeMoon,
+                },
+                earthView: {
+                    eclipticalLength: orbitLengthEarth,
+                    vernalPoint: springEquinoxLength,
+                    indicatorDirection: localSiderealTime,
+                },
+            };
+            requestDraw();
         }
 
-        function fillTable() {
+        window.addEventListener('load', () => {
+            // Neu zeichnen, wenn sich die Größe der Bilder oder das Farbschema ändert
+            const observer = new ResizeObserver(requestDraw);
+            for (const id of Object.keys(FIGURES)) observer.observe(document.getElementById(id));
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
 
-            let str ="";
-            for(let day = 0; day < 365; day++) {
-                datetime.setTime(datetime.getTime()+86400000);
-                const julianDate = julianDayFromDate(datetime);
-                const equationOfTimeFull = calculateEquationOfTime(julianDate,true);
-                const equatonOfTimeWithoutTilt = calculateEquationOfTime(julianDate,false);
-                const equationOfTimeWithoutExcentric = equationOfTimeFull - equatonOfTimeWithoutTilt;
-                const siderealTime = siderealTimeHours(julianDate);//-equationOfTimeWithoutExcentric/60/24
-                const siderealTimeRelative = (((siderealTime - equatonOfTimeWithoutTilt/60 - datetime.getUTCHours()-datetime.getUTCMinutes()/60)%24)+24)%24;
-                const eclipticalLength = calculateSunPosition(julianDate).longitude*RAD2DEG;
-                const delta = normalizeDegrees(siderealTimeRelative*15-180);
-                str +=(julianDate).toString() + " " + String(eclipticalLength) + " " + String(delta) + " " +String(equatonOfTimeWithoutTilt)+"\n";
-            }
-            document.getElementById("table").value = str;
-
-        }
-
-        window.onload = function () {
-            initUI();
+            initUI();                  // ruft update() auf
             createTimeButtons('timeButtons', [
                 { label: '1 Minute',   step: 60000 },
                 { label: '1 Stunde',   step: 3600000 },
                 { label: '1 Tag',      step: 86400000 },
                 { label: '1 Sterntag', step: 86164100 },
             ]);
-        };
+        });
     </script>
 </head>
 <body>
@@ -555,68 +581,62 @@
     <p>Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Die Angaben beziehen sich auf Weltzeit (UTC). Mit „Lokalzeit“ werden Datum und Uhrzeit sowie Sonnenauf-, -untergang und -durchgang in der Zeitzone des Browsers angegeben (einschließlich Sommerzeit); Auf-, Untergang und Durchgang gelten dann für den lokalen Kalendertag. Die Knöpfe für Modifikation der Zeit können gedrückt gehalten werden.</p>
 
     <div id="locationControls"></div>
-<p></p>
     <div id="timeControls"></div>
-<div style="display: flow-root;">
-<div style ="float:left;">
 
-    <canvas id="solarSystem" width="620" height="620"></canvas>
-    <p>
-        Erdbahn um die Sonne
-    </p>
+    <div class="workspace">
+        <div class="figures">
+            <figure>
+                <canvas id="solarSystem" role="img" aria-label="Erdbahn um die Sonne mit Tag- und Nachtgleichen, Sonnenwenden, Perihel und Aphel"></canvas>
+                <figcaption>Erdbahn um die Sonne</figcaption>
+            </figure>
+            <figure>
+                <canvas id="earth" role="img" aria-label="Erde mit geneigter Achse, von links beleuchtet; Meridian des Beobachtungsorts rot"></canvas>
+                <figcaption>Ausrichtung der Erde zur Sonne</figcaption>
+            </figure>
+        </div>
+        <div class="time-panel"><div id="timeButtons"></div></div>
+    </div>
 
-
-    <canvas id="earth" width="550" height="410"></canvas>
-
-    <canvas id="moon" width="200" height="200"></canvas>
-
-</div>
-<div style ="position: sticky; top: 15px;padding: 10px;">
-<div id="timeButtons"></div>
-</div>
-     <div id="outputTable" style="display:block;clear:left;"></div>
-</div>
-
-    <textarea id="table"></textarea>
+    <div id="outputTable"></div>
 
 
 <h2>Hintergründe und Begriffe</h2>
-<table>
+<table class="glossary">
 <tr>
-<td valign="top">Sternzeit</td>
+<td>Sternzeit</td>
 <td>Die Erde dreht sich sowohl um ihre eigene Achse, als auch um die Sonne. Die Sternzeit berücksichtigt nur die Drehung um die eigene Achse - jeden Tag zur gleichen Sternzeit hat die Erde die gleiche Blickrichtung ins Universum (die Position auf der Bahn um die Sonne wird vernachlässigt). Ein Sterntag ist ca. 4 Minuten kürzer als ein normaler Tag und lässt sich in 24 Sternzeitstunden teilen. Die Sternzeit ist ortsabhängig.
 </td>
 </tr>
 <tr>
-<td valign="top">Julianisches Datum</td><td>Ein in der Astronomie verwendetes Zeitmaß. Es zählt fortlaufend die Anzahl der Tage seit dem 1. Januar 4713 v.Chr. Ein Tag beginnt um 12 Uhr mittags in Greenwich (Nullmeridian), Uhrzeiten werden als Bruchteile eines Tages angegeben. Das Julianische Datum hat seinen Ursprung in einem 1583 n.Chr. erschienenen Buch von Joseph Scaliger, das verschiedene Kalendersysteme beleuchtete. Die genaue Messung und Referenzierung der Zeit stellt auch heute noch eine Herausforderung dar. Zwar haben wir mittlerweile sehr gleichmäßig laufende Atomuhren, über Jahrhunderte hinweg dienten jedoch astronomische Beobachtungen als Referenz. Die koordinierte Weltzeit (UTC) ist letztlich ein Kompromiss aus internationaler Atomzeit und astronomisch basierter Universalzeit.
+<td>Julianisches Datum</td><td>Ein in der Astronomie verwendetes Zeitmaß. Es zählt fortlaufend die Anzahl der Tage seit dem 1. Januar 4713 v.Chr. Ein Tag beginnt um 12 Uhr mittags in Greenwich (Nullmeridian), Uhrzeiten werden als Bruchteile eines Tages angegeben. Das Julianische Datum hat seinen Ursprung in einem 1583 n.Chr. erschienenen Buch von Joseph Scaliger, das verschiedene Kalendersysteme beleuchtete. Die genaue Messung und Referenzierung der Zeit stellt auch heute noch eine Herausforderung dar. Zwar haben wir mittlerweile sehr gleichmäßig laufende Atomuhren, über Jahrhunderte hinweg dienten jedoch astronomische Beobachtungen als Referenz. Die koordinierte Weltzeit (UTC) ist letztlich ein Kompromiss aus internationaler Atomzeit und astronomisch basierter Universalzeit.
 </td>
 </tr>
 <tr>
-<td valign="top" id="Zeitgleichung">Zeitgleichung</td>
+<td id="Zeitgleichung">Zeitgleichung</td>
 <td>Im Durchschnitt vergehen genau 24 Stunden, bis die Sonne zum Mittag wieder im Süden steht. Durch die Neigung der Erdachse und die elliptische Bahn um die Sonne schwankt die genaue Zeitdauer innerhalb eines Jahres. Die Zeitgleichung gibt die Differenz der "wahren Sonnenzeit" (Zeit, die eine Sonnenuhr zeigt) zur "mittleren Zeit" (Zeit auf der Uhr) an. Dieser Unterschied kann bis zu ca. 16 Minuten betragen und ändert sich im Laufe des Jahres.
 </td>
 </tr>
 <tr>
-<td valign="top" id="EkliptikaleLaenge">Ekliptikale Länge</td>
+<td id="EkliptikaleLaenge">Ekliptikale Länge</td>
 <td>Die Erde bewegt sich (annähernd) in einer Ebene um die Sonne, diese Ebene wird Ekliptik genannt. Die ekliptikale Länge gibt den Winkel in dieser Ebene in Bezug zum Frühlingspunkt an. In der Tabelle ist es die Richtung von der Erde zur Sonne bzw. zum Mond.
 </td>
 </tr>
 <tr>
-<td valign="top">Frühlingspunkt</td><td>Der Frühlingspunkt ergibt sich aus der Position von Erde und Sonne zum Frühlingsäquinoktium - das ist der genaue Zeitpunkt der Tag-und-Nacht-Gleiche im März.
+<td>Frühlingspunkt</td><td>Der Frühlingspunkt ergibt sich aus der Position von Erde und Sonne zum Frühlingsäquinoktium - das ist der genaue Zeitpunkt der Tag-und-Nacht-Gleiche im März.
 Die Richtung, die die Sonne zu diesem Zeitpunkt hat, gilt als Referenz für astronomische Koordinatensysteme (ekliptikales und äquatoriales Koordinatensystem). Durch verschiedene Einflüsse verschiebt sich der Frühlingspunkt geringfügig im Laufe der Zeit. Als Bezugsangabe ist es daher wichtig, von welchem Frühlingspunkt die Rede ist.</td>
 </tr>
 <tr>
-<td valign="top" id="WahreAnomalie">Wahre Anomalie</td>
+<td id="WahreAnomalie">Wahre Anomalie</td>
 <td>Die "wahre Anomalie" ist eine weitere Bezugsangabe der Erdposition. Sie gibt den Winkel zwischen Perihel (Punkt der elliptischen Bahn, der der Sonne am nächsten ist), Sonne und Erde an. Die "wahre Anomalie" entsteht aus der Berechnung der Planetenbahn (Kepler-Gleichung) und ist bis auf den Bezugspunkt sehr ähnlich zur ekliptikalen Länge. Die Differenz ist aber nicht konstant, da beide Größen auf unterschiedlichen Zusammenhängen basieren. Sie verschiebt sich um ca. 1,7° je Jahrhundert.
 </td>
 </tr>
 <tr>
-<td valign="top" id="DeltaSternzeit">Δ (UTC-Sternzeit)</td>
+<td id="DeltaSternzeit">Δ (UTC-Sternzeit)</td>
 <td>Die Differenz aus normaler Uhrzeit (Stunden und Minuten) und Sternzeit ist zwar keine formale Angabe, beschreibt aber einen interessanten Zusammenhang: Zum ersten Sonnendurchgang nach dem Frühlingsäquinoktium besteht eine definierte Differenz von 12 Stunden, anschließend laufen die Uhren je Tag um ca. 4 Minuten auseinander. Aus der Differenz lässt sich somit auf die Position schließen. Eine Abweichung entsteht durch die Exzentrizität der Bahn - die Umrechnung von Differenz in ekliptikale Länge schwankt genau um diesen Anteil der Zeitgleichung. Der Anteil der geneigten Erdachse wird dagegen indirekt berücksichtigt. Daneben gibt es nur eine kleine konstante Verschiebung, die sich aus der Definition der Sternzeit ergibt.
 </td>
 </tr>
 <tr>
-<td valign="top" id="Perihel">Perihel</td>
+<td id="Perihel">Perihel</td>
 <td>Perihel ist der Punkt, an dem die Erde am nächsten zur Sonne ist. Die Erde beschreibt eine leicht elliptische Bahn um die Sonne, die Sonne steht dabei in einem der Brennpunkte der Ellipse.
 Die beiden Brennpunkte der Ellipse sind in der Grafik der Erdbahn als kleine schwarze Punkte dargestellt. Die Sonne ist natürlich in der Darstellung viel zu groß, real befindet sie sich im rechten Brennpunkt. Die Erde bewegt sich in der Nähe des Perihels schneller auf ihrer Bahn um die Sonne, aktuell ist also der Winter auf der Nordhalbkugel etwas kürzer als der Sommer.
 Im Jahr 1246 fielen Wintersonnenwende und Perihel zusammen.
@@ -624,11 +644,11 @@ Eine direkte Berechnung des Perihels ohne iterative Näherung ist nicht einfach.
 </td>
 </tr>
 <tr>
-<td valign="top" id="Aphel">Aphel</td>
+<td id="Aphel">Aphel</td>
 <td>Aphel ist der Punkt, an dem die Erde die größte Entfernung zur Sonne hat.</td>
 </tr>
 <tr>
-<td valign="top" id="Aequinoktium">Frühlingsäquinoktium</td>
+<td id="Aequinoktium">Frühlingsäquinoktium</td>
 <td>
 Das Äquinoktium (lateinisch für „gleiche Nacht“) ist genau der Zeitpunkt, zu dem die Tag- und Nachtgleiche eintritt, bzw. die Sonne den Himmelsäquator überschreitet. Zu diesem Zeitpunkt ist die Erdachse nur seitlich zur Sonne geneigt, auf jedem Breitengrad wird genau die Hälfte von der Sonne beschienen.
 
@@ -636,16 +656,16 @@ Das Frühlingsäquinoktium ist der wichtigste Bezugspunkt im astronomischen Jahr
 </td>
 </tr>
 <tr>
-<td valign="top" id="Solstitium">Sommersolstitium/ Wintersolstitium</td>
+<td id="Solstitium">Sommersolstitium/ Wintersolstitium</td>
 <td>Das Solstitium (lateinisch für „Sonnenstillstand“) ist der Zeitpunkt im Jahr, an dem die Sonne ihren höchsten oder tiefsten Mittagsstand am Himmel erreicht. Dies markiert den Beginn des astronomischen Sommers oder Winters. Zur Sommersonnenwende ist der Tag auf der Nordhalbkugel am längsten, zur Wintersonnenwende am kürzesten.
 </td>
 </tr>
 <tr>
-<td valign="top" id="HoeheAzimut">Höhe/Azimut</td>
+<td id="HoeheAzimut">Höhe/Azimut</td>
 <td>Höhe und Azimut sind Angaben des horizontalen Koordinatensystems. Höhe gibt den Winkel zum Horizont an, Azimut die Richtung. Der Blick nach Süden, Westen, Norden, Osten entspricht 0°, 90°, 180° und -90° (= 270°). Anders als beim Kompass wird also von Süden aus gezählt.</td>
 </tr>
 <tr>
-<td valign="top" id="Sonnenaufgang">Sonnenaufgang/ Sonnenuntergang</td>
+<td id="Sonnenaufgang">Sonnenaufgang/ Sonnenuntergang</td>
 <td>Sonnenaufgang ist der Moment an dem die Sonne gerade so sichtbar wird, Sonnenuntergang der Moment, an dem sie gerade so verschwindet. Durch Lichtbrechung (Refraktion) befindet sich die Sonne in Wirklichkeit schon unterhalb des Horizontes, obwohl sie noch sichtbar ist. Der Effekt ist unter anderem abhängig von Lufttemperatur und Luftdruck und sorgt für kleine Abweichungen. Neben dem Begriff der Sonnenauf- und Untergänge, gibt es noch verschiedene Phasen der Dämmerung: Bürgerliche Dämmerung, nautische Dämmerung und astronomische Dämmerung.
 <br>
 Sonnenauf- und Untergang liegen nahezu symmetrisch zum Sonnendurchgang. Weil sich die Deklination der Sonne im Lauf des Tages ändert, nicht exakt: In Berlin beträgt der Unterschied bis zu ca. 1 Minute, in Polarnähe deutlich mehr.
@@ -660,7 +680,7 @@ In Weltzeit kann an Orten fern von Greenwich der Untergang vor dem Aufgang liege
 </td>
 </tr>
 <tr>
-<td valign="top" id="Sonnendurchgang">Sonnendurchgang</td>
+<td id="Sonnendurchgang">Sonnendurchgang</td>
 <td>Sonnendurchgang bezeichnet den Moment, in dem die Sonne den höchsten Punkt ihrer täglichen Bahn am Himmel erreicht. Dies wird auch als Kulmination der Sonne bezeichnet, der Meridian (Längengrad des Beobachters) ist dann genau zur Sonne ausgerichtet. Der Sonnendurchgang (in Weltzeit) ergibt sich aus der Zeitgleichung und der geographischen Länge des Beobachters; mit „Lokalzeit“ wird er in der Zeitzone des Browsers angegeben.
 In Weltzeit kann der Durchgang an Orten nahe der Datumsgrenze (Länge ±180°) an einzelnen Tagen knapp vor oder nach dem UTC-Tag liegen; dann steht „-“ in der Tabelle.
 </td>
