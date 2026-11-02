@@ -48,15 +48,26 @@ die Sonne dem Zenit kommt, desto stärker ändert schon ein kleines Stück Weg i
 
 ## 2. Die Ursache: die geneigte Erdachse
 
+Abschnitt 1 beschreibt den Himmel so, wie ihn ein Beobachter sieht: Die Sonne steht in einer
+Himmelsrichtung und in einer Höhe über dem Horizont (**Horizontsystem**). Diese Angaben gelten nur
+für einen Ort, schon ein paar hundert Kilometer weiter sind sie andere. Um zu verstehen, warum der
+Tagbogen im Lauf des Jahres wandert, wechseln wir den Blickwinkel und schauen von außen auf die Erde.
+
 Die Erdachse ist um **23,44°** gegen die Senkrechte auf der Erdbahn geneigt und zeigt dabei
 (fast) immer in dieselbe Richtung im Raum – zum Polarstern. Während die Erde einmal um die Sonne
 läuft, ist daher mal die Nordhalbkugel zur Sonne hin geneigt (Juni), mal die Südhalbkugel
 (Dezember).
 
-Vom Erdboden aus gesehen bedeutet das: Die Sonne steht im Juni bis zu 23,44° nördlich des
-Himmelsäquators, im Dezember bis zu 23,44° südlich. Diesen Winkel nennt man **Deklination** δ.
+Zurück zum Beobachter: Die Himmelsachse aus Abschnitt 1 ist die verlängerte Erdachse, der
+Himmelsäquator die verlängerte Ebene des Erdäquators. Beide sind für alle Orte gleich. Wie weit die
+Sonne nördlich oder südlich des Himmelsäquators steht, heißt **Deklination** δ (**Äquatorsystem**).
+An einem Tag ändert sie sich kaum, deshalb läuft die Sonne auf einem Kreis um die Himmelsachse. Im
+Lauf des Jahres pendelt sie: Im Juni steht die Sonne bis zu 23,44° nördlich des Himmelsäquators, ihr
+Tagkreis liegt darüber; im Dezember bis zu 23,44° südlich; zu Frühlings- und Herbstanfang genau auf
+dem Himmelsäquator. Weil die Achse ihre Richtung behält, wandert der Kreis nur auf und ab und kippt
+nicht.
 
-Daraus folgt eine einfache Formel für die **Mittagshöhe**:
+Beide Blickwinkel verbindet eine einfache Formel für die **Mittagshöhe**:
 
 ```
 Mittagshöhe = 90° − geografische Breite + Deklination
@@ -79,7 +90,10 @@ nördlich, desto größer die Unterschiede:
 Im Sommer steht die Sonne höher (die Strahlung trifft steiler auf) und scheint länger. Am
 sonnennächsten ist die Erde sogar Anfang Januar (→ Abschnitt 6).
 
-> **Ausprobieren:** `Erdposition.html` zeigt die Erde von außen mit geneigter Achse und beleuchteter
+> **Ausprobieren:** `Himmelsachse3D.html` zeigt den Blickwechsel als 3D-Modell: die Erde von außen mit einem
+> Beobachter, seinem Horizont und seiner Himmelsachse parallel zur Erdachse, Deklination und Höhe der Sonne,
+> dann der Übergang zum Blick vom Horizont aus (Knopf „Schritt für Schritt erklären“).
+> `Erdposition.html` zeigt die Erde von außen mit geneigter Achse und beleuchteter
 > Hälfte – man sieht direkt, warum der Tagbogen eines Ortes im Juni länger ist als im Dezember.
 > In `ErdeMond3D.html` macht die Ebene „Äquatorebene“ den Winkel zwischen Erdäquator und Ekliptik
 > sichtbar; die Ansicht „von der Sonne“ zeigt, welche Halbkugel gerade zur Sonne geneigt ist.
@@ -381,6 +395,7 @@ dauerhaft seit 1980.
 |-------|-------|--------------------|
 | Tagkreis im Jahreslauf, 3D | `Tagbogen3D.html` | Horizontscheibe mit Kompassrose, Tagkreis mit Stunden, Auf- und Untergang, Mittagshöhe; Regler für Tag und Uhrzeit, Vergleichskreise, Ansichten von schräg, Süden, Osten, oben |
 | Tagbögen am Himmel, Analemma | `Sichtbarkeit.html` | Rundumblick mit Sonnenbahnen am 21. jedes Monats und Stundenlinien; Karte mit Auf- und Untergangsrichtungen am 21.6. und 21.12. (benötigt `python3 -m http.server 8000`) |
+| Horizontsystem und Äquatorsystem, 3D | `Himmelsachse3D.html` | Erde mit Beobachter, Horizont und Himmelskugel; Himmelsachse parallel zur Erdachse, Polhöhe = Breite, Deklination, Stundenwinkel, Höhe und Richtung; Umschalten zwischen Blick von außen und vom Beobachter, Größe der Erde einstellbar |
 | Auf-, Untergang, Mittag, Tageslänge | `Tageslaenge.html` | Jahresdiagramme der Zeiten, Zunahme pro Tag am Morgen und Abend, Kennzahlen; Untergangshöhe −0°50′ oder 0° |
 | Achsneigung, Erdbahn, Zeitgleichung | `Erdposition.html` | Erdbahn mit Jahrespunkten, Perihel und Aphel; Erde mit geneigter Achse und Tag-/Nachtseite; Tabelle mit Zeitgleichung, Sonnenstand, Auf- und Untergang; Begriffserklärungen |
 | Entfernung zur Sonne im Jahr | `Mondbahn.html` | Bahn von Erde und Mond um die Sonne, Diagramm der Entfernung zur Sonne |

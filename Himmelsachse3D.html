@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erdachse und Himmelsachse</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --muted: #8a8984;
+            --ground: rgba(196, 214, 178, 0.72);
+            --ground-line: #6f7f62;
+            --hz: #3f8a2e;
+            --eq: #2a78d6;
+            --eq-fill: rgba(42, 120, 214, 0.07);
+            --sun: #e39a00;
+            --night: #5b6f9a;
+            --axis: #7a59c9;
+            --north: #d0362b;
+            --earth-day: #8fb4dc;
+            --earth-night: #34425c;
+            --grid: rgba(255, 255, 255, 0.45);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --muted: #8f8e86;
+                --ground: rgba(52, 66, 44, 0.85);
+                --ground-line: #9fb08f;
+                --hz: #7cc26a;
+                --eq: #4a93ea;
+                --eq-fill: rgba(74, 147, 234, 0.08);
+                --sun: #f2b01e;
+                --night: #8fa3d6;
+                --axis: #a68cf0;
+                --north: #f0564a;
+                --earth-day: #5a86b8;
+                --earth-night: #1d2638;
+                --grid: rgba(255, 255, 255, 0.3);
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --muted: #8f8e86;
+            --ground: rgba(52, 66, 44, 0.85);
+            --ground-line: #9fb08f;
+            --hz: #7cc26a;
+            --eq: #4a93ea;
+            --eq-fill: rgba(74, 147, 234, 0.08);
+            --sun: #f2b01e;
+            --night: #8fa3d6;
+            --axis: #a68cf0;
+            --north: #f0564a;
+            --earth-day: #5a86b8;
+            --earth-night: #1d2638;
+            --grid: rgba(255, 255, 255, 0.3);
+        }
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            touch-action: none;
+            cursor: grab;
+            border-radius: 6px;
+            background: var(--surface-2);
+        }
+        canvas.dragging { cursor: grabbing; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 20px;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls input[type="number"] { width: 5.5em; }
+        .controls input[type="text"] { width: 7em; }
+        .controls input.invalid { border-color: red; }
+        .controls .wide { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .controls .wide input[type="range"] { flex: 1; min-width: 80px; }
+        .controls .value { font-variant-numeric: tabular-nums; min-width: 7.5em; font-weight: 600; white-space: nowrap; }
+        .controls .group { display: flex; flex-wrap: wrap; gap: 6px; }
+        .feedback { color: var(--text-2); font-size: 0.9em; }
+        button { padding: 3px 10px; }
+        button.active { font-weight: bold; outline: 2px solid var(--axis); outline-offset: -1px; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            font-size: 0.9em;
+            color: var(--text-2);
+            margin: 6px 0 10px;
+        }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before {
+            background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px);
+        }
+        .legend .area::before { height: 10px; }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 16px; }
+        #info table { border-collapse: collapse; }
+        #info td { padding: 2px 14px 2px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+        #info td:first-child { color: var(--text-2); }
+        #info tr.head td { color: var(--text); font-weight: bold; padding-top: 10px; }
+        #info .note { color: var(--text-2); font-size: 0.9em; }
+        h2 { margin-top: 28px; }
+        .tour {
+            border-left: 4px solid var(--axis);
+            background: var(--surface-2);
+            border-radius: 6px;
+            padding: 10px 14px 12px;
+            margin-bottom: 10px;
+        }
+        .tour-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
+        .tour-head b { font-size: 1.1em; }
+        .tour-head span { color: var(--text-2); font-size: 0.9em; }
+        #tourText { min-height: 7.5em; }
+        #tourText p { margin: 8px 0; }
+        .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tour-nav .end { margin-left: auto; }
+        .start-tour { margin: 0 0 14px; }
+        .start-tour button { padding: 6px 14px; font-size: 1em; }
+    </style>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script>
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zustand                                //
+    /////////////////////////////////////////////////////////////////
+
+        const state = {
+            year: new Date().getFullYear(),
+            day: 0,              // Tag im Jahr, 0 = 1. Januar; beim Abspielen mit Bruchteil
+            minutes: 720,        // Uhrzeit [min] in der Zeitzone des Browsers
+            lat: 50,
+            lon: 10,
+            earth: 0.85,         // Größe der Erde, 1 = Radius EARTH_MAX
+            frame: 0,            // Bezugssystem: 0 = von außen (Erde dreht sich), 1 = Beobachter (Himmel dreht sich)
+            viewName: 'oblique',
+            cam: { az: 150, el: 20, dist: 3.8 },
+            playYear: false,
+            playDay: false,
+            show: { sky: true, angles: true, hourAngle: false, noon: false, grid: true },
+        };
+
+        // Ansichten je Bezugssystem. Von außen: x zur Sonne, z zum Himmelsnordpol.
+        // Beim Beobachter: x nach Osten, y nach Norden, z zum Zenit (wie Tagbogen3D.html).
+        const VIEWS = {
+            space: {
+                oblique: { az: 150, el: 20, dist: 3.8 },
+                side:    { az: 180, el: 0, dist: 3.8 },     // Sonne rechts, Erdachse senkrecht
+                top:     { az: 180, el: 89, dist: 3.8 },    // über dem Nordpol
+            },
+            observer: {
+                oblique: { az: 205, el: 22, dist: 3.8 },
+                side:    { az: 90, el: 0, dist: 3.8 },      // von Osten: Tagkreise als Striche
+                top:     { az: 180, el: 89, dist: 3.8 },
+            },
+        };
+
+        const EARTH_MAX = 0.4;           // Erdradius bei Größe 100 % (Himmelskugel = 1)
+        const EARTH_RADIUS_KM = 6371;
+        const POLARIS_KM = 430 * 9.4607e12;   // Polarstern, rund 430 Lichtjahre
+        const COMPASS = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+
+        /**
+         * Ist eine Ebene der Zeichnung sichtbar? In der Tour bestimmt der Schritt, sonst die Häkchen.
+         * Ebenen: earth, grid, earthAxis, sky, celEquator, poles, observer, zenith, obsAxis, latAngle,
+         * sun, rays, decAngle, hourAngle, dayCircle, altitude, noonArcs
+         */
+        function visible(layer) {
+            const step = tour ? TOUR[tour.index] : null;
+            if (step && step.layers) return step.layers.includes(layer);
+            switch (layer) {
+                case 'sky': case 'celEquator': case 'dayCircle': case 'poles': return state.show.sky;
+                case 'latAngle': case 'decAngle': case 'altitude': return state.show.angles;
+                case 'hourAngle': return state.show.hourAngle;
+                case 'noonArcs': return state.show.noon;
+                case 'grid': return state.show.grid;
+                default: return true;
+            }
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Vektoren                               //
+    /////////////////////////////////////////////////////////////////
+
+        const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+        const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+        const scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+        const norm = (a) => scale(a, 1 / Math.hypot(a[0], a[1], a[2]));
+        const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        const clamp1 = x => Math.max(-1, Math.min(1, x));
+        const mulMat = (m, v) => [dot(m[0], v), dot(m[1], v), dot(m[2], v)];
+
+        /** Quaternion [w, x, y, z] einer Drehmatrix (Zeilen) */
+        function quatFromMatrix(m) {
+            const tr = m[0][0] + m[1][1] + m[2][2];
+            let w, x, y, z;
+            if (tr > 0) {
+                const s = Math.sqrt(tr + 1) * 2;
+                w = 0.25 * s; x = (m[2][1] - m[1][2]) / s; y = (m[0][2] - m[2][0]) / s; z = (m[1][0] - m[0][1]) / s;
+            } else if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) {
+                const s = Math.sqrt(1 + m[0][0] - m[1][1] - m[2][2]) * 2;
+                w = (m[2][1] - m[1][2]) / s; x = 0.25 * s; y = (m[0][1] + m[1][0]) / s; z = (m[0][2] + m[2][0]) / s;
+            } else if (m[1][1] > m[2][2]) {
+                const s = Math.sqrt(1 + m[1][1] - m[0][0] - m[2][2]) * 2;
+                w = (m[0][2] - m[2][0]) / s; x = (m[0][1] + m[1][0]) / s; y = 0.25 * s; z = (m[1][2] + m[2][1]) / s;
+            } else {
+                const s = Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]) * 2;
+                w = (m[1][0] - m[0][1]) / s; x = (m[0][2] + m[2][0]) / s; y = (m[1][2] + m[2][1]) / s; z = 0.25 * s;
+            }
+            return w < 0 ? [-w, -x, -y, -z] : [w, x, y, z];
+        }
+
+        /** Anteil f der Drehung q, von der Einheitsdrehung aus (Slerp) */
+        function partialQuat(q, f) {
+            const half = Math.acos(Math.min(1, q[0]));
+            const s = Math.sin(half);
+            if (s < 1e-9) return [1, 0, 0, 0];
+            const k = Math.sin(f * half) / s;
+            return [Math.cos(f * half), q[1] * k, q[2] * k, q[3] * k];
+        }
+
+        function matrixFromQuat([w, x, y, z]) {
+            return [
+                [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+                [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+                [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+            ];
+        }
+
+        /** Strecke als Polylinie (fein unterteilt, damit die Verdeckung durch die Erde stimmt) */
+        function segment(a, b, steps = 100) {
+            const pts = [];
+            for (let i = 0; i <= steps; i++) pts.push(lerp(a, b, i / steps));
+            return pts;
+        }
+
+        /** Bogen um center mit Radius r von Richtung u1 nach u2 (Einheitsvektoren) */
+        function arc(center, u1, u2, r, steps = 40) {
+            const w = Math.acos(clamp1(dot(u1, u2)));
+            if (w < 1e-6) return [add(center, scale(u1, r))];
+            const pts = [];
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const d = add(scale(u1, Math.sin((1 - t) * w)), scale(u2, Math.sin(t * w)));
+                pts.push(add(center, scale(d, r / Math.sin(w))));
+            }
+            return pts;
+        }
+
+        /** Kreis parallel zur Äquatorebene (z = const) */
+        function circleZ(radius, z, steps = 180) {
+            const pts = [];
+            for (let i = 0; i <= steps; i++) {
+                const a = 2 * Math.PI * i / steps;
+                pts.push([radius * Math.cos(a), radius * Math.sin(a), z]);
+            }
+            return pts;
+        }
+
+        /** Strahl von p in Richtung d (Einheitsvektor) bis zur Himmelskugel (Radius 1 um den Erdmittelpunkt) */
+        function toSky(p, d) {
+            const b = dot(p, d);
+            return add(p, scale(d, -b + Math.sqrt(Math.max(0, b * b - dot(p, p) + 1))));
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Berechnung                             //
+    /////////////////////////////////////////////////////////////////
+
+        function daysInYear(year) {
+            return (new Date(year, 1, 29).getMonth() === 1) ? 366 : 365;
+        }
+
+        /** Kalenderdatum (lokal) des Tages im Jahr */
+        function dateOfDay(year, day, minutes = 0) {
+            return new Date(year, 0, 1 + Math.floor(day), 0, minutes);
+        }
+
+        function observerLocation() {
+            return { latitude: state.lat * DEG2RAD, longitude: state.lon * DEG2RAD, elevation: 0 };
+        }
+
+        /** Rektaszension und Deklination der Sonne [rad] */
+        function sunEquatorial(jd) {
+            return calculateEquatorial(calculateSunPosition(jd), calculateObliquity(jd));
+        }
+
+        /** Stundenwinkel der Sonne [rad] in (−π, π] */
+        function hourAngle(jd, loc) {
+            return normalizeAngleSigned(calculateLocalSiderealTime(jd, loc) - sunEquatorial(jd).ra);
+        }
+
+        /** Auf-, Untergang und Mittag des eingestellten Tages nach astro.js */
+        function riseSetOfDay() {
+            const d = dateOfDay(state.year, state.day);
+            const noonDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+            const offset = -noonDate.getTimezoneOffset() / 60;
+            return { rs: calculateSunRiseSet(julianDayFromDate(noonDate), observerLocation(), offset), offset };
+        }
+
+        /**
+         * Alles für das Bild. Weltkoordinaten: Erdmittelpunkt im Ursprung, z zum Himmelsnordpol, die Sonne liegt
+         * fest in der x-z-Ebene (Deklination δ über der x-Achse), die Erde dreht sich darunter. Der Beobachter
+         * steht im Stundenwinkel H vom Meridian der Sonne aus. Die Himmelskugel hat den Radius 1.
+         */
+        function computeScene() {
+            const loc = observerLocation();
+            const phi = loc.latitude;
+            const moment = dateOfDay(state.year, state.day, state.minutes);
+            const jd = julianDayFromDate(moment) + (state.day - Math.floor(state.day));
+            const dec = sunEquatorial(jd).dec;
+            const H = hourAngle(jd, loc);
+            const rE = EARTH_MAX * state.earth;
+
+            const s = [Math.cos(dec), 0, Math.sin(dec)];                                   // zur Sonne
+            const U = [Math.cos(phi) * Math.cos(H), Math.cos(phi) * Math.sin(H), Math.sin(phi)];  // Zenit
+            const E = [-Math.sin(H), Math.cos(H), 0];                                      // Osten
+            const N = cross(U, E);                                                         // Norden
+            const m = [Math.cos(H), Math.sin(H), 0];       // Himmelsäquator im Meridian des Beobachters
+            const o = scale(U, rE);                         // Standort
+
+            // Horizontkoordinaten (geometrisch, ohne Lichtbrechung)
+            const alt = Math.asin(clamp1(dot(s, U)));
+            const az = normalizeDegrees(Math.atan2(dot(s, E), dot(s, N)) * RAD2DEG);
+
+            // Darstellung: von außen (f = 0) bis Beobachter (f = 1); beim Beobachter liegt sein Horizont fest
+            const f = state.frame;
+            const R = matrixFromQuat(partialQuat(quatFromMatrix([E, N, U]), f));
+            const shift = scale(o, f);
+            const rd = (0.04 + 0.3 * rE) * (1 - f) + f;    // Radius der Horizontscheibe
+
+            const { rs, offset } = riseSetOfDay();
+            return { phi, dec, H, jd, rE, s, U, E, N, m, o, alt, az, f, R, shift, rd, rs, offset };
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Projektion                             //
+    /////////////////////////////////////////////////////////////////
+
+        let canvas, ctx, width = 0, height = 0, cssColors = {};
+        let camBasis = null, S = null, occluder = null;
+
+        // Fast Parallelprojektion: parallele Achsen erscheinen parallel; state.cam.dist wirkt als Zoom
+        const EYE_DISTANCE = 40;
+
+        function updateCamera() {
+            const az = state.cam.az * DEG2RAD, el = state.cam.el * DEG2RAD, d = EYE_DISTANCE;
+            const target = [0, 0, 0.15 * state.frame];
+            const eye = [target[0] + d * Math.cos(el) * Math.sin(az),
+                         target[1] + d * Math.cos(el) * Math.cos(az),
+                         target[2] + d * Math.sin(el)];
+            const f = norm(sub(target, eye));
+            const r = norm(cross(f, [0, 0, 1]));
+            const u = cross(r, f);
+            const focal = 1.2 * Math.min(width, height * 1.3) * EYE_DISTANCE / state.cam.dist;
+            camBasis = { eye, f, r, u, focal };
+        }
+
+        function project(p) {
+            const d = sub(p, camBasis.eye);
+            const z = Math.max(dot(d, camBasis.f), 0.05);
+            return [width / 2 + camBasis.focal * dot(d, camBasis.r) / z,
+                    height * 0.5 - camBasis.focal * dot(d, camBasis.u) / z];
+        }
+
+        /** Weltpunkt → Darstellung (Drehung und Verschiebung des Bezugssystems) */
+        const D = p => mulMat(S.R, sub(p, S.shift));
+        /** Weltrichtung → Darstellung */
+        const Dd = v => mulMat(S.R, v);
+
+        /** Liegt ein Punkt der Darstellung (vom Auge aus) hinter der Erdkugel? */
+        function hiddenByEarth(p) {
+            if (!occluder) return false;
+            const { c, r } = occluder;
+            const e = camBasis.eye;
+            const d = sub(p, e);
+            const L = Math.hypot(d[0], d[1], d[2]);
+            const u = scale(d, 1 / L);
+            const ce = sub(c, e);
+            const b = dot(ce, u);
+            const dist2 = dot(ce, ce) - b * b;
+            if (dist2 >= r * r) return false;
+            return b - Math.sqrt(r * r - dist2) < L - 1e-3 * r - 1e-6;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zeichnen                               //
+    /////////////////////////////////////////////////////////////////
+
+        // Zeichenbefehle nach Lage zum Horizont des Beobachters, damit die Horizontscheibe richtig verdeckt
+        let cmds = null;
+
+        function readColors() {
+            const cs = getComputedStyle(document.documentElement);
+            for (const name of ['surface', 'surface-2', 'text', 'text-2', 'muted', 'ground', 'ground-line', 'hz', 'eq',
+                                'eq-fill', 'sun', 'night', 'axis', 'north', 'earth-day', 'earth-night', 'grid']) {
+                cssColors[name] = cs.getPropertyValue('--' + name).trim();
+            }
+        }
+
+        function strokeD(points, { color, width: lw = 1, dash = [], alpha = 1 }) {
+            if (points.length < 2) return;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lw;
+            ctx.setLineDash(dash);
+            ctx.beginPath();
+            points.forEach((p, i) => {
+                const s = project(p);
+                if (i === 0) ctx.moveTo(s[0], s[1]); else ctx.lineTo(s[0], s[1]);
+            });
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function fillD(points, color, alpha = 1) {
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            points.forEach((p, i) => {
+                const s = project(p);
+                if (i === 0) ctx.moveTo(s[0], s[1]); else ctx.lineTo(s[0], s[1]);
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function textAt(sp, text, color, { bold = false, size = 12, align = 'center', baseline = 'middle', dx = 0, dy = 0, alpha = 1 } = {}) {
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.font = `${bold ? 'bold ' : ''}${size}px Arial, sans-serif`;
+            ctx.textAlign = align;
+            ctx.textBaseline = baseline;
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = cssColors['surface-2'];
+            ctx.strokeText(text, sp[0] + dx, sp[1] + dy);
+            ctx.fillStyle = color;
+            ctx.fillText(text, sp[0] + dx, sp[1] + dy);
+            ctx.restore();
+        }
+
+        function dotAt(sp, radius, color, filled = true) {
+            ctx.beginPath();
+            ctx.arc(sp[0], sp[1], radius, 0, 2 * Math.PI);
+            if (filled) { ctx.fillStyle = color; ctx.fill(); }
+            else { ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke(); }
+        }
+
+        /** Lage eines Weltpunkts zum Horizont des Beobachters */
+        function sideOf(p) {
+            if (!S.split) return 'above';
+            return dot(sub(p, S.o), S.U) >= 0 ? 'above' : 'below';
+        }
+
+        /** Polylinie (Welt) am Horizont des Beobachters teilen, mit den Schnittpunkten */
+        function splitBySide(pts) {
+            if (!S.split) return [{ side: 'above', pts }];
+            const val = p => dot(sub(p, S.o), S.U);
+            const runs = [];
+            let v0 = val(pts[0]), up = v0 >= 0, cur = [pts[0]];
+            for (let i = 1; i < pts.length; i++) {
+                const v1 = val(pts[i]);
+                if ((v1 >= 0) !== up) {
+                    const cp = lerp(pts[i - 1], pts[i], v0 / (v0 - v1));
+                    cur.push(cp);
+                    runs.push({ side: up ? 'above' : 'below', pts: cur });
+                    cur = [cp, pts[i]];
+                    up = !up;
+                } else {
+                    cur.push(pts[i]);
+                }
+                v0 = v1;
+            }
+            runs.push({ side: up ? 'above' : 'below', pts: cur });
+            return runs;
+        }
+
+        /** Polylinie (Darstellung) in sichtbare und von der Erde verdeckte Stücke teilen */
+        function splitHidden(pts) {
+            if (!occluder) return [{ hidden: false, pts }];
+            const runs = [];
+            let h = hiddenByEarth(pts[0]), cur = [pts[0]];
+            for (let i = 1; i < pts.length; i++) {
+                const hi = hiddenByEarth(pts[i]);
+                if (hi !== h) {
+                    runs.push({ hidden: h, pts: cur });
+                    cur = [pts[i - 1], pts[i]];
+                    h = hi;
+                } else {
+                    cur.push(pts[i]);
+                }
+            }
+            runs.push({ hidden: h, pts: cur });
+            return runs.filter(r => r.pts.length > 1);
+        }
+
+        /**
+         * Linie in Weltkoordinaten vormerken. style für den Teil über dem Horizont des Beobachters, below für den
+         * Teil darunter (null = nicht zeichnen). Mit xray wird auch der von der Erde verdeckte Teil blass gezeigt.
+         */
+        function addLine(pts, style, below = style) {
+            for (const run of splitBySide(pts)) {
+                const st = run.side === 'above' ? style : below;
+                if (!st) continue;
+                for (const part of splitHidden(run.pts.map(D))) {
+                    if (!part.hidden) {
+                        cmds[run.side].push(() => strokeD(part.pts, st));
+                    } else if (st.xray) {
+                        cmds.xray.push(() => strokeD(part.pts, { ...st, dash: [3, 3], alpha: (st.alpha ?? 1) * 0.6 }));
+                    }
+                }
+            }
+        }
+
+        function addDot(p, radius, color, filled = true) {
+            const d = D(p);
+            if (hiddenByEarth(d)) return;
+            cmds[sideOf(p)].push(() => dotAt(project(d), radius, color, filled));
+        }
+
+        function addLabel(p, text, color, opts = {}) {
+            const d = D(p);
+            if (!opts.xray && hiddenByEarth(d)) return;
+            cmds.labels.push(() => textAt(project(d), text, color, opts));
+        }
+
+        /** Erdkugel mit Tag- und Nachtseite und Gradnetz (nur die Vorderseite) */
+        function drawEarth() {
+            const c = cssColors;
+            const rE = S.rE;
+            const cD = D([0, 0, 0]);
+            const cp = project(cD);
+            const edge = project(add(cD, scale(camBasis.r, rE)));
+            const rp = Math.hypot(edge[0] - cp[0], edge[1] - cp[1]);
+            if (rp < 1.5) { dotAt(cp, 1.5, c['earth-day']); return; }
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cp[0], cp[1], rp, 0, 2 * Math.PI);
+            ctx.fillStyle = c['earth-night'];
+            ctx.fill();
+
+            // Beleuchtete Hälfte: Halbkreis zur Sonne hin plus/minus halbe Ellipse (projizierte Tag-Nacht-Grenze)
+            const sD = Dd(S.s);
+            const sx = dot(sD, camBasis.r), sy = -dot(sD, camBasis.u), sz = -dot(sD, camBasis.f);
+            const th = Math.atan2(sy, sx);
+            ctx.beginPath();
+            ctx.arc(cp[0], cp[1], rp, th - Math.PI / 2, th + Math.PI / 2, false);
+            if (sz > 0) ctx.ellipse(cp[0], cp[1], rp * sz, rp, th, Math.PI / 2, 3 * Math.PI / 2, false);
+            else ctx.ellipse(cp[0], cp[1], rp * -sz, rp, th, Math.PI / 2, -Math.PI / 2, true);
+            ctx.fillStyle = c['earth-day'];
+            ctx.fill();
+            ctx.restore();
+
+            // Linien auf der Oberfläche: nur die dem Auge zugewandte Seite
+            const front = p => dot(Dd(scale(p, 1 / rE)), sub(camBasis.eye, D(p))) > 0;
+            const surfaceLine = (pts, style) => {
+                let run = [];
+                for (const p of pts) {
+                    if (front(p)) { run.push(D(p)); continue; }
+                    if (run.length > 1) strokeD(run, style);
+                    run = [];
+                }
+                if (run.length > 1) strokeD(run, style);
+            };
+            const meridian = a => {
+                const pts = [];
+                for (let i = 0; i <= 60; i++) {
+                    const b = -Math.PI / 2 + Math.PI * i / 60;
+                    pts.push([rE * Math.cos(b) * Math.cos(a), rE * Math.cos(b) * Math.sin(a), rE * Math.sin(b)]);
+                }
+                return pts;
+            };
+            if (visible('grid')) {
+                const greenwich = S.H - state.lon * DEG2RAD;
+                for (let k = 0; k < 12; k++) surfaceLine(meridian(greenwich + k * Math.PI / 6), { color: c.grid, width: 0.8 });
+                for (const b of [-60, -30, 30, 60]) {
+                    surfaceLine(circleZ(rE * Math.cos(b * DEG2RAD), rE * Math.sin(b * DEG2RAD), 90), { color: c.grid, width: 0.8 });
+                }
+            }
+            surfaceLine(circleZ(rE, 0, 120), { color: c.eq, width: 1.8 });
+            if (visible('latAngle') && visible('observer')) surfaceLine(meridian(S.H), { color: c.axis, width: 1.2 });
+
+            ctx.beginPath();
+            ctx.arc(cp[0], cp[1], rp, 0, 2 * Math.PI);
+            ctx.strokeStyle = c.muted;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        /** Alle Linien, Punkte und Beschriftungen vormerken */
+        function buildScene() {
+            const c = cssColors;
+            const { rE, s, U, E, N, m, o, rd, dec } = S;
+            const zAxis = [0, 0, 1];
+
+            // Himmelsäquator: die verlängerte Äquatorebene
+            if (visible('celEquator')) {
+                // Strichelung unter dem Horizont nur im Blick des Beobachters, von außen sähe sie wie „hinten“ aus
+                const eqStyle = { color: c.eq, width: 1.8 };
+                addLine(circleZ(1, 0), eqStyle, S.f >= 0.5 ? { color: c.eq, width: 1.3, dash: [5, 4], alpha: 0.6 } : eqStyle);
+                addLabel([Math.cos(-2.2), Math.sin(-2.2), 0], 'Himmelsäquator', c.eq, { size: 12, dy: 14 });
+            }
+
+            // Tagkreis der Sonne
+            if (visible('dayCircle')) {
+                addLine(circleZ(Math.cos(dec), Math.sin(dec)), { color: c.sun, width: 2.8 },
+                        { color: c.night, width: 1.5, dash: [5, 4], alpha: 0.8 });
+            }
+
+            // Erdachse bis zu den Himmelspolen
+            if (visible('earthAxis')) {
+                addLine(segment([0, 0, -1], [0, 0, 1], 160), { color: c.axis, width: 2.4, xray: true });
+                addLabel([0, 0, -(rE + 1) / 2], 'Erdachse', c.axis, { size: 12, bold: true, align: 'left', dx: 8 });
+            }
+            if (visible('poles')) {
+                addLabel([0, 0, 1], '★', c.text, { size: 16 });
+                addLabel([0, 0, 1], 'Himmelsnordpol', c.axis, { size: 12, align: 'left', dx: 12 });
+                addLabel([0, 0, 1], 'Polarstern (fast genau)', c['text-2'], { size: 11, align: 'left', dx: 12, dy: 14 });
+                addLabel([0, 0, -1], 'Himmelssüdpol', c.axis, { size: 12, align: 'left', dx: 10 });
+            }
+
+            // Beobachter mit Horizont und Zenit
+            const seen = !hiddenByEarth(D(o));
+            if (visible('observer')) {
+                const disc = [];
+                for (let i = 0; i <= 90; i++) {
+                    const a = 2 * Math.PI * i / 90;
+                    disc.push(add(o, add(scale(N, rd * Math.cos(a)), scale(E, rd * Math.sin(a)))));
+                }
+                const dd = disc.map(D);
+                if (seen || !occluder) {
+                    cmds.disc.push(() => {
+                        fillD(dd, c.ground);
+                        strokeD(dd, { color: c['ground-line'], width: 1.3 });
+                        strokeD([D(o), D(add(o, scale(N, rd)))], { color: c.north, width: 1.5 });
+                    });
+                    for (const [name, dir, color] of [['N', N, c.north], ['O', E, c.text], ['S', scale(N, -1), c.text], ['W', scale(E, -1), c.text]]) {
+                        addLabel(add(o, scale(dir, rd * 1.15)), name, color, { bold: true, size: 12 });
+                    }
+                }
+                const h = Math.max(0.025, 0.07 * rd);
+                addLine([o, add(o, scale(U, h))], { color: c.text, width: 2 });
+                addDot(add(o, scale(U, h * 1.2)), 3, c.text);
+            }
+            if (visible('zenith')) {
+                const z = toSky(o, U);
+                addLine(segment(add(o, scale(U, 0.03)), z, 60), { color: c.hz, width: 1, dash: [1, 4] });
+                addDot(z, 2.5, c.hz);
+                addLabel(z, 'Zenit', c.hz, { size: 11, dy: -11 });
+            }
+
+            // Himmelsachse durch den Beobachter, parallel zur Erdachse
+            if (visible('obsAxis')) {
+                const top = toSky(o, zAxis), bottom = toSky(o, [0, 0, -1]);
+                addLine(segment(bottom, top, 160), { color: c.axis, width: 1.6, dash: [7, 4] },
+                        { color: c.axis, width: 1.2, dash: [7, 4], alpha: 0.5 });
+                const right = project(D(o))[0] >= project(D([0, 0, 0]))[0] - 0.5;
+                addLabel(lerp(o, top, 0.85), 'Himmelsachse des Beobachters', c.axis,
+                         { size: 12, align: right ? 'left' : 'right', dx: right ? 8 : -8 });
+            }
+
+            // Breite φ: im Erdmittelpunkt und als Polhöhe über dem Horizont
+            if (visible('latAngle') && visible('observer')) {
+                const st = { color: c.axis, width: 1.6, xray: true };
+                if (rE > 0.05) {
+                    addLine(segment([0, 0, 0], scale(m, rE), 30), { color: c.axis, width: 1, xray: true });
+                    addLine(segment([0, 0, 0], o, 30), { color: c.axis, width: 1, xray: true });
+                    const a = arc([0, 0, 0], m, U, rE * 0.55);
+                    addLine(a, st);
+                    addLabel(scale(norm(add(m, U)), rE * 0.75), 'φ', c.axis, { bold: true, size: 14, xray: true });
+                }
+                const pole = state.lat >= 0 ? zAxis : [0, 0, -1];
+                const hp = sub(pole, scale(U, dot(pole, U)));
+                if (Math.hypot(...hp) > 1e-3) {
+                    const hpn = norm(hp);
+                    const r = Math.max(0.55 * rd, 0.14);
+                    addLine([o, add(o, scale(hpn, r * 1.15))], { color: c.axis, width: 1 });
+                    addLine(arc(o, hpn, pole, r), { color: c.axis, width: 1.8 });
+                    addLabel(add(o, scale(norm(add(hpn, pole)), r * 1.3)), 'φ', c.axis, { bold: true, size: 14 });
+                }
+            }
+
+            // Sonne und parallele Strahlen
+            if (visible('rays')) {
+                const style = { color: c.sun, width: 1.2, dash: [6, 4], alpha: 0.85 };
+                addLine(segment(toSky(o, s), o, 80), style);
+                if (rE > 0.01) addLine(segment(s, scale(s, rE), 80), style);
+            }
+            if (visible('sun')) {
+                const d = D(s);
+                if (!hiddenByEarth(d)) {
+                    cmds[sideOf(s)].push(() => {
+                        const p = project(d);
+                        const glow = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], 24);
+                        glow.addColorStop(0, c.sun);
+                        glow.addColorStop(1, 'rgba(0,0,0,0)');
+                        ctx.save();
+                        ctx.globalAlpha = 0.45;
+                        ctx.fillStyle = glow;
+                        ctx.fillRect(p[0] - 24, p[1] - 24, 48, 48);
+                        ctx.restore();
+                        dotAt(p, 8, c.sun);
+                    });
+                    addLabel(s, 'Sonne', c.text, { bold: true, size: 12, dy: -18 });
+                }
+            }
+
+            // Äquatorsystem: Deklination δ im Meridian der Sonne, Stundenwinkel t in der Äquatorebene
+            if (visible('decAngle')) {
+                addLine(segment([0, 0, 0], [0.8, 0, 0], 60), { color: c.eq, width: 1, dash: [4, 3] });
+                addLine(segment([0, 0, 0], scale(s, 0.8), 60), { color: c.sun, width: 1, dash: [4, 3] });
+                addLine(arc([0, 0, 0], [1, 0, 0], s, 0.72), { color: c.eq, width: 2.2 });
+                addLabel(scale(norm(add([1, 0, 0], s)), 0.8), 'δ', c.eq, { bold: true, size: 15 });
+            }
+            if (visible('hourAngle')) {
+                addLine(segment([0, 0, 0], scale(m, 0.6), 60), { color: c.eq, width: 1, dash: [4, 3] });
+                if (!visible('decAngle')) addLine(segment([0, 0, 0], [0.6, 0, 0], 60), { color: c.eq, width: 1, dash: [4, 3] });
+                const pts = [];
+                for (let i = 0; i <= 60; i++) {
+                    const a = S.H * i / 60;
+                    pts.push([0.5 * Math.cos(a), 0.5 * Math.sin(a), 0]);
+                }
+                addLine(pts, { color: c.eq, width: 2 });
+                addLabel([0.58 * Math.cos(S.H / 2), 0.58 * Math.sin(S.H / 2), 0], 't', c.eq, { bold: true, size: 15 });
+            }
+
+            // Horizontsystem: Höhe h über dem Horizont und Richtung A von Norden
+            if (visible('altitude') && visible('observer')) {
+                const hs0 = sub(s, scale(U, dot(s, U)));
+                if (Math.hypot(...hs0) > 1e-4) {
+                    const hs = norm(hs0);
+                    addLine([o, add(o, scale(hs, rd))], { color: c.hz, width: 1.2, dash: [4, 3] });
+                    addLine([o, add(o, scale(s, rd))], { color: c.sun, width: 1.6 });
+                    addLine(arc(o, hs, s, rd * 0.85), { color: c.hz, width: 2.2 });
+                    addLabel(add(o, scale(norm(add(hs, s)), rd * 0.95)), 'h', c.hz, { bold: true, size: 15 });
+                    const azr = S.az * DEG2RAD, pts = [];
+                    for (let i = 0; i <= 60; i++) {
+                        const a = azr * i / 60;
+                        pts.push(add(o, add(scale(N, 0.45 * rd * Math.cos(a)), scale(E, 0.45 * rd * Math.sin(a)))));
+                    }
+                    addLine(pts, { color: c.hz, width: 1.8 });
+                    const mid = azr / 2;
+                    addLabel(add(o, add(scale(N, 0.56 * rd * Math.cos(mid)), scale(E, 0.56 * rd * Math.sin(mid)))), 'A', c.hz,
+                             { bold: true, size: 14 });
+                }
+            }
+
+            // Mittagshöhe: Himmelsäquator 90° − φ über dem Horizont, Sonne δ darüber
+            if (visible('noonArcs') && visible('observer')) {
+                const hm0 = sub(m, scale(U, dot(m, U)));
+                if (Math.hypot(...hm0) > 1e-3) {
+                    const hm = norm(hm0);
+                    const cul = add(scale(m, Math.cos(dec)), scale(zAxis, Math.sin(dec)));
+                    addLine([o, add(o, scale(m, rd))], { color: c.eq, width: 1.4 });
+                    addLine([o, add(o, scale(cul, rd))], { color: c.sun, width: 1.6 });
+                    addLine(arc(o, hm, m, rd * 0.92), { color: c.hz, width: 2.2 });
+                    addLabel(add(o, scale(norm(add(hm, m)), rd * 1.02)), '90° − φ', c.hz, { bold: true, size: 13, align: 'left', dx: 4 });
+                    addLine(arc(o, m, cul, rd * 0.92), { color: c.eq, width: 2.6 });
+                    addLabel(add(o, scale(norm(add(m, cul)), rd * 1.02)), 'δ', c.eq, { bold: true, size: 15, align: 'left', dx: 4 });
+                    addDot(add(o, scale(cul, rd)), 4, c.sun);
+                }
+            }
+        }
+
+        function draw() {
+            if (!ctx) return;
+            readColors();
+            updateCamera();
+            const dpr = window.devicePixelRatio || 1;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+
+            S = computeScene();
+            S.split = visible('observer');
+            occluder = (visible('earth') && S.rE > 1e-4) ? { c: D([0, 0, 0]), r: S.rE } : null;
+            cmds = { above: [], below: [], disc: [], xray: [], labels: [] };
+            const c = cssColors;
+
+            // Hintergrund: Umriss der Himmelskugel und die Äquatorebene
+            if (visible('sky')) {
+                const center = D([0, 0, 0]), outline = [];
+                for (let i = 0; i <= 120; i++) {
+                    const a = 2 * Math.PI * i / 120;
+                    outline.push(add(center, add(scale(camBasis.r, Math.cos(a)), scale(camBasis.u, Math.sin(a)))));
+                }
+                strokeD(outline, { color: c['text-2'], width: 1, dash: [2, 3], alpha: 0.7 });
+            }
+            if (visible('celEquator')) fillD(circleZ(1, 0, 120).map(D), c['eq-fill']);
+
+            buildScene();
+
+            // Liegt das Auge über dem Horizont des Beobachters, verdeckt die Scheibe, was darunter liegt
+            const camAbove = !S.split || dot(sub(camBasis.eye, D(S.o)), Dd(S.U)) >= 0;
+            const run = list => list.forEach(fn => fn());
+            const earth = () => { if (occluder) drawEarth(); };
+            if (camAbove) {
+                earth(); run(cmds.xray); run(cmds.below); run(cmds.disc); run(cmds.above);
+            } else {
+                run(cmds.above); run(cmds.disc); earth(); run(cmds.xray); run(cmds.below);
+            }
+            run(cmds.labels);
+
+            updateInfo(S);
+            renderTour(S);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Anzeige                                //
+    /////////////////////////////////////////////////////////////////
+
+        function formatNumber(x, digits) {
+            return x.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        }
+
+        function formatDeg(x, digits = 1) {
+            return formatNumber(x, digits) + '°';
+        }
+
+        /** Zwei geltende Ziffern, z. B. 99 300 → 99.000 */
+        function twoDigits(x) {
+            return formatNumber(Number(x.toPrecision(2)), 0);
+        }
+
+        function clock(hours) {
+            const m = Math.round(hours * 60);
+            const hh = Math.floor(m / 60) % 24, mm = ((m % 60) + 60) % 60;
+            return `${hh}:${String(mm).padStart(2, '0')}`;
+        }
+
+        function compassName(az) {
+            return COMPASS[Math.round(normalizeDegrees(az) / 22.5) % 16];
+        }
+
+        /** Name der Zeitzone (z. B. MEZ, MESZ), sonst UTC±h */
+        function zoneName(offset) {
+            try {
+                const d = dateOfDay(state.year, state.day, 720);
+                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short' })
+                    .formatToParts(d).find(p => p.type === 'timeZoneName');
+                if (part) return part.value;
+            } catch (e) { /* ältere Browser */ }
+            return 'UTC' + (offset >= 0 ? '+' : '−') + Math.abs(offset);
+        }
+
+        /** Abstand der beiden Achsen und wie groß er von der Sonne und vom Polarstern aus erscheint */
+        function axisOffset() {
+            const km = EARTH_RADIUS_KM * Math.cos(state.lat * DEG2RAD);
+            const fromSunArcsec = km / AU_KM * RAD2DEG * 3600;
+            const fromPolaris = km / POLARIS_KM;               // [rad]
+            const hairKm = 1e-7 / Math.max(fromPolaris, 1e-30); // Haar von 0,1 mm, gleich groß erscheinend
+            return { km, fromSunArcsec, fromPolaris, hairKm };
+        }
+
+        /** Mittagshöhe aus Breite und Deklination [°] */
+        function noonAltitude(dec) {
+            const h = 90 - Math.abs(state.lat) + (state.lat >= 0 ? 1 : -1) * dec * RAD2DEG;
+            return h > 90 ? 180 - h : h;
+        }
+
+        function updateInfo(sc) {
+            const d = dateOfDay(state.year, state.day);
+            const tz = zoneName(sc.offset);
+            const rows = [];
+            const row = (k, v, note = '') => rows.push(`<tr><td>${k}</td><td>${v}${note ? ` <span class="note">${note}</span>` : ''}</td></tr>`);
+            const head = (k, note) => rows.push(`<tr class="head"><td colspan="2">${k} <span class="note">${note}</span></td></tr>`);
+            row('Zeitpunkt', d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+                + `, ${clock(state.minutes / 60)} ${tz}`);
+
+            head('Äquatorsystem', '– an der Erdachse festgemacht');
+            row('Deklination δ', formatDeg(sc.dec * RAD2DEG), 'Abstand der Sonne vom Himmelsäquator, für alle Orte gleich');
+            const tDeg = sc.H * RAD2DEG;
+            row('Stundenwinkel t', `${formatDeg(tDeg)} = ${formatNumber(tDeg / 15, 2)} h`,
+                tDeg < 0 ? 'so lange noch bis zum Mittag' : 'so lange ist der Mittag her');
+
+            head('Horizontsystem', '– am Horizont des Beobachters, nur für diesen Ort');
+            const alt = sc.alt * RAD2DEG;
+            row('Höhe h', formatDeg(alt), alt < 0 ? 'unter dem Horizont' : 'über dem Horizont, ohne Lichtbrechung');
+            row('Richtung A', `${formatDeg(sc.az, 0)} (${compassName(sc.az)})`, 'von Norden über Osten gezählt');
+
+            head('Verbindung', '');
+            const pole = state.lat >= 0 ? 'Himmelsnordpol' : 'Himmelssüdpol';
+            row('Polhöhe', `${formatDeg(Math.abs(state.lat))} = Breite φ`, `so hoch steht der ${pole} über dem Horizont`);
+            row('Mittagshöhe', `${state.lat >= 0 ? '90° − φ + δ' : '90° − |φ| − δ'} = ${formatDeg(noonAltitude(sc.dec))}`,
+                sc.rs.hasTransit ? `um ${clock(sc.rs.transit)} ${tz}` : '');
+            const ao = axisOffset();
+            row('Abstand Erdachse – Himmelsachse', `${twoDigits(ao.km)} km`,
+                `von der Sonne aus ${formatNumber(ao.fromSunArcsec, 1)}″, vom Polarstern aus wie ein Haar aus ${twoDigits(ao.hairKm)} km Entfernung`);
+            document.getElementById('info').innerHTML = `<table>${rows.join('')}</table>`;
+
+            document.getElementById('dayValue').textContent = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+            document.getElementById('timeValue').textContent = `${clock(state.minutes / 60)} ${tz}`;
+            document.getElementById('earthValue').textContent = state.earth < 0.005 ? 'Punkt' : `${formatNumber(state.earth * 100, 0)} %`;
+            document.getElementById('frameSpace').classList.toggle('active', state.frame < 0.5);
+            document.getElementById('frameObserver').classList.toggle('active', state.frame >= 0.5);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Geführte Tour                          //
+    /////////////////////////////////////////////////////////////////
+
+        /** Werte für die Tourtexte */
+        function tourValues(sc) {
+            const north = state.lat >= 0;
+            const ao = axisOffset();
+            const decDeg = sc.dec * RAD2DEG;
+            return {
+                date: dateOfDay(state.year, state.day).toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+                lat: formatNumber(Math.abs(state.lat), 0),
+                latSide: north ? 'N' : 'S',
+                poleSide: north ? 'Nord' : 'Süd',
+                dec: formatNumber(decDeg, 1),
+                decAbove: decDeg * (north ? 1 : -1) >= 0,
+                sunHalf: decDeg >= 0 ? 'Nordhalbkugel' : 'Südhalbkugel',
+                alt: formatNumber(sc.alt * RAD2DEG, 0),
+                az: formatNumber(sc.az, 0),
+                noon: formatNumber(noonAltitude(sc.dec), 0),
+                eqAlt: formatNumber(90 - Math.abs(state.lat), 0),
+                noonDir: north ? 'Süden' : 'Norden',
+                noonSide: north ? 'Süd' : 'Nord',
+                formula: north ? '90° − φ + δ' : '90° − |φ| − δ',
+                offsetKm: twoDigits(ao.km),
+                fromSun: formatNumber(ao.fromSunArcsec, 1),
+                hairKm: twoDigits(ao.hairKm),
+            };
+        }
+
+        const ALL_SPACE = ['earth', 'grid', 'earthAxis', 'sky', 'celEquator', 'poles', 'observer', 'zenith', 'obsAxis'];
+
+        // Schritte: layers = sichtbare Ebenen (null = wie eingestellt), frame/earth/view = Bezugssystem, Größe der Erde
+        // und Ansicht, event = Tagundnachtgleiche/Sonnenwende, minutes = Uhrzeit, noon = Uhrzeit des Mittags,
+        // playDay/playYear = Abspielen; text bekommt die aktuellen Werte
+        const TOUR = [
+            {
+                title: 'Die Erde von außen',
+                layers: ['earth', 'grid', 'earthAxis', 'sun'],
+                frame: 0, earth: 0.85, view: 'oblique', event: EquinoxType.Summer, playDay: true,
+                text: v => `<p>Das Modell zeigt die Erde von außen. Sie dreht sich in 24 Stunden einmal um ihre
+                    <b>Erdachse</b> (lila), die durch Nord- und Südpol geht.</p>
+                    <p>Die Sonne steht in diesem Modell immer rechts, die helle Hälfte der Erde hat gerade Tag. Am
+                    ${v.date} ist die ${v.sunHalf} der Sonne zugeneigt.</p>`,
+            },
+            {
+                title: 'Die Himmelskugel',
+                layers: ['earth', 'grid', 'earthAxis', 'sun', 'sky', 'celEquator', 'poles'],
+                frame: 0, earth: 0.85, view: 'oblique', playDay: true,
+                text: v => `<p>Die Sterne sind so weit weg, dass sie alle gleich weit entfernt scheinen – wie auf einer
+                    riesigen Kugel um die Erde, der <b>Himmelskugel</b> (gepunkteter Umriss).</p>
+                    <p>Verlängert man die Erdachse bis zur Himmelskugel, trifft sie den <b>Himmelsnordpol</b> und den
+                    <b>Himmelssüdpol</b>; dicht am Nordpol steht der Polarstern. Verlängert man die Ebene des
+                    Erdäquators, schneidet sie die Kugel im <b>Himmelsäquator</b> (blau). Pole und Äquator des Himmels
+                    sind also Pole und Äquator der Erde, an den Himmel verlängert.</p>`,
+            },
+            {
+                title: 'Ein Beobachter',
+                layers: ['earth', 'grid', 'earthAxis', 'sun', 'sky', 'celEquator', 'poles', 'observer', 'zenith'],
+                frame: 0, earth: 0.85, view: 'oblique', minutes: 10 * 60,
+                text: v => `<p>Bei ${v.lat}° ${v.latSide} steht ein Beobachter. Für ihn ist die Erde flach: Er sieht
+                    seinen <b>Horizont</b> (grüne Scheibe), der die Erdkugel nur an seinem Standort berührt. Senkrecht
+                    über ihm liegt der <b>Zenit</b>, in Verlängerung des Erdradius.</p>
+                    <p>Weil die Erde rund ist, liegt der Horizont an jedem Ort anders im Raum, und er dreht sich mit
+                    der Erde. Höhe und Himmelsrichtung, die der Beobachter misst (<b>Horizontsystem</b>), gelten
+                    deshalb nur für seinen Ort und nur für diesen Augenblick.</p>`,
+            },
+            {
+                title: 'Seine Himmelsachse',
+                layers: [...ALL_SPACE, 'sun', 'latAngle'],
+                frame: 0, earth: 0.85, view: 'oblique',
+                text: v => `<p>Durch den Beobachter läuft seine <b>Himmelsachse</b> (lila gestrichelt), um die er den
+                    Himmel kreisen sieht. Sie ist <b>parallel zur Erdachse</b>: Beide zeigen in dieselbe Richtung, zum
+                    Himmels${v.poleSide.toLowerCase()}pol.</p>
+                    <p>Gegen seinen Horizont ist die Himmelsachse um ${v.lat}° geneigt, genau um die geografische
+                    Breite φ. Der zweite Winkel φ im Erdmittelpunkt zeigt, warum: Der Horizont steht senkrecht auf dem
+                    Erdradius, die Achse senkrecht auf dem Äquator – beide sind um 90° gedreht, der Winkel bleibt
+                    gleich. Darum steht der Himmels${v.poleSide.toLowerCase()}pol ${v.lat}° über dem
+                    ${v.poleSide}horizont.</p>`,
+            },
+            {
+                title: 'Parallel, aber nicht dieselbe Linie',
+                layers: [...ALL_SPACE, 'sun', 'latAngle'],
+                frame: 0, earth: 0.06, view: 'oblique', duration: 2500,
+                text: v => `<p>Ganz genau sind Erdachse und Himmelsachse nicht dieselbe Linie: Sie laufen parallel
+                    nebeneinander, bei ${v.lat}° Breite im Abstand von ${v.offsetKm} km.</p>
+                    <p>Im Modell ist die Himmelskugel aber viel zu klein. Jetzt schrumpft die Erde: Je kleiner sie
+                    gegenüber der Himmelskugel ist, desto enger rücken die beiden Achsen zusammen. Schon von der Sonne
+                    aus wäre der Abstand nur ${v.fromSun}″ (Bogensekunden) groß, vom Polarstern aus so groß wie ein
+                    Haar aus ${v.hairKm} km Entfernung. Am Himmel zeigen beide Achsen deshalb auf denselben Punkt.</p>`,
+            },
+            {
+                title: 'Die Sonne im Äquatorsystem',
+                layers: [...ALL_SPACE, 'sun', 'rays', 'decAngle', 'hourAngle', 'dayCircle'],
+                frame: 0, earth: 0.55, view: 'oblique', minutes: 7 * 60, playDay: true,
+                text: v => `<p>Die Sonne ist so weit weg, dass ihre Strahlen parallel ankommen (gestrichelt). Wie weit
+                    sie über oder unter dem Himmelsäquator steht, ist ihre <b>Deklination</b> δ, am ${v.date}
+                    ${v.dec}°.</p>
+                    <p>Während sich die Erde dreht, bleibt δ gleich: Die Sonne läuft am Himmel auf einem Kreis parallel
+                    zum Himmelsäquator, ihrem <b>Tagkreis</b> (orange). Der <b>Stundenwinkel</b> t sagt, wie weit sich die
+                    Erde seit dem Mittag weitergedreht hat, 15° pro Stunde. δ und t bilden das <b>Äquatorsystem</b>: Es
+                    hängt an der Erdachse statt am Horizont.</p>`,
+            },
+            {
+                title: 'Höhe und Richtung',
+                layers: [...ALL_SPACE, 'sun', 'rays', 'decAngle', 'dayCircle', 'altitude'],
+                frame: 0, earth: 0.55, view: 'oblique', minutes: 9 * 60, playDay: true,
+                text: v => `<p>Der Beobachter misst die Sonne dagegen an seinem Horizont (grün): <b>Höhe</b> h über dem
+                    Horizont und <b>Richtung</b> A, von Norden über Osten gezählt. Gerade sind es h = ${v.alt}° und
+                    A = ${v.az}°.</p>
+                    <p>Diese Werte ändern sich ständig, weil sich der Horizont mit der Erde dreht: Morgens kippt er der
+                    Sonne entgegen, abends von ihr weg. δ bleibt dabei gleich. Der Teil des Tagkreises über dem
+                    Horizont (durchgezogen) ist der Tagbogen.</p>`,
+            },
+            {
+                title: 'Blickwechsel: der Himmel dreht sich',
+                layers: ['earth', 'sky', 'celEquator', 'poles', 'observer', 'zenith', 'obsAxis', 'sun', 'dayCircle', 'altitude'],
+                frame: 1, earth: 0.06, view: 'oblique', playDay: true, duration: 2500,
+                text: v => `<p>Jetzt fährt die Kamera zum Beobachter und dreht sich mit ihm. Sein Horizont liegt still,
+                    dafür dreht sich der ganze Himmel um die Himmelsachse – mit Himmelsäquator, Tagkreis und Sonne.
+                    Die Erde ist zu einem Punkt unter dem Horizont geschrumpft.</p>
+                    <p>Das ist das Bild aus <code>Tagbogen3D.html</code>. Beide Ansichten zeigen dasselbe: Ob sich die
+                    Erde dreht oder der Himmel, ist eine Frage des Blickwinkels. Die Himmelsachse ist dieselbe wie
+                    vorher, nur vom Horizont aus gesehen: um ${v.lat}° gegen ihn geneigt.</p>`,
+            },
+            {
+                title: 'Die Mittagshöhe',
+                layers: ['earth', 'sky', 'celEquator', 'poles', 'observer', 'zenith', 'obsAxis', 'sun', 'dayCircle', 'noonArcs'],
+                frame: 1, earth: 0.06, view: 'side', noon: true,
+                text: v => `<p>Mittags steht die Sonne genau im ${v.noonDir}. Von der Seite gesehen setzt sich ihre
+                    Höhe aus zwei Winkeln zusammen: Der Himmelsäquator steht ${v.eqAlt}° über dem
+                    ${v.noonSide}horizont (90° − φ, weil die Achse um φ geneigt ist), die Sonne steht δ = ${v.dec}°
+                    ${v.decAbove ? 'darüber' : 'darunter'}.</p>
+                    <p>Mittagshöhe = ${v.formula} = ${v.noon}°. Die Formel verbindet beide Systeme: φ kommt vom Ort,
+                    δ von der Sonne, und heraus kommt eine Höhe im Horizontsystem.</p>`,
+            },
+            {
+                title: 'Durch das Jahr',
+                layers: [...ALL_SPACE, 'sun', 'rays', 'decAngle', 'dayCircle'],
+                frame: 0, earth: 0.55, view: 'side', playYear: true,
+                text: v => `<p>Im Lauf des Jahres ändert sich nur die Deklination: Die Sonne steht im Juni bis zu
+                    23,44° über der Äquatorebene, im Dezember bis zu 23,44° darunter. Der Tagkreis wandert mit ihr auf
+                    und ab, die Achsen behalten ihre Richtung. Am ${v.date}: δ = ${v.dec}°.</p>
+                    <p>In Wirklichkeit wandert nicht die Sonne auf und ab, sondern die Erde läuft mit gleich bleibend
+                    geneigter Achse um die Sonne (<code>Erdposition.html</code>). Für den Winkel zwischen Sonne und
+                    Äquatorebene kommt es auf dasselbe heraus.</p>`,
+            },
+            {
+                title: 'Selbst ausprobieren',
+                layers: null,
+                frame: 0, earth: 0.85, view: 'oblique',
+                text: v => `<p>Jetzt sind alle Teile zu sehen. Unter dem Bild lässt sich zwischen den beiden
+                    Blickwinkeln umschalten und die Größe der Erde einstellen; Ziehen dreht die Ansicht, das Mausrad
+                    zoomt.</p>
+                    <p>Unter „Ort“ lässt sich die Breite ändern: Am Äquator liegt die Himmelsachse waagerecht im
+                    Horizont, am Pol steht sie senkrecht und zeigt zum Zenit.</p>`,
+            },
+        ];
+
+        let tour = null;            // { index } während der Tour
+        let tourHtml = '';
+
+        function startTour() {
+            tour = { index: 0 };
+            document.getElementById('tour').hidden = false;
+            document.getElementById('tourStart').hidden = true;
+            for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
+            applyTourStep();
+            document.getElementById('tour').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function endTour() {
+            tour = null;
+            tourHtml = '';
+            document.getElementById('tour').hidden = true;
+            document.getElementById('tourStart').hidden = false;
+            for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = false;
+            setPlay('year', false);
+            setPlay('day', false);
+            requestDraw();
+        }
+
+        function tourStep(delta) {
+            const next = tour.index + delta;
+            if (next >= TOUR.length) { endTour(); return; }
+            tour.index = Math.max(0, next);
+            applyTourStep();
+        }
+
+        /** Zeit, Abspielen, Bezugssystem und Ansicht des Schritts einstellen */
+        function applyTourStep() {
+            const step = TOUR[tour.index];
+            setPlay('year', !!step.playYear);
+            setPlay('day', !!step.playDay);
+            if (step.event !== undefined) jumpToEvent(step.event);
+            if (step.minutes !== undefined) setMinutes(step.minutes);
+            if (step.noon) {
+                const { rs } = riseSetOfDay();
+                if (rs.hasTransit) setMinutes(rs.transit * 60);
+            }
+            state.viewName = step.view || state.viewName;
+            const frame = step.frame ?? state.frame;
+            animateTo({ frame, earth: step.earth, cam: VIEWS[frame >= 0.5 ? 'observer' : 'space'][state.viewName],
+                        duration: step.duration });
+            document.getElementById('tourTitle').textContent = step.title;
+            document.getElementById('tourCount').textContent = `Schritt ${tour.index + 1} von ${TOUR.length}`;
+            document.getElementById('tourBack').disabled = tour.index === 0;
+            document.getElementById('tourNext').textContent = tour.index === TOUR.length - 1 ? 'Fertig' : 'Weiter →';
+            requestDraw();
+        }
+
+        /** Text des Schritts mit den aktuellen Werten; nur neu schreiben, wenn er sich ändert */
+        function renderTour(sc) {
+            if (!tour) return;
+            const html = TOUR[tour.index].text(tourValues(sc));
+            if (html !== tourHtml) {
+                tourHtml = html;
+                document.getElementById('tourText').innerHTML = html;
+            }
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Bedienung                              //
+    /////////////////////////////////////////////////////////////////
+
+        let frameRequested = false;
+        function requestDraw() {
+            if (frameRequested) return;
+            frameRequested = true;
+            requestAnimationFrame(() => { frameRequested = false; draw(); });
+        }
+
+        function resize() {
+            const dpr = window.devicePixelRatio || 1;
+            width = canvas.clientWidth;
+            height = Math.round(Math.min(Math.max(width * 0.62, 340), 640));
+            canvas.style.height = height + 'px';
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            draw();
+        }
+
+        /** Breite/Länge: Dezimalgrad oder 48°51'22"N (dmsToDecimal aus ui.js) */
+        function parseCoordinate(text) {
+            const s = text.trim().replace(',', '.');
+            if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+            try { return dmsToDecimal(s); } catch (e) { return NaN; }
+        }
+
+        function readLocationInputs() {
+            const latInput = document.getElementById('lat'), lonInput = document.getElementById('lon');
+            const lat = parseCoordinate(latInput.value), lon = parseCoordinate(lonInput.value);
+            const latOk = Number.isFinite(lat) && Math.abs(lat) <= 90;
+            const lonOk = Number.isFinite(lon) && Math.abs(lon) <= 180;
+            latInput.classList.toggle('invalid', !latOk);
+            lonInput.classList.toggle('invalid', !lonOk);
+            if (latOk) { state.lat = lat; document.getElementById('latSlider').value = lat; }
+            if (lonOk) state.lon = lon;
+            requestDraw();
+        }
+
+        function setYear(year) {
+            state.year = year;
+            const slider = document.getElementById('daySlider');
+            slider.max = daysInYear(year) - 1;
+            state.day = Math.min(state.day, daysInYear(year) - 1);
+            slider.value = Math.floor(state.day);
+            document.getElementById('year').value = year;
+            requestDraw();
+        }
+
+        function setDay(day) {
+            state.day = day;
+            document.getElementById('daySlider').value = Math.floor(day);
+            requestDraw();
+        }
+
+        function setMinutes(minutes) {
+            state.minutes = ((minutes % 1440) + 1440) % 1440;
+            document.getElementById('timeSlider').value = Math.round(state.minutes);
+            requestDraw();
+        }
+
+        function setEarth(value) {
+            state.earth = Math.max(0, Math.min(1, value));
+            document.getElementById('earthSlider').value = Math.round(state.earth * 100);
+            requestDraw();
+        }
+
+        /** Sprung zu Tagundnachtgleiche/Sonnenwende (EquinoxType 0..3) im eingestellten Jahr */
+        function jumpToEvent(type) {
+            const d = julianDayToDate(calculateEquinoxSolstice(state.year, type));
+            const start = new Date(state.year, 0, 1);
+            const local = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            setDay(Math.round((local - start) / 86400000));
+        }
+
+        function showNow() {
+            const now = new Date();
+            setYear(now.getFullYear());
+            setDay(Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(now.getFullYear(), 0, 1)) / 86400000));
+            setMinutes(now.getHours() * 60 + now.getMinutes());
+        }
+
+        function setView(name) {
+            state.viewName = name;
+            animateTo({ cam: VIEWS[state.frame >= 0.5 ? 'observer' : 'space'][name] });
+        }
+
+        /** Bezugssystem wechseln: 0 = von außen, 1 = Beobachter; die Ansicht bleibt dieselbe Art */
+        function setFrame(frame) {
+            animateTo({ frame, cam: VIEWS[frame >= 0.5 ? 'observer' : 'space'][state.viewName], duration: 1800 });
+        }
+
+        // Kamera, Bezugssystem und Größe der Erde weich zum Ziel bewegen
+        let tween = null;
+        function animateTo({ cam, earth, frame, duration }) {
+            const from = { cam: { ...state.cam }, earth: state.earth, frame: state.frame };
+            const to = { cam: cam || from.cam, earth: earth ?? from.earth, frame: frame ?? from.frame };
+            const dAz = ((to.cam.az - from.cam.az) % 360 + 540) % 360 - 180;    // kürzester Weg
+            tween = { from, to, dAz, start: performance.now(), duration: duration || 900 };
+            startLoop();
+        }
+
+        function applyTween(t) {
+            const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            const { from, to, dAz } = tween;
+            state.cam.az = normalizeDegrees(from.cam.az + dAz * e);
+            state.cam.el = from.cam.el + (to.cam.el - from.cam.el) * e;
+            state.cam.dist = from.cam.dist + (to.cam.dist - from.cam.dist) * e;
+            state.frame = from.frame + (to.frame - from.frame) * e;
+            setEarth(from.earth + (to.earth - from.earth) * e);
+            if (t >= 1) tween = null;
+        }
+
+        // Abspielen (Jahr oder Tag) und Überblendungen in einer gemeinsamen Schleife
+        let loopRunning = false, lastTime = 0;
+        function startLoop() {
+            if (loopRunning) return;
+            loopRunning = true;
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function loop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+            const n = daysInYear(state.year);
+            if (state.playYear) {
+                state.day = (state.day + 30 * dt) % n;                 // 30 Tage pro Sekunde
+                document.getElementById('daySlider').value = Math.floor(state.day);
+            }
+            if (state.playDay) {
+                setMinutes(state.minutes + 120 * dt);                  // 2 Stunden pro Sekunde
+            }
+            if (tween) applyTween(Math.min((now - tween.start) / tween.duration, 1));
+            draw();
+            if (state.playYear || state.playDay || tween) {
+                requestAnimationFrame(loop);
+            } else {
+                loopRunning = false;
+            }
+        }
+
+        function setPlay(which, on) {
+            const key = which === 'year' ? 'playYear' : 'playDay';
+            state[key] = on;
+            if (!on && which === 'year') state.day = Math.floor(state.day);
+            document.getElementById('playYear').textContent = state.playYear ? '❚❚ Jahr' : '▶ Jahr';
+            document.getElementById('playDay').textContent = state.playDay ? '❚❚ Tag' : '▶ Tag';
+            if (state.playYear || state.playDay) startLoop(); else requestDraw();
+        }
+
+        function togglePlay(which) {
+            setPlay(which, !(which === 'year' ? state.playYear : state.playDay));
+        }
+
+        function setupCameraInteraction() {
+            let drag = null;
+            canvas.addEventListener('pointerdown', ev => {
+                drag = { x: ev.clientX, y: ev.clientY };
+                if (tween) applyTween(1);          // laufende Überblendung sofort beenden
+                canvas.setPointerCapture(ev.pointerId);
+                canvas.classList.add('dragging');
+            });
+            canvas.addEventListener('pointermove', ev => {
+                if (!drag) return;
+                state.cam.az = normalizeDegrees(state.cam.az - (ev.clientX - drag.x) * 0.4);
+                state.cam.el = Math.max(-60, Math.min(89, state.cam.el + (ev.clientY - drag.y) * 0.3));
+                drag = { x: ev.clientX, y: ev.clientY };
+                requestDraw();
+            });
+            const end = () => { drag = null; canvas.classList.remove('dragging'); };
+            canvas.addEventListener('pointerup', end);
+            canvas.addEventListener('pointercancel', end);
+            canvas.addEventListener('wheel', ev => {
+                ev.preventDefault();
+                state.cam.dist = Math.max(1.2, Math.min(8, state.cam.dist * Math.exp(ev.deltaY * 0.001)));
+                requestDraw();
+            }, { passive: false });
+        }
+
+        function saveLocation() {
+            localStorage.setItem('latitude', document.getElementById('lat').value.trim());
+            localStorage.setItem('longitude', document.getElementById('lon').value.trim());
+            document.getElementById('locationFeedback').textContent = 'Ort gespeichert';
+        }
+
+        window.onload = function () {
+            canvas = document.getElementById('view');
+            ctx = canvas.getContext('2d');
+
+            // Ort wie auf den anderen Seiten aus localStorage, sonst Mitte Deutschlands
+            let storedLat = null, storedLon = null;
+            try { storedLat = localStorage.getItem('latitude'); storedLon = localStorage.getItem('longitude'); } catch (e) { /* gesperrt */ }
+            document.getElementById('lat').value = storedLat || '50';
+            document.getElementById('lon').value = storedLon || '10';
+            readLocationInputs();
+            document.getElementById('lat').addEventListener('input', readLocationInputs);
+            document.getElementById('lon').addEventListener('input', readLocationInputs);
+            document.getElementById('latSlider').addEventListener('input', ev => {
+                document.getElementById('lat').value = Number(ev.target.value).toFixed(1);
+                readLocationInputs();
+            });
+
+            document.getElementById('year').addEventListener('input', ev => {
+                const y = parseInt(ev.target.value, 10);
+                if (Number.isFinite(y) && y >= 1000 && y <= 3000) setYear(y);
+            });
+            document.getElementById('daySlider').addEventListener('input', ev => setDay(Number(ev.target.value)));
+            document.getElementById('timeSlider').addEventListener('input', ev => setMinutes(Number(ev.target.value)));
+            document.getElementById('earthSlider').addEventListener('input', ev => {
+                tween = null;
+                setEarth(Number(ev.target.value) / 100);
+            });
+            for (const key of Object.keys(state.show)) {
+                const box = document.getElementById('show-' + key);
+                box.checked = state.show[key];
+                box.addEventListener('change', () => { state.show[key] = box.checked; requestDraw(); });
+            }
+
+            setupCameraInteraction();
+            setEarth(state.earth);
+            showNow();
+            new ResizeObserver(resize).observe(canvas);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
+        };
+    </script>
+</head>
+<body>
+    <h1>Erdachse und Himmelsachse</h1>
+    <p>Von der Erde aus sehen wir den Himmel um eine schräge Achse kreisen, die Himmelsachse. Im Weltraum dreht sich
+    die Erde um ihre Erdachse. Wie hängen beide zusammen – und wie kommt man von Höhe und Himmelsrichtung, die ein
+    Beobachter misst (Horizontsystem), zur Deklination, die für die ganze Erde gilt (Äquatorsystem)?</p>
+    <p class="start-tour" id="tourStart"><button onclick="startTour()">▶ Schritt für Schritt erklären</button>
+    <span class="feedback">Blendet die Teile des Modells nach und nach ein.</span></p>
+    <p>Die Kugel in der Mitte ist die Erde, der gepunktete Umriss die Himmelskugel. Auf der Erde steht ein Beobachter
+    mit seinem Horizont (grüne Scheibe). Unter dem Bild lässt sich umschalten zwischen dem Blick von außen, bei dem
+    sich die Erde dreht, und dem Blick des Beobachters, bei dem sich der Himmel dreht. Zum Nachlesen: Abschnitt 2 in
+    <code>Erklaerung-Sonnenbahn.md</code>.</p>
+
+    <div class="controls">
+        <div class="wide">
+            <label for="daySlider">Tag</label>
+            <input type="range" id="daySlider" min="0" max="364" step="1">
+            <span class="value" id="dayValue"></span>
+        </div>
+        <div class="group">
+            <button id="playYear" onclick="togglePlay('year')">▶ Jahr</button>
+            <button onclick="jumpToEvent(EquinoxType.Spring)" title="Frühlingsanfang">März</button>
+            <button onclick="jumpToEvent(EquinoxType.Summer)" title="Sommersonnenwende">Juni</button>
+            <button onclick="jumpToEvent(EquinoxType.Autumn)" title="Herbstanfang">September</button>
+            <button onclick="jumpToEvent(EquinoxType.Winter)" title="Wintersonnenwende">Dezember</button>
+        </div>
+    </div>
+    <div class="controls">
+        <div class="wide">
+            <label for="timeSlider">Uhrzeit</label>
+            <input type="range" id="timeSlider" min="0" max="1435" step="5">
+            <span class="value" id="timeValue"></span>
+        </div>
+        <div class="group">
+            <button id="playDay" onclick="togglePlay('day')">▶ Tag</button>
+            <button onclick="showNow()">Jetzt</button>
+        </div>
+    </div>
+
+    <div class="tour" id="tour" hidden>
+        <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
+        <div id="tourText"></div>
+        <div class="tour-nav">
+            <button id="tourBack" onclick="tourStep(-1)">← Zurück</button>
+            <button id="tourNext" onclick="tourStep(1)">Weiter →</button>
+            <button class="end" onclick="endTour()">Tour beenden</button>
+        </div>
+    </div>
+
+    <canvas id="view"></canvas>
+    <div class="legend">
+        <span style="--c: var(--axis)">Erdachse</span>
+        <span class="dashed" style="--c: var(--axis)">Himmelsachse des Beobachters</span>
+        <span style="--c: var(--eq)">Äquator, Himmelsäquator, δ und t (Äquatorsystem)</span>
+        <span class="area" style="--c: var(--ground)">Horizont</span>
+        <span style="--c: var(--hz)">Zenit, h und A (Horizontsystem)</span>
+        <span style="--c: var(--sun)">Tagkreis der Sonne</span>
+        <span class="dashed" style="--c: var(--sun)">Sonnenstrahlen</span>
+    </div>
+
+    <div class="controls">
+        <span>Blick:</span>
+        <div class="group">
+            <button id="frameSpace" onclick="setFrame(0)">Von außen (Erde dreht sich)</button>
+            <button id="frameObserver" onclick="setFrame(1)">Vom Beobachter (Himmel dreht sich)</button>
+        </div>
+        <span>Ansicht:</span>
+        <div class="group">
+            <button onclick="setView('oblique')">Schräg</button>
+            <button onclick="setView('side')">Von der Seite</button>
+            <button onclick="setView('top')">Von oben</button>
+        </div>
+    </div>
+    <div class="controls">
+        <div class="wide">
+            <label for="earthSlider">Größe der Erde</label>
+            <input type="range" id="earthSlider" min="0" max="100" step="1">
+            <span class="value" id="earthValue"></span>
+        </div>
+        <label><input type="checkbox" id="show-sky"> Himmelskugel und Tagkreis</label>
+        <label><input type="checkbox" id="show-angles"> Winkel φ, δ, h, A</label>
+        <label><input type="checkbox" id="show-hourAngle"> Stundenwinkel t</label>
+        <label><input type="checkbox" id="show-noon"> Mittagshöhe</label>
+        <label><input type="checkbox" id="show-grid"> Gradnetz</label>
+    </div>
+
+    <div id="info"></div>
+
+    <h2>Ort</h2>
+    <div class="controls">
+        <label>Breite <input type="text" id="lat"></label>
+        <input type="range" id="latSlider" min="-90" max="90" step="0.5" aria-label="Breite">
+        <label>Länge (Ost +) <input type="text" id="lon"></label>
+        <label>Jahr <input type="number" id="year" min="1000" max="3000" step="1"></label>
+        <button onclick="saveLocation()">Ort merken</button>
+        <span class="feedback" id="locationFeedback"></span>
+    </div>
+    <p class="hint">Mit dem Breiten-Regler den Beobachter nach Norden oder Süden schieben: Die Himmelsachse bleibt
+    parallel zur Erdachse, nur der Horizont kippt. Am Äquator liegt die Achse im Horizont, am Pol steht sie senkrecht.</p>
+
+    <h2>Wie lese ich das?</h2>
+    <ul class="hint">
+        <li><b>Von außen:</b> Die Sonne steht fest rechts, die Erde dreht sich darunter; der Beobachter wird mitgenommen.
+        <b>Vom Beobachter:</b> Sein Horizont liegt fest, dafür dreht sich der Himmel. Beide Bilder zeigen dasselbe.</li>
+        <li><b>Erdachse und Himmelsachse</b> sind parallel, aber um bis zu einen Erdradius gegeneinander verschoben. Mit
+        dem Regler „Größe der Erde“ sieht man, wie der Abstand gegenüber der Himmelskugel verschwindet. In Wirklichkeit ist
+        die Himmelskugel unendlich groß: Beide Achsen zeigen auf denselben Himmelspol.</li>
+        <li><b>Blau</b> ist alles, was an der Erdachse hängt (Äquatorsystem): Himmelsäquator, Deklination δ und
+        Stundenwinkel t. <b>Grün</b> ist alles, was am Horizont des Beobachters hängt (Horizontsystem): Zenit, Höhe h
+        und Richtung A.</li>
+        <li>Die <b>Winkel φ</b> (lila) zeigen die Polhöhe: Die Himmelsachse steht so steil über dem Horizont, wie die
+        geografische Breite angibt. Derselbe Winkel liegt im Erdmittelpunkt zwischen Äquator und Standort.</li>
+        <li>Der <b>Tagkreis</b> ist durchgezogen, soweit er über dem Horizont des Beobachters liegt (Tagbogen), darunter
+        gestrichelt. Bei großer Erde liegt der Horizont merklich über dem Erdmittelpunkt; deshalb stimmen Auf- und
+        Untergang im Bild nur bei kleiner Erde.</li>
+        <li>Das Modell zeigt die Sonne fest und lässt nur ihre Deklination im Jahreslauf auf und ab wandern. In
+        Wirklichkeit läuft die Erde um die Sonne (<code>Erdposition.html</code>); für die Winkel kommt es auf dasselbe
+        heraus. Lichtbrechung ist nicht berücksichtigt.</li>
+    </ul>
+</body>
+</html>
