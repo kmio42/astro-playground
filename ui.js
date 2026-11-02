@@ -1,7 +1,6 @@
         // Gemeinsame Variablen
         var datetime = new Date();
         var intervalId;
-        var addTimeOffset;
         var latitude = 0;  // Breitengrad Ort [°]
         var longitude = 0; // Längengrad Ort [°], Ost positiv
         var useLocalTime = false;
@@ -289,18 +288,27 @@
             update();
         }
 
-        function changeTimeRepeat() {
-            changeTime(addTimeOffset);
+        function stopTimeRepeat() {
+            clearInterval(intervalId);
+            intervalId = undefined;
         }
 
+        /**
+         * Zeitknopf: ein Klick (auch per Tastatur) verschiebt einmal, gedrückt halten wiederholt alle 200 ms.
+         * Pointer-Events gelten für Maus, Finger und Stift; Wegziehen zum Scrollen bricht ab (pointercancel).
+         */
         function addEvents(elem, timeoffset) {
             elem.addEventListener('click', () => { changeTime(timeoffset); });
-            elem.addEventListener('mousedown', () => {
-                clearInterval(intervalId);
-                intervalId = setInterval(changeTimeRepeat, 200);
-                addTimeOffset = timeoffset;
+            elem.addEventListener('pointerdown', (ev) => {
+                if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+                stopTimeRepeat();
+                intervalId = setInterval(() => changeTime(timeoffset), 200);
             });
-            elem.addEventListener('mouseleave', () => { clearInterval(intervalId); });
+            for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+                elem.addEventListener(type, stopTimeRepeat);
+            }
+            // Langes Drücken auf dem Touchscreen öffnet sonst das Kontextmenü
+            elem.addEventListener('contextmenu', (ev) => ev.preventDefault());
         }
 
         /**
@@ -310,20 +318,17 @@
          *   step: Zeitversatz in Millisekunden (positiv)
          */
         function createTimeButtons(containerId, buttons) {
+            injectUiStyles();
             const container = document.getElementById(containerId);
-            const btnStyle = 'float:left; margin: 2px; width: 8em;';
+            container.classList.add('ui-time-buttons');
             buttons.forEach(({ label, step }) => {
-                const btnMinus = document.createElement('button');
-                btnMinus.textContent = '-' + label;
-                btnMinus.style.cssText = btnStyle;
-                addEvents(btnMinus, -step);
-                const btnPlus = document.createElement('button');
-                btnPlus.textContent = '+' + label;
-                btnPlus.style.cssText = btnStyle;
-                addEvents(btnPlus, step);
-                container.appendChild(btnMinus);
-                container.appendChild(btnPlus);
-                container.appendChild(document.createElement('br'));
+                for (const [sign, offset] of [['-', -step], ['+', step]]) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = sign + label;
+                    addEvents(btn, offset);
+                    container.appendChild(btn);
+                }
             });
         }
 
@@ -331,33 +336,62 @@
     //              Formulargenerierung                           //
     /////////////////////////////////////////////////////////////////
 
+        /**
+         * Grundgestaltung der Bedienelemente, einmal pro Seite in den <head> eingefügt. Es steht vor den Stilen der
+         * Seite, deshalb gewinnen deren Regeln bei gleicher Spezifität. Farben kommen aus den CSS-Variablen der Seite
+         * (--surface-2, --text-2); ohne Variablen bleibt es beim hellen Grau.
+         */
+        function injectUiStyles() {
+            if (document.getElementById('ui-js-styles')) return;
+            const style = document.createElement('style');
+            style.id = 'ui-js-styles';
+            style.textContent = `
+        .ui-panel { background-color: var(--surface-2, #eeeeee); color: inherit; padding: 5px; }
+        .ui-panel table, .ui-panel .ui-indent { margin-left: 1em; }
+        .ui-panel button { width: auto; margin-left: 1em; }
+        .ui-panel .ui-wide { width: 100%; box-sizing: border-box; }
+        .ui-panel .ui-hint { color: var(--text-2, inherit); }
+        .ui-time-buttons { display: grid; grid-template-columns: repeat(2, max-content); gap: 4px; }
+        .ui-time-buttons > button {
+            width: 8em;
+            margin: 0;
+            touch-action: manipulation;      /* kein Doppeltipp-Zoom, Halten bleibt ein Halten */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }`;
+            document.head.prepend(style);
+        }
+
         function createLocationControls(containerId) {
+            injectUiStyles();
             document.getElementById(containerId).innerHTML = `
-    <div style="background-color: #EEEEEE;padding:5px">Beobachtungsort auf Erde
-    <table style="margin-left:1em">
+    <div class="ui-panel">Beobachtungsort auf Erde
+    <table>
         <tr>
             <td><label for="latitude">Breitengrad</label></td>
-            <td><input type="text" id="latitude" placeholder="" value="0"> (z.B. 48.8566 oder 48°51'22"N)</td>
+            <td><input type="text" id="latitude" placeholder="" value="0"> <span class="ui-hint">(z.B. 48.8566 oder 48°51'22"N)</span></td>
             <td><span id="latitude-feedback" class="feedback"></span></td>
         </tr>
         <tr>
             <td><label for="longitude">Längengrad</label></td>
-            <td><input type="text" id="longitude" placeholder="" value="0"> (z.B. 2.3522 oder 2°20'15"E)</td>
+            <td><input type="text" id="longitude" placeholder="" value="0"> <span class="ui-hint">(z.B. 2.3522 oder 2°20'15"E)</span></td>
             <td><span id="longitude-feedback" class="feedback"></span></td>
         </tr>
     </table>
-    <button onclick="saveData()" style="margin-left:1em;width:fit-content;">Ort für nächsten Seitenaufruf lokal merken</button>
-    <button onclick="useGpsLocation()" style="margin-left:1em;width:fit-content;">Aktuelle GPS-Position verwenden</button>
+    <button type="button" onclick="saveData()">Ort für nächsten Seitenaufruf lokal merken</button>
+    <button type="button" onclick="useGpsLocation()">Aktuelle GPS-Position verwenden</button>
     <span id="gps-feedback" class="feedback"></span>
     </div>`;
         }
 
         function createTimeControls(containerId) {
+            injectUiStyles();
             const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
             document.getElementById(containerId).innerHTML = `
-    <div style="background-color: #EEEEEE;padding:5px">Zeit
-    <label style="margin-left:1em"><input type="checkbox" id="localTime"> Lokalzeit (${tzName})</label>
-    <table style="margin-left:1em">
+    <div class="ui-panel">Zeit
+    <label class="ui-indent"><input type="checkbox" id="localTime"> Lokalzeit (${tzName})</label>
+    <table>
         <tr>
             <td></td>
             <td>Tag.Monat.Jahr</td>
@@ -368,13 +402,13 @@
             <td>Datum und Uhrzeit</td>
             <td><input type="date" id="date" /></td>
             <td><input type="time" id="time" /></td>
-            <td><input id="seconds" style="width:100%" /></td>
+            <td><input id="seconds" class="ui-wide" /></td>
         </tr>
         <tr>
             <td>Sternzeit (Greenwich)</td>
             <td></td>
             <td><input id="siderealTime" type="time" /></td>
-            <td><input id="siderealSeconds" style="width:100%" /></td>
+            <td><input id="siderealSeconds" class="ui-wide" /></td>
         </tr>
         <tr>
             <td>Sternzeit Lokal</td>
@@ -384,7 +418,7 @@
         </tr>
         <tr>
             <td><label for="julianDate">Julianisches Datum</label></td>
-            <td colspan="3"><input id="julianDate" style="width:100%" /></td>
+            <td colspan="3"><input id="julianDate" class="ui-wide" /></td>
         </tr>
     </table>
     </div>`;
@@ -463,5 +497,7 @@
             document.getElementById('julianDate').addEventListener('input', changeJD);
             document.getElementById('siderealTime').addEventListener('input', changeSiderealTime);
             document.getElementById('siderealSeconds').addEventListener('input', changeSiderealTime);
-            document.addEventListener('mouseup', () => { clearInterval(intervalId); });
+            // Sicherheitsnetz: Wiederholung endet auch, wenn das Loslassen woanders passiert oder das Fenster wechselt
+            document.addEventListener('pointerup', stopTimeRepeat);
+            window.addEventListener('blur', stopTimeRepeat);
         }

@@ -167,10 +167,7 @@
         .columns > div { flex: 1 1 380px; min-width: 0; }
         #outputTable table { border-collapse: collapse; }
         #outputTable td { padding: 1px 8px 1px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
-        /* createTimeButtons (ui.js) setzt float per style-Attribut; hier als Raster mit −/+ nebeneinander */
-        #timeButtons { display: grid; grid-template-columns: repeat(2, max-content); gap: 4px; margin-top: 6px; }
-        #timeButtons button { float: none !important; margin: 0 !important; }
-        #timeButtons br { display: none; }
+        #timeButtons { margin-top: 6px; }
         details { margin-top: 12px; }
         .glossary { border-collapse: collapse; max-width: 900px; margin-bottom: 8px; }
         .glossary td { padding: 4px 12px 4px 0; vertical-align: top; }
@@ -180,8 +177,8 @@
             .glossary td:last-child { padding-bottom: 8px; }
         }
         summary { cursor: pointer; }
-        /* Formulare aus ui.js haben einen festen hellen Hintergrund */
-        #locationControls > div, #timeControls > div { color: #0b0b0b; border-radius: 6px; overflow-x: auto; }
+        /* Formulare aus ui.js (Farbe kommt dort aus --surface-2) */
+        #locationControls > div, #timeControls > div { border-radius: 6px; overflow-x: auto; }
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>

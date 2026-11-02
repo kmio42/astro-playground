@@ -73,11 +73,10 @@
         }
         a { color: var(--link); }
 
-        /* Formulare aus ui.js haben einen festen hellen Hintergrund per style-Attribut */
+        /* Formulare aus ui.js (Farbe kommt dort aus --surface-2) */
         #locationControls > div, #timeControls > div {
-            background-color: var(--surface-2) !important;
             border-radius: 6px;
-            padding: 8px 10px !important;
+            padding: 8px 10px;
             margin-bottom: 10px;
             overflow-x: auto;
         }
@@ -101,15 +100,11 @@
         #solarSystem { aspect-ratio: 620 / 620; }
         #earth { aspect-ratio: 550 / 410; }
         .time-panel { position: sticky; top: 12px; }
-        /* createTimeButtons (ui.js) setzt float und Breite per style-Attribut; hier als Raster mit −/+ nebeneinander */
-        #timeButtons { display: grid; grid-template-columns: repeat(2, max-content); gap: 4px; }
-        #timeButtons button { float: none !important; margin: 0 !important; }
-        #timeButtons br { display: none; }
         @media (max-width: 720px) {
             .workspace { grid-template-columns: minmax(0, 1fr); }
             .time-panel { grid-row: 1; top: 0; z-index: 1; background: var(--surface); padding: 6px 0; }
             #timeButtons { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-            #timeButtons button { width: auto !important; padding: 4px 2px; font-size: 0.85em; }
+            #timeButtons button { width: auto; padding: 4px 2px; font-size: 0.85em; }
         }
 
         #outputTable { margin-top: 20px; }
