@@ -23,6 +23,7 @@
             --winter: #2a78d6;
             --axis: #7a59c9;
             --north: #d0362b;
+            --shadow: rgba(35, 40, 30, 0.6);
         }
         @media (prefers-color-scheme: dark) {
             :root:not([data-theme="light"]) {
@@ -43,6 +44,7 @@
                 --winter: #4a93ea;
                 --axis: #a68cf0;
                 --north: #f0564a;
+                --shadow: rgba(0, 0, 0, 0.65);
             }
         }
         :root[data-theme="dark"] {
@@ -63,6 +65,7 @@
             --winter: #4a93ea;
             --axis: #a68cf0;
             --north: #f0564a;
+            --shadow: rgba(0, 0, 0, 0.65);
         }
         body {
             max-width: 1000px;
@@ -165,7 +168,7 @@
             cam: { az: 205, el: 22, dist: 3.6 },   // Kamera: Richtung von der Mitte aus [°], Höhe [°], Abstand
             playYear: false,
             playDay: false,
-            show: { compare: true, axis: true, hours: true },
+            show: { compare: true, axis: true, hours: true, shadow: false },
         };
 
         const VIEWS = {
@@ -177,7 +180,7 @@
 
         /**
          * Ist eine Ebene der Zeichnung sichtbar? In der Tour bestimmt der Schritt, sonst die Häkchen.
-         * Ebenen: dome, sphere, zenith, axis, circle, sun, riseSet, noon, hours, cmpJune, cmpEquinox, cmpDec
+         * Ebenen: dome, sphere, zenith, axis, circle, sun, riseSet, noon, hours, shadow, cmpJune, cmpEquinox, cmpDec
          */
         function visible(layer) {
             const step = tour ? TOUR[tour.index] : null;
@@ -187,12 +190,14 @@
                 case 'dome': case 'zenith': case 'axis': return state.show.axis;
                 case 'sphere': return false;
                 case 'hours': return state.show.hours;
+                case 'shadow': return state.show.shadow;
                 default: return true;
             }
         }
 
         const COMPASS = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
         const OBLIQUITY_DEG = 23.44;
+        const ROD_HEIGHT = 0.2;        // Höhe des Stabs in der Mitte (Radius der Scheibe = 1)
 
     /////////////////////////////////////////////////////////////////
     //                      Berechnung                             //
@@ -365,7 +370,7 @@
         function readColors() {
             const cs = getComputedStyle(document.documentElement);
             for (const name of ['surface', 'surface-2', 'text', 'text-2', 'muted', 'ground', 'ground-line', 'sun',
-                                'day-fill', 'night', 'night-fill', 'summer', 'equinox', 'winter', 'axis', 'north']) {
+                                'day-fill', 'night', 'night-fill', 'summer', 'equinox', 'winter', 'axis', 'north', 'shadow']) {
                 cssColors[name] = cs.getPropertyValue('--' + name).trim();
             }
         }
@@ -565,8 +570,11 @@
                 dot2d(cu, 3.5, c.sun);
             }
 
-            // Beobachter in der Mitte
-            if (up) {
+            // Beobachter in der Mitte, mit Schatten als Stab
+            if (up && visible('shadow')) {
+                stroke([[0, 0, 0], [0, 0, ROD_HEIGHT]], c.text, 3);
+                dot2d([0, 0, ROD_HEIGHT], 2.5, c.text);
+            } else if (up) {
                 stroke([[0, 0, 0], [0, 0, 0.07]], c.text, 2);
                 dot2d([0, 0, 0.085], 3, c.text);
             }
@@ -611,6 +619,50 @@
             }
         }
 
+        /** Schattenspitze des Stabs auf der Scheibe für einen Punkt der Sonne am Himmel (null, wenn zu tief) */
+        function shadowTip(sun) {
+            if (sun[2] < 0.02) return null;
+            return [-ROD_HEIGHT * sun[0] / sun[2], -ROD_HEIGHT * sun[1] / sun[2], 0];
+        }
+
+        /** Schatten des Stabs und Spur der Schattenspitze über den Tag (in der Ebene, nach der Scheibe) */
+        function drawShadow(scene) {
+            if (!visible('shadow')) return;
+            const c = cssColors;
+            const inside = p => p && Math.hypot(p[0], p[1]) <= 1;
+
+            // Spur der Schattenspitze, nur innerhalb der Scheibe
+            for (const run of scene.above.above) {
+                let line = [];
+                for (const p of run) {
+                    const tip = shadowTip(p);
+                    if (inside(tip)) {
+                        line.push(tip);
+                    } else if (line.length) {
+                        if (line.length > 1) stroke(line, c.shadow, 1.2, [2, 3]);
+                        line = [];
+                    }
+                }
+                if (line.length > 1) stroke(line, c.shadow, 1.2, [2, 3]);
+            }
+            for (const h of scene.hours) {
+                const tip = shadowTip(h.point);
+                if (!inside(tip)) continue;
+                dot2d(tip, 2, c.shadow);
+                label(tip, String(h.hour), c['text-2'], { size: 10, dy: 9 });
+            }
+
+            // Schatten zur eingestellten Uhrzeit, am Rand der Scheibe abgeschnitten
+            let tip = shadowTip(scene.sun);
+            if (!tip) return;
+            const len = Math.hypot(tip[0], tip[1]);
+            if (len > 1) tip = scale(tip, 1 / len);
+            ctx.save();
+            ctx.lineCap = 'round';
+            stroke([[0, 0, 0], tip], c.shadow, 5);
+            ctx.restore();
+        }
+
         function draw() {
             if (!ctx) return;
             readColors();
@@ -625,6 +677,7 @@
             drawHalf(scene, cameraAbove ? 'below' : 'above');
             drawDisc();
             drawHorizonPoints(scene);
+            if (cameraAbove) drawShadow(scene);
             drawHalf(scene, cameraAbove ? 'above' : 'below');
 
             updateInfo(scene);
@@ -693,7 +746,13 @@
             const alt = scene.sunHz.altitude * RAD2DEG, az = normalizeDegrees(scene.sunHz.azimuth * RAD2DEG + 180);
             add(`Sonne um ${clock(state.minutes / 60)}`, `Höhe ${formatDeg(alt)}, Richtung ${formatDeg(az, 0)} (${compassName(az)})`
                 + (alt < 0 ? ' – unter dem Horizont' : ''));
+            if (visible('shadow')) {
+                add('Schatten des Stabs', alt > 0
+                    ? `${formatNumber(1 / Math.tan(alt * DEG2RAD), 1)}-fache Stablänge, Richtung ${formatDeg(normalizeDegrees(az + 180), 0)} (${compassName(az + 180)})`
+                    : 'keiner, die Sonne steht unter dem Horizont');
+            }
             document.getElementById('info').innerHTML = `<table>${rows.join('')}</table>`;
+            document.getElementById('shadowLegend').hidden = !visible('shadow');
 
             document.getElementById('dayValue').textContent =
                 d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
@@ -1155,6 +1214,7 @@
         <span style="--c: var(--equinox)">Tagundnachtgleiche (Himmelsäquator)</span>
         <span style="--c: var(--winter)">Tagkreis am 21. Dezember</span>
         <span class="dashed" style="--c: var(--axis)">Himmelsachse</span>
+        <span id="shadowLegend" style="--c: var(--shadow)">Schatten des Stabs, gepunktet: Spur der Spitze</span>
     </div>
 
     <div class="controls">
@@ -1168,6 +1228,7 @@
         <label><input type="checkbox" id="show-compare"> Vergleichskreise</label>
         <label><input type="checkbox" id="show-axis"> Himmelsachse und Zenit</label>
         <label><input type="checkbox" id="show-hours"> Stunden</label>
+        <label><input type="checkbox" id="show-shadow"> Schatten eines Stabs</label>
     </div>
 
     <div id="info"></div>
@@ -1196,6 +1257,10 @@
         Stunde um die Achse); der Mittag liegt wegen Längengrad, Zeitgleichung und Sommerzeit nicht bei 12.</li>
         <li>Die gestrichelten Linien vom Beobachter zeigen die Richtung von Aufgang, Untergang und Sonne; der
         gepunktete Bogen im Süden die Höhe der Sonne am Mittag.</li>
+        <li><b>Schatten eines Stabs</b> (Häkchen): In der Mitte steht dann ein senkrechter Stab. Sein Schatten zeigt
+        immer von der Sonne weg und ist umso länger, je tiefer die Sonne steht. Die gepunktete Linie ist die Spur
+        der Schattenspitze über den Tag, mit den vollen Stunden – so funktioniert eine Sonnenuhr. Ein langer Schatten
+        wird am Rand der Scheibe abgeschnitten; die Tabelle nennt seine Länge als Vielfaches der Stablänge.</li>
         <li>Gezeichnet ist der geometrische Kreis ohne Lichtbrechung. Die Uhrzeiten und Richtungen von Auf- und
         Untergang in der Tabelle rechnet <code>astro.js</code> wie üblich mit dem Oberrand der Sonne und
         Lichtbrechung (−0°50′); deshalb ist der Tag dort ein paar Minuten länger, als der Kreis zeigt.</li>
