@@ -135,6 +135,7 @@
             border-radius: 6px;
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
         }
+        .menu-panel button { width: 100%; text-align: left; }
         .menu-panel hr { width: 100%; border: 0; border-top: 1px solid var(--grid); margin: 4px 0; }
         .menu-panel a { color: var(--accent); }
 
@@ -310,6 +311,7 @@
         }
         table.data th { color: var(--text-2); font-weight: 600; }
         table.data input[type="number"] { width: 5.5em; }
+        table.data input.note { width: 12em; }
         table.data tr.clickable { cursor: pointer; }
         table.data tr.clickable:hover td { background: var(--surface-2); }
         table.data tr.full td { background: var(--highlight); }
@@ -384,7 +386,8 @@
                 observations: (Array.isArray(v.observations) ? v.observations : [])
                     .filter(o => o && !isNaN(new Date(o.time).getTime()))
                     .map(o => ({ time: String(o.time), body: o.body === 'moon' ? 'moon' : 'sun',
-                                 event: o.event === 'appear' ? 'appear' : 'disappear' })),
+                                 event: o.event === 'appear' ? 'appear' : 'disappear',
+                                 note: typeof o.note === 'string' ? o.note : '' })),
                 floor: Number.isFinite(num(v.floor)) ? num(v.floor) : 0,
                 floorHeight: num(v.floorHeight) > 0 ? num(v.floorHeight) : 3,
                 eyeHeight: Number.isFinite(num(v.eyeHeight)) ? num(v.eyeHeight) : 1.6,
@@ -874,6 +877,15 @@
                     ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4);
                     ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4);
                     ctx.stroke();
+                    // Notiz als kurze Beschriftung neben dem Kreuz
+                    const note = (o.note || '').trim();
+                    if (note) {
+                        ctx.font = '11px Arial';
+                        ctx.fillStyle = css('--text');
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(note.length > 30 ? note.slice(0, 29) + '…' : note, x + 7, y);
+                    }
                 }
             }
             // Neues Rechteck beim Aufziehen
@@ -1164,7 +1176,7 @@
 
             // Beobachtungen
             const loc = getLocation();
-            const oTable = el('table', { className: 'data' }, [el('tr', {}, ['Zeitpunkt (Lokalzeit)', 'Gestirn', 'Ereignis', 'Richtung', '', ''].map(t => el('th', { textContent: t })))]);
+            const oTable = el('table', { className: 'data' }, [el('tr', {}, ['Zeitpunkt (Lokalzeit)', 'Gestirn', 'Ereignis', 'Notiz', 'Richtung', '', ''].map(t => el('th', { textContent: t })))]);
             vp.observations.forEach((o, i) => {
                 const dirCell = el('td', { className: 'value' });
                 const refresh = () => {
@@ -1186,6 +1198,10 @@
                     s.addEventListener('change', () => { o[key] = s.value; refresh(); maskChanged(false); });
                     return s;
                 };
+                const noteInput = el('input', { type: 'text', className: 'note', value: o.note || '',
+                                                placeholder: 'z. B. hinter dem Kirchturm' });
+                noteInput.addEventListener('input', () => { o.note = noteInput.value; drawHorizonChart(); });
+                noteInput.addEventListener('change', () => saveState());
                 const take = el('button', { textContent: '→ Horizont', title: 'Richtung als Horizontpunkt übernehmen' });
                 take.addEventListener('click', () => {
                     const dir = observationDirection(o, getLocation());
@@ -1195,13 +1211,14 @@
                     el('td', {}, [timeInput]),
                     el('td', {}, [select([['sun', 'Sonne'], ['moon', 'Mond']], 'body')]),
                     el('td', {}, [select([['disappear', 'verschwand'], ['appear', 'erschien']], 'event')]),
+                    el('td', {}, [noteInput]),
                     dirCell,
                     el('td', {}, [take]),
                     el('td', {}, [deleteButton(() => { vp.observations.splice(i, 1); maskChanged(); })]),
                 ]));
                 refresh();
             });
-            if (!vp.observations.length) oTable.append(el('tr', {}, [el('td', { colSpan: 6, className: 'empty', textContent: 'keine' })]));
+            if (!vp.observations.length) oTable.append(el('tr', {}, [el('td', { colSpan: 7, className: 'empty', textContent: 'keine' })]));
             obsBox.replaceChildren(oTable);
         }
 
@@ -1221,7 +1238,7 @@
             const vp = editableViewpoint();
             if (!vp) return;
             vp.observations.push({ time: new Date(Math.round(datetime.getTime() / 60000) * 60000).toISOString(),
-                                   body: 'sun', event: 'disappear' });
+                                   body: 'sun', event: 'disappear', note: '' });
             maskChanged();
         }
 
@@ -1292,10 +1309,26 @@
             selectViewpoint(0);
         }
 
+        // Vorschlag für den Dateinamen: eigenes Haus (Name oder Adresse aus OSM), Standpunkt(e) und Datum,
+        // z. B. „Sichtbarkeit Musterstraße 5 Balkon 2026-11-02“
+        function exportFileName() {
+            const vps = state.selected >= 0 ? [state.viewpoints[state.selected]] : state.viewpoints;
+            const own = buildingList.find(b => b.id === state.environment.ownBuilding);
+            const house = own && buildingTitle(own) !== 'Gebäude' ? buildingTitle(own) + ' ' : '';
+            const d = new Date();
+            const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            return `Sichtbarkeit ${house}${vps.map(v => v.name).join(', ')} ${date}`;
+        }
+
         function exportJson() {
+            const answer = prompt('Name der Datei:', exportFileName());
+            if (answer === null) return;
+            // Zeichen, die Dateisysteme nicht mögen, ersetzen
+            let name = answer.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').trim() || 'sichtbarkeit';
+            if (!/\.json$/i.test(name)) name += '.json';
             const data = { location: { latitude, longitude }, ...state };
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const a = el('a', { href: URL.createObjectURL(blob), download: 'sichtbarkeit.json' });
+            const a = el('a', { href: URL.createObjectURL(blob), download: name });
             a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);
         }
@@ -4077,7 +4110,7 @@
                     <button type="button" id="renameViewpoint" onclick="menuAction(renameViewpoint)">Standpunkt umbenennen …</button>
                     <button type="button" id="deleteViewpoint" onclick="menuAction(deleteViewpoint)">Standpunkt löschen</button>
                     <hr>
-                    <button type="button" onclick="menuAction(exportJson)">Exportieren</button>
+                    <button type="button" onclick="menuAction(exportJson)">Exportieren …</button>
                     <button type="button" onclick="menuAction(() => document.getElementById('importFile').click())">Importieren …</button>
                     <button type="button" onclick="menuAction(resetAll)">Alle Eingaben löschen …</button>
                     <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -4226,7 +4259,8 @@
                 <div id="observationTable" class="scroll"></div>
                 <button type="button" onclick="addObservation()">+ Beobachtung</button>
                 <p class="hint">Wann ist die Sonne oder der Mond hinter einem Hindernis verschwunden oder aufgetaucht?
-                    Die Richtung (Mittelpunkt der Scheibe) erscheint als Kreuz im Diagramm und lässt sich als Horizontpunkt übernehmen.</p>
+                    Die Richtung (Mittelpunkt der Scheibe) erscheint als Kreuz im Diagramm und lässt sich als Horizontpunkt übernehmen.
+                    Eine Notiz (z. B. „hinter dem Kirchturm“) steht im Diagramm neben dem Kreuz.</p>
                 <details class="more" data-more="maskTables" id="maskTablesMore">
                     <summary>Mehr: Sichtbereiche und Horizontlinie als Zahlen</summary>
                     <div class="tables">
