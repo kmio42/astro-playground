@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sonne und Mond vom Balkon</title>
+    <title>Sichtbarkeitsrechner für Sonne und Mond</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
     <style>
         :root {
@@ -101,6 +101,7 @@
         .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
         .bar + .bar { margin-top: 6px; }
         .brand { font-weight: 700; font-size: 1.1em; margin-right: auto; }
+        @media (max-width: 520px) { .brand-long { display: none; } }   /* schmal: Kopfleiste einzeilig */
         .tabs { display: inline-flex; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; }
         .tabs button { border: 0; background: transparent; color: var(--text); padding: 5px 14px; font: inherit; cursor: pointer; }
         .tabs button[aria-pressed="true"] { background: var(--accent); color: #fff; }
@@ -4063,7 +4064,7 @@
 <body>
     <header id="topbar">
         <div class="bar">
-            <span class="brand">Sonne und Mond vom Balkon</span>
+            <span class="brand">Sichtbarkeitsrechner<span class="brand-long"> für Sonne und Mond</span></span>
             <div class="tabs">
                 <button id="tabIntro" type="button" onclick="setView('intro')">Einführung</button>
                 <button id="tabSetup" type="button" onclick="setView('setup')">Einrichten</button>

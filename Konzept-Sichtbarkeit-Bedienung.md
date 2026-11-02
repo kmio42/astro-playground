@@ -60,7 +60,7 @@ Dazu kommen:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Sonne und Mond vom Balkon                                            │
+│ Sichtbarkeitsrechner für Sonne und Mond                              │
 │ Standpunkt [Wohnzimmer ▾]   28.10.2026 [14:30]  ◀ 1 Tag ▶  ☑ Lokalzeit│  ← Kopfleiste, bleibt oben stehen
 │ ( Einrichten )  ( Ergebnis )                              ⋯ Menü      │
 └──────────────────────────────────────────────────────────────────────┘
