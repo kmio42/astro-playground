@@ -786,6 +786,9 @@
                 setDir: rs.hasSet ? dir(s.setAz) : null,
                 higher: s.dec * (state.lat >= 0 ? 1 : -1) >= 0,
                 size: formatNumber(Math.cos(s.dec) * 100, 0),
+                noonShadow: s.culmination[2] > 0.02
+                    ? formatNumber(Math.sqrt(1 - s.culmination[2] ** 2) / s.culmination[2], 1) : null,
+                shadowNoonDir: s.culmination[1] < 0 ? 'Norden' : 'Süden',
             };
         }
 
@@ -893,6 +896,20 @@
                     jeder Zeitpunkt einstellen; Ziehen dreht die Ansicht, das Mausrad zoomt.</p>
                     <p>Unter „Ort“ lässt sich die Breite ändern: Am Äquator stehen die Kreise senkrecht und liegen immer
                     zur Hälfte über dem Horizont, am Pol liegen sie flach – dann gibt es Polartag und Polarnacht.</p>`,
+            },
+            {
+                title: 'Der Schatten eines Stabs',
+                layers: ['dome', 'zenith', 'axis', 'circle', 'sun', 'riseSet', 'noon', 'hours', 'shadow'],
+                event: EquinoxType.Summer, minutes: 5 * 60, playDay: true,
+                view: 'oblique',
+                text: v => `<p>In der Mitte steht jetzt ein senkrechter Stab. Sein Schatten zeigt immer von der Sonne weg:
+                    morgens nach Westen, mittags nach ${v.shadowNoonDir}, abends nach Osten. Je tiefer die Sonne steht,
+                    desto länger ist er${v.noonShadow ? ` – am ${v.date} ist er mittags ${v.noonShadow}-mal so lang wie
+                    der Stab` : ''}. Morgens und abends reicht er weit über die Scheibe hinaus.</p>
+                    <p>Die gepunktete Linie ist die Spur der Schattenspitze über den Tag, mit den vollen Stunden – so
+                    funktioniert eine Sonnenuhr. Zu Frühlings- und Herbstanfang ist die Spur eine gerade Linie, sonst ist
+                    sie gebogen: Mit dem Regler „Tag“ ausprobieren.</p>
+                    <p>Außerhalb der Tour schaltet das Häkchen „Schatten eines Stabs“ unter dem Bild den Stab ein.</p>`,
             },
         ];
 
