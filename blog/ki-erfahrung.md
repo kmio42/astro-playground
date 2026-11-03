@@ -20,12 +20,19 @@
 
 KI beim Programmieren nutze ich privat wie in der Firma seit etwa 2024. Als mir im Herbst 2024 der
 frühe Sonnenuntergang bewusst wurde, interessierte mich der Zusammenhang – dabei hatte ich mich für
-Astronomie vorher nie besonders interessiert. Es begann mit einigen Fragen an ChatGPT, und die
-Antworten waren damals noch häufiger fehlerhaft. Auch die kleinen Skripte, die ich mir schreiben ließ,
-etwa um die Zeitgleichung oder Sonnenauf- und -untergang darzustellen, enthielten Fehler.
+Astronomie vorher nie besonders interessiert. Es begann mit einigen Fragen an ChatGPT. Die Antworten
+kamen damals überwiegend aus dem gelernten Wissen des Modells, eine Websuche gab es erst in Ansätzen –
+und so waren sie noch häufiger fehlerhaft. Auch die kleinen Skripte, die ich mir schreiben ließ, etwa
+um die Zeitgleichung oder Sonnenauf- und -untergang darzustellen, enthielten Fehler.
 
-Bei der Einarbeitung war ich überladen von Koordinatensystemen und Fachbegriffen, und die Zeichnungen
-verstand ich oft nicht. Am Schluss landete ich bei Jean Meeus' *Astronomische Algorithmen* und begann
+<!-- Websuche in ChatGPT (geprüft 2026-11-03): „Browse with Bing“ ab Mai 2023 für Plus, Juli–September
+     2023 pausiert; für kostenlose Nutzer mit GPT-4o angekündigt 13.5.2024, verfügbar ab Ende Mai 2024
+     (begrenzt); „ChatGPT Search“ mit Quellenlinks ab 31.10.2024 für Plus/Team, ab 16.12.2024 für alle
+     Angemeldeten. Ob gesucht wurde, entschied meist das Modell. -->
+
+ChatGPT half ein bisschen bei der Einarbeitung in das neue Thema, ein ganzer Teil war aber noch
+gewöhnliche Recherche. Dabei war ich überladen von Koordinatensystemen und Fachbegriffen, und die
+Zeichnungen verstand ich oft nicht. Am Schluss landete ich bei Jean Meeus' *Astronomische Algorithmen* und begann
 eine eigene Umsetzung in JavaScript. Dabei stieß ich auf ein Git-Projekt in Go
 ([soniakeys/meeus](https://github.com/soniakeys/meeus)), in dem alle Formeln des Buchs schon umgesetzt
 waren. Leicht war es trotzdem nicht, die Formeln richtig umzusetzen und
