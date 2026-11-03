@@ -155,6 +155,7 @@
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
+    <script src="embed.js"></script>
     <script>
 
     /////////////////////////////////////////////////////////////////
@@ -178,6 +179,7 @@
 
         // Ansichten je Bezugssystem. Von außen: x zur Sonne, z zum Himmelsnordpol.
         // Beim Beobachter: x nach Osten, y nach Norden, z zum Zenit (wie Tagbogen3D.html).
+        // In der Adresse (view): „side“ = von außen, „observer-side“ = beim Beobachter.
         const VIEWS = {
             space: {
                 oblique: { az: 150, el: 20, dist: 3.8 },
@@ -204,6 +206,7 @@
         function visible(layer) {
             const step = tour ? TOUR[tour.index] : null;
             if (step && step.layers) return step.layers.includes(layer);
+            if (fixedLayers) return fixedLayers.includes(layer);
             switch (layer) {
                 case 'sky': case 'celEquator': case 'dayCircle': case 'poles': return state.show.sky;
                 case 'latAngle': case 'decAngle': case 'altitude': return state.show.angles;
@@ -1099,13 +1102,17 @@
         let tour = null;            // { index } während der Tour
         let tourHtml = '';
 
-        function startTour() {
-            tour = { index: 0 };
-            document.getElementById('tour').hidden = false;
+        let fixedLayers = null;     // Ebenen aus der Adresse (layers), sonst null = Häkchen
+
+        /** Tour ab Schritt index (0 = erster); showBox = false stellt nur den Zustand des Schritts ein */
+        function startTour(index = 0, showBox = true) {
+            tour = { index: Math.min(Math.max(index, 0), TOUR.length - 1) };
+            document.getElementById('tour').hidden = !showBox;
             document.getElementById('tourStart').hidden = true;
             for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
             applyTourStep();
-            document.getElementById('tour').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // eingebettet nicht scrollen, das würde die umgebende Seite verschieben
+            if (showBox && !kmEmbed.active) document.getElementById('tour').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function endTour() {
@@ -1234,11 +1241,43 @@
             setDay(Math.round((local - start) / 86400000));
         }
 
+        /** Jahr, Tag und Uhrzeit eines Zeitpunkts (Ortszeit des Browsers) einstellen */
+        function showDate(date) {
+            setYear(date.getFullYear());
+            setDay(Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - new Date(date.getFullYear(), 0, 1)) / 86400000));
+            setMinutes(date.getHours() * 60 + date.getMinutes());
+        }
+
         function showNow() {
-            const now = new Date();
-            setYear(now.getFullYear());
-            setDay(Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(now.getFullYear(), 0, 1)) / 86400000));
-            setMinutes(now.getHours() * 60 + now.getMinutes());
+            showDate(new Date());
+        }
+
+        /**
+         * Startzustand aus der Adresse (embed.js): Tourschritt step (mit tour als Tour-Kasten), dann Zeitpunkt t,
+         * Ansicht view („side“ von außen, „observer-side“ beim Beobachter), Ebenen layers und Abspielen play;
+         * was ausdrücklich angegeben ist, gilt vor dem Schritt. Übergänge springen sofort ans Ziel.
+         */
+        function applyEmbedState(s) {
+            if (s.step || s.tour) startTour((s.step || 1) - 1, s.tour || !kmEmbed.active);
+            if (s.t) showDate(s.t);
+            if (s.view) {
+                const observer = s.view.startsWith('observer');
+                const name = observer ? (s.view.split('-')[1] || 'oblique') : s.view;
+                if (VIEWS.space[name]) {
+                    state.viewName = name;
+                    animateTo({ frame: observer ? 1 : 0, cam: VIEWS[observer ? 'observer' : 'space'][name] });
+                }
+            }
+            if (tween) applyTween(1);
+            if (s.layers) {
+                fixedLayers = s.layers;
+                for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
+            }
+            if (s.play) {
+                setPlay('year', s.play === 'year');
+                setPlay('day', s.play === 'day');
+            }
+            requestDraw();
         }
 
         function setView(name) {
@@ -1275,7 +1314,7 @@
         // Abspielen (Jahr oder Tag) und Überblendungen in einer gemeinsamen Schleife
         let loopRunning = false, lastTime = 0;
         function startLoop() {
-            if (loopRunning) return;
+            if (loopRunning || !kmEmbed.visible) return;
             loopRunning = true;
             lastTime = performance.now();
             requestAnimationFrame(loop);
@@ -1294,7 +1333,9 @@
             }
             if (tween) applyTween(Math.min((now - tween.start) / tween.duration, 1));
             draw();
-            if (state.playYear || state.playDay || tween) {
+            if (!kmEmbed.visible) {
+                loopRunning = false;        // außerhalb des Bildes: anhalten, onVisibility setzt fort
+            } else if (state.playYear || state.playDay || tween) {
                 requestAnimationFrame(loop);
             } else {
                 loopRunning = false;
@@ -1349,12 +1390,13 @@
             canvas = document.getElementById('view');
             ctx = canvas.getContext('2d');
 
-            // Ort wie auf den anderen Seiten aus localStorage, sonst Mitte Deutschlands
-            let storedLat = null, storedLon = null;
-            try { storedLat = localStorage.getItem('latitude'); storedLon = localStorage.getItem('longitude'); } catch (e) { /* gesperrt */ }
-            document.getElementById('lat').value = storedLat || '50';
-            document.getElementById('lon').value = storedLon || '10';
-            readLocationInputs();
+            // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst Mitte Deutschlands;
+            // folgt, wenn ein anderes Modell oder ein anderer Tab einen Ort merkt (embed.js)
+            kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
+                document.getElementById('lat').value = String(lat);
+                document.getElementById('lon').value = String(lon);
+                readLocationInputs();
+            });
             document.getElementById('lat').addEventListener('input', readLocationInputs);
             document.getElementById('lon').addEventListener('input', readLocationInputs);
             document.getElementById('latSlider').addEventListener('input', ev => {
@@ -1381,24 +1423,29 @@
             setupCameraInteraction();
             setEarth(state.earth);
             showNow();
+            applyEmbedState(kmEmbed.state);
             new ResizeObserver(resize).observe(canvas);
+            kmEmbed.onVisibility(visible => {
+                if (visible && (state.playYear || state.playDay || tween)) startLoop();
+            });
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
+            kmEmbed.ready();
         };
     </script>
 </head>
 <body>
-    <h1>Erdachse und Himmelsachse</h1>
-    <p>Von der Erde aus sehen wir den Himmel um eine schräge Achse kreisen, die Himmelsachse. Im Weltraum dreht sich
+    <h1 data-embed="hide">Erdachse und Himmelsachse</h1>
+    <p data-embed="hide">Von der Erde aus sehen wir den Himmel um eine schräge Achse kreisen, die Himmelsachse. Im Weltraum dreht sich
     die Erde um ihre Erdachse. Wie hängen beide zusammen – und wie kommt man von Höhe und Himmelsrichtung, die ein
     Beobachter misst (Horizontsystem), zur Deklination, die für die ganze Erde gilt (Äquatorsystem)?</p>
-    <p class="start-tour" id="tourStart"><button onclick="startTour()">▶ Schritt für Schritt erklären</button>
+    <p class="start-tour" id="tourStart" data-embed="hide"><button onclick="startTour()">▶ Schritt für Schritt erklären</button>
     <span class="feedback">Blendet die Teile des Modells nach und nach ein.</span></p>
-    <p>Die Kugel in der Mitte ist die Erde, der gepunktete Umriss die Himmelskugel. Auf der Erde steht ein Beobachter
+    <p data-embed="hide">Die Kugel in der Mitte ist die Erde, der gepunktete Umriss die Himmelskugel. Auf der Erde steht ein Beobachter
     mit seinem Horizont (grüne Scheibe). Unter dem Bild lässt sich umschalten zwischen dem Blick von außen, bei dem
     sich die Erde dreht, und dem Blick des Beobachters, bei dem sich der Himmel dreht. Zum Nachlesen: Abschnitt 2 in
     <code>Erklaerung-Sonnenbahn.md</code>.</p>
 
-    <div class="controls">
+    <div class="controls" data-control="basic">
         <div class="wide">
             <label for="daySlider">Tag</label>
             <input type="range" id="daySlider" min="0" max="364" step="1">
@@ -1412,7 +1459,7 @@
             <button onclick="jumpToEvent(EquinoxType.Winter)" title="Wintersonnenwende">Dezember</button>
         </div>
     </div>
-    <div class="controls">
+    <div class="controls" data-control="basic">
         <div class="wide">
             <label for="timeSlider">Uhrzeit</label>
             <input type="range" id="timeSlider" min="0" max="1435" step="5">
@@ -1445,7 +1492,7 @@
         <span class="dashed" style="--c: var(--sun)">Sonnenstrahlen</span>
     </div>
 
-    <div class="controls">
+    <div class="controls" data-control="extra">
         <span>Blick:</span>
         <div class="group">
             <button id="frameSpace" onclick="setFrame(0)">Von außen (Erde dreht sich)</button>
@@ -1458,7 +1505,7 @@
             <button onclick="setView('top')">Von oben</button>
         </div>
     </div>
-    <div class="controls">
+    <div class="controls" data-control="extra">
         <div class="wide">
             <label for="earthSlider">Größe der Erde</label>
             <input type="range" id="earthSlider" min="0" max="100" step="1">
@@ -1471,10 +1518,11 @@
         <label><input type="checkbox" id="show-grid"> Gradnetz</label>
     </div>
 
+    <div id="kmPlace" data-control="place" hidden></div>
     <div id="info"></div>
 
-    <h2>Ort</h2>
-    <div class="controls">
+    <h2 data-embed="hide">Ort</h2>
+    <div class="controls" data-embed="hide">
         <label>Breite <input type="text" id="lat"></label>
         <input type="range" id="latSlider" min="-90" max="90" step="0.5" aria-label="Breite">
         <label>Länge (Ost +) <input type="text" id="lon"></label>
@@ -1482,11 +1530,11 @@
         <button onclick="saveLocation()">Ort merken</button>
         <span class="feedback" id="locationFeedback"></span>
     </div>
-    <p class="hint">Mit dem Breiten-Regler den Beobachter nach Norden oder Süden schieben: Die Himmelsachse bleibt
+    <p class="hint" data-embed="hide">Mit dem Breiten-Regler den Beobachter nach Norden oder Süden schieben: Die Himmelsachse bleibt
     parallel zur Erdachse, nur der Horizont kippt. Am Äquator liegt die Achse im Horizont, am Pol steht sie senkrecht.</p>
 
-    <h2>Wie lese ich das?</h2>
-    <ul class="hint">
+    <h2 data-embed="hide">Wie lese ich das?</h2>
+    <ul class="hint" data-embed="hide">
         <li><b>Von außen:</b> Die Sonne steht fest rechts, die Erde dreht sich darunter; der Beobachter wird mitgenommen.
         <b>Vom Beobachter:</b> Sein Horizont liegt fest, dafür dreht sich der Himmel. Beide Bilder zeigen dasselbe.</li>
         <li><b>Erdachse und Himmelsachse</b> sind parallel, aber um bis zu einen Erdradius gegeneinander verschoben. Mit

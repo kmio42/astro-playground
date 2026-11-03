@@ -13,7 +13,13 @@
  *   data-datum     Zeitpunkt: „2026-06-21 10:00“ (Ortszeit des Lesers) oder ISO 8601 mit Zone „2026-06-21T10:00Z“
  *   data-ort       Breite, Länge in Grad: „50,10“ oder „50.5, 10.2“ oder „50,5; 10,2“; gilt, solange der Leser
  *                  keinen eigenen Ort gemerkt hat
+ *   data-ort-fest  „ja“: data-ort gilt immer (Text hängt am Ort); der Leser kann im Modell zu seinem Ort wechseln
  *   data-ansicht   Ansicht, Namen wie in VIEWS der Modellseite (z. B. „east“)
+ *   data-schritt   Tourschritt ab 1 als Startzustand (Ebenen, Zeit, Ansicht wie in der Tour der Modellseite)
+ *   data-tour      „ja“: Tour-Kasten mit Weiter/Zurück im Modell zeigen
+ *   data-ebenen    sichtbare Ebenen, Namen der Modellseite, z. B. „dome,zenith,axis,circle,sun“
+ *   data-abspielen „tag“ oder „jahr“
+ *   data-bedienung „voll“ (Standard), „min“ (nur Datum und Uhrzeit) oder „keine“ (nur das Bild)
  *   data-farben    „hell“ (Standard), „dunkel“ oder „auto“ (nach dem System des Lesers)
  *   data-hoehe     Seitenverhältnis Breite/Höhe bis zur ersten Höhenmeldung, z. B. „3/4“
  *
@@ -31,16 +37,23 @@
     // Modelle mit Einbettmodus (embed.js); ratio = Breite/Höhe des Inhalts bei etwa 660 px Breite
     const MODELS = {
         tagbogen: { page: 'Tagbogen3D.html', title: '3D-Modell: Tagbogen der Sonne', ratio: '660/1000' },
+        himmelsachse: { page: 'Himmelsachse3D.html', title: '3D-Modell: Erdachse und Himmelsachse', ratio: '660/1100' },
     };
 
     const THEMES = { hell: 'light', dunkel: 'dark', auto: 'auto' };
+    const PLAY = { tag: 'day', jahr: 'year' };
+    const CONTROLS = { voll: 'full', min: 'min', keine: 'none' };
+    const YES = ['', 'ja', 'true', '1'];
 
     const style = document.createElement('style');
     style.id = 'km-modelle-styles';
     style.textContent = `
         .km-modell { margin: 1em 0; }
         .km-modell iframe { display: block; width: 100%; border: 0; aspect-ratio: var(--km-ratio, 3/4); }
-        .km-modell .km-modell-link { margin: 2px 0 0; text-align: right; font-size: 0.85em; }`;
+        .km-modell iframe:fullscreen { background: #fff; }
+        .km-modell .km-modell-link { margin: 2px 0 0; text-align: right; font-size: 0.85em; }
+        .km-modell .km-modell-link button { padding: 0; border: 0; background: none; color: inherit; font: inherit;
+            text-decoration: underline; cursor: pointer; }`;
     document.head.appendChild(style);
 
     /** „50,10“, „50.5, 10.2“ oder „50,5; 10,2“ → [Breite, Länge] als Texte, sonst null */
@@ -67,7 +80,13 @@
             if (place) { p.set('lat', place[0]); p.set('lon', place[1]); }
             else console.warn('modelle.js: data-ort nicht lesbar:', d.ort);
         }
+        if (d.ortFest !== undefined && YES.includes(d.ortFest.trim())) p.set('ortfest', '');
         if (d.ansicht) p.set('view', d.ansicht.trim());
+        if (d.schritt) p.set('step', d.schritt.trim());
+        if (d.tour !== undefined && YES.includes(d.tour.trim())) p.set('tour', '');
+        if (d.ebenen) p.set('layers', d.ebenen.replace(/\s+/g, ''));
+        const play = PLAY[(d.abspielen || '').trim()];
+        if (play) p.set('play', play);
         return p;
     }
 
@@ -89,9 +108,11 @@
         if (el.id) embed.set('id', el.id);
         const theme = THEMES[(el.dataset.farben || '').trim()];
         if (theme) embed.set('theme', theme);
+        const controls = CONTROLS[(el.dataset.bedienung || '').trim()];
+        if (controls) embed.set('controls', controls);
         embed.set('v', VERSION);
         const frameUrl = new URL(pageUrl);
-        frameUrl.search = 'embed&' + embed.toString();
+        frameUrl.search = 'embed&' + embed.toString().replace(/=(?=&|$)/g, '');
 
         const iframe = document.createElement('iframe');
         iframe.src = frameUrl.href;
@@ -102,7 +123,7 @@
         iframe.style.setProperty('--km-ratio', (el.dataset.hoehe || model.ratio).trim());
 
         const own = new URL(pageUrl);
-        own.search = state.toString();
+        own.search = state.toString().replace(/=(?=&|$)/g, '');
         const link = document.createElement('p');
         link.className = 'km-modell-link';
         const a = document.createElement('a');
@@ -110,6 +131,13 @@
         a.target = '_blank';
         a.rel = 'noopener';
         a.textContent = 'Eigene Seite ↗';
+        if (document.fullscreenEnabled && iframe.requestFullscreen) {
+            const full = document.createElement('button');
+            full.type = 'button';
+            full.textContent = 'Vollbild';
+            full.addEventListener('click', () => iframe.requestFullscreen().catch(() => {}));
+            link.append(full, ' · ');
+        }
         link.appendChild(a);
 
         el.replaceChildren(iframe, link);
@@ -126,6 +154,19 @@
             iframe.style.aspectRatio = 'auto';
             iframe.style.height = Math.ceil(data.height) + 'px';
         }
+    });
+
+    // Vollbild an das betroffene Modell melden (es scrollt dann selbst und gibt Mausrad und Touch frei)
+    let fullscreenFrame = null;
+    document.addEventListener('fullscreenchange', () => {
+        const now = frames.includes(document.fullscreenElement) ? document.fullscreenElement : null;
+        if (fullscreenFrame && fullscreenFrame !== now && fullscreenFrame.contentWindow) {
+            fullscreenFrame.contentWindow.postMessage({ source: 'km-host', type: 'fullscreen', on: false }, location.origin);
+        }
+        if (now && now.contentWindow) {
+            now.contentWindow.postMessage({ source: 'km-host', type: 'fullscreen', on: true }, location.origin);
+        }
+        fullscreenFrame = now;
     });
 
     function scan() {

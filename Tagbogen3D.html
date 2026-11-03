@@ -186,6 +186,7 @@
         function visible(layer) {
             const step = tour ? TOUR[tour.index] : null;
             if (step && step.layers) return step.layers.includes(layer);
+            if (fixedLayers) return fixedLayers.includes(layer);
             switch (layer) {
                 case 'cmpJune': case 'cmpEquinox': case 'cmpDec': return state.show.compare;
                 case 'dome': case 'zenith': case 'axis': return state.show.axis;
@@ -917,14 +918,17 @@
 
         let tour = null;            // { index } während der Tour
         let tourHtml = '';
+        let fixedLayers = null;     // Ebenen aus der Adresse (layers), sonst null = Häkchen
 
-        function startTour() {
-            tour = { index: 0 };
-            document.getElementById('tour').hidden = false;
+        /** Tour ab Schritt index (0 = erster); showBox = false stellt nur den Zustand des Schritts ein */
+        function startTour(index = 0, showBox = true) {
+            tour = { index: Math.min(Math.max(index, 0), TOUR.length - 1) };
+            document.getElementById('tour').hidden = !showBox;
             document.getElementById('tourStart').hidden = true;
             for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
             applyTourStep();
-            document.getElementById('tour').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // eingebettet nicht scrollen, das würde die umgebende Seite verschieben
+            if (showBox && !kmEmbed.active) document.getElementById('tour').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function endTour() {
@@ -1051,13 +1055,32 @@
             showDate(new Date());
         }
 
-        /** Startzustand aus der Adresse (embed.js): Zeitpunkt t, Ansicht view (ohne Kamerafahrt) */
+        /**
+         * Startzustand aus der Adresse (embed.js): Tourschritt step (mit tour als Tour-Kasten), dann Zeitpunkt t,
+         * Ansicht view (ohne Kamerafahrt), Ebenen layers und Abspielen play; was ausdrücklich angegeben ist,
+         * gilt vor dem Schritt.
+         */
         function applyEmbedState(s) {
+            if (s.step || s.tour) {
+                startTour((s.step || 1) - 1, s.tour || !kmEmbed.active);
+                cameraTween = null;
+                const view = TOUR[tour.index].view;
+                if (view) state.cam = { ...VIEWS[view] };
+            }
             if (s.t) showDate(s.t);
             if (s.view && VIEWS[s.view]) {
+                cameraTween = null;
                 state.cam = { ...VIEWS[s.view] };
-                requestDraw();
             }
+            if (s.layers) {
+                fixedLayers = s.layers;
+                for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
+            }
+            if (s.play) {
+                setPlay('year', s.play === 'year');
+                setPlay('day', s.play === 'day');
+            }
+            requestDraw();
         }
 
         function setView(name) {
@@ -1076,7 +1099,7 @@
         // Abspielen (Jahr oder Tag) und Kamerafahrt in einer gemeinsamen Schleife
         let loopRunning = false, lastTime = 0;
         function startLoop() {
-            if (loopRunning) return;
+            if (loopRunning || !kmEmbed.visible) return;
             loopRunning = true;
             lastTime = performance.now();
             requestAnimationFrame(loop);
@@ -1103,7 +1126,9 @@
                 if (t >= 1) cameraTween = null;
             }
             draw();
-            if (state.playYear || state.playDay || cameraTween) {
+            if (!kmEmbed.visible) {
+                loopRunning = false;        // außerhalb des Bildes: anhalten, onVisibility setzt fort
+            } else if (state.playYear || state.playDay || cameraTween) {
                 requestAnimationFrame(loop);
             } else {
                 loopRunning = false;
@@ -1158,11 +1183,13 @@
             canvas = document.getElementById('view');
             ctx = canvas.getContext('2d');
 
-            // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst Mitte Deutschlands
-            const start = kmEmbed.state;
-            document.getElementById('lat').value = localStorage.getItem('latitude') || String(start.lat ?? 50);
-            document.getElementById('lon').value = localStorage.getItem('longitude') || String(start.lon ?? 10);
-            readLocationInputs();
+            // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst Mitte Deutschlands;
+            // folgt, wenn ein anderes Modell oder ein anderer Tab einen Ort merkt (embed.js)
+            kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
+                document.getElementById('lat').value = String(lat);
+                document.getElementById('lon').value = String(lon);
+                readLocationInputs();
+            });
             document.getElementById('lat').addEventListener('input', readLocationInputs);
             document.getElementById('lon').addEventListener('input', readLocationInputs);
             document.getElementById('latSlider').addEventListener('input', ev => {
@@ -1186,6 +1213,9 @@
             showNow();
             applyEmbedState(kmEmbed.state);
             new ResizeObserver(resize).observe(canvas);
+            kmEmbed.onVisibility(visible => {
+                if (visible && (state.playYear || state.playDay || cameraTween)) startLoop();
+            });
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
             kmEmbed.ready();
         };
@@ -1205,7 +1235,7 @@
     Kreis nach oben und unten wandert, wie sich Auf- und Untergangsrichtung ändern und wie viel vom Kreis
     über dem Horizont liegt. Zum Nachlesen: Abschnitt 1 und 2 in <code>Erklaerung-Sonnenbahn.md</code>.</p>
 
-    <div class="controls">
+    <div class="controls" data-control="basic">
         <div class="wide">
             <label for="daySlider">Tag</label>
             <input type="range" id="daySlider" min="0" max="364" step="1">
@@ -1219,7 +1249,7 @@
             <button onclick="jumpToEvent(EquinoxType.Winter)" title="Wintersonnenwende">Dezember</button>
         </div>
     </div>
-    <div class="controls">
+    <div class="controls" data-control="basic">
         <div class="wide">
             <label for="timeSlider">Uhrzeit</label>
             <input type="range" id="timeSlider" min="0" max="1435" step="5">
@@ -1252,7 +1282,7 @@
         <span id="shadowLegend" style="--c: var(--shadow)">Schatten des Stabs, gepunktet: Spur der Spitze</span>
     </div>
 
-    <div class="controls">
+    <div class="controls" data-control="extra">
         <span>Ansicht:</span>
         <div class="group">
             <button onclick="setView('oblique')">Schräg</button>
@@ -1266,6 +1296,7 @@
         <label><input type="checkbox" id="show-shadow"> Schatten eines Stabs</label>
     </div>
 
+    <div id="kmPlace" data-control="place" hidden></div>
     <div id="info"></div>
 
     <h2 data-embed="hide">Ort</h2>
