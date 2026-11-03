@@ -149,7 +149,8 @@
         .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
         .tour-nav .end { margin-left: auto; }
         .start-tour { margin: 0 0 14px; }
-        .start-tour button { padding: 6px 14px; font-size: 1em; }
+        .start-tour button { padding: 6px 14px; font-size: 1em; text-align: left; }
+        body.touring #kmPlace { display: none; }
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
@@ -209,9 +210,18 @@
             return (new Date(year, 1, 29).getMonth() === 1) ? 366 : 365;
         }
 
-        /** Kalenderdatum (lokal) des Tages im Jahr */
+        // Zeitzone der Uhrzeiten: die des Browsers, im Rundgang mit festem Ort die deutsche (MEZ/MESZ)
+        let displayZone = null;
+        const TOUR_ZONE = 'Europe/Berlin';
+
+        /** Zeitpunkt zu Tag im Jahr und Uhrzeit [min] in der Zeitzone der Anzeige */
         function dateOfDay(year, day, minutes = 0) {
-            return new Date(year, 0, 1 + Math.floor(day), 0, minutes);
+            return zonedDate(year, 0, 1 + Math.floor(day), 0, minutes, displayZone);
+        }
+
+        /** Option für toLocaleDateString, damit das Datum in der Zeitzone der Anzeige erscheint */
+        function zoneOption() {
+            return displayZone ? { timeZone: displayZone } : {};
         }
 
         function observerLocation() {
@@ -295,13 +305,13 @@
             // Volle Stunden der Uhrzeit auf dem Kreis
             const hours = [];
             for (let h = 0; h < 24; h++) {
-                const t = julianDayFromDate(new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), h));
+                const t = julianDayFromDate(dateOfDay(state.year, state.day, h * 60));
                 hours.push({ hour: h, point: skyPoint(hourAngle(t, loc), dec, phi) });
             }
 
             // Auf-/Untergang nach astro.js (mit Lichtbrechung, Oberrand)
-            const noonDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 12);
-            const offset = -noonDate.getTimezoneOffset() / 60;
+            const noonDate = dateOfDay(state.year, state.day, 720);
+            const offset = zoneOffsetHours(noonDate, displayZone);
             const rs = calculateSunRiseSet(julianDayFromDate(noonDate), loc, offset);
             const midnightJd = julianDayFromDate(dayDate);
             const azimuthAt = (hoursOfDay) => {
@@ -717,7 +727,7 @@
         function zoneName(offset) {
             try {
                 const d = dateOfDay(state.year, state.day, 720);
-                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short' })
+                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short', ...zoneOption() })
                     .formatToParts(d).find(p => p.type === 'timeZoneName');
                 if (part) return part.value;
             } catch (e) { /* ältere Browser */ }
@@ -730,7 +740,7 @@
             const rs = scene.rs;
             const rows = [];
             const add = (k, v) => rows.push(`<tr><td>${k}</td><td>${v}</td></tr>`);
-            add('Datum', d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }));
+            add('Datum', d.toLocaleDateString('de-DE', { ...zoneOption(), weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }));
             add('Deklination δ', formatDeg(scene.dec * RAD2DEG) + ' (Abstand vom Himmelsäquator)');
             if (rs.hasRise || rs.hasSet) {
                 add('Aufgang', rs.hasRise ? `${clock(rs.rise)} ${tz}, Richtung ${formatDeg(scene.riseAz, 0)} (${compassName(scene.riseAz)})` : '–');
@@ -757,7 +767,7 @@
             document.getElementById('shadowLegend').hidden = !visible('shadow');
 
             document.getElementById('dayValue').textContent =
-                d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+                d.toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' });
             document.getElementById('timeValue').textContent = `${clock(state.minutes / 60)} ${tz}`;
         }
 
@@ -774,7 +784,7 @@
             const rs = s.rs, tz = zoneName(s.offset);
             const dir = az => DIRECTION_NAMES[Math.round(normalizeDegrees(az) / 22.5) % 16];
             return {
-                date: dateOfDay(state.year, state.day).toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+                date: dateOfDay(state.year, state.day).toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' }),
                 lat: formatNumber(Math.abs(state.lat), 0),
                 poleSide: state.lat >= 0 ? 'Nord' : 'Süd',
                 tilt: formatNumber(90 - Math.abs(state.lat), 0),
@@ -791,7 +801,32 @@
                 noonShadow: s.culmination[2] > 0.02
                     ? formatNumber(Math.sqrt(1 - s.culmination[2] ** 2) / s.culmination[2], 1) : null,
                 shadowNoonDir: s.culmination[1] < 0 ? 'Norden' : 'Süden',
+                setAngle: sunsetAngle(s.dec) === null ? null : formatNumber(sunsetAngle(s.dec), 0),
+                setMinutes: sunsetMinutes(s.dec) === null ? null : formatNumber(sunsetMinutes(s.dec), 1),
+                solsticeAngle: sunsetAngle(23.44 * DEG2RAD) === null ? null
+                    : formatNumber((sunsetAngle(23.44 * DEG2RAD) + sunsetAngle(-23.44 * DEG2RAD)) / 2, 0),
             };
+        }
+
+        /** Stundenwinkel des Untergangs (Sonnenmitte bei −0°50′) für die Deklination dec, null ohne Untergang */
+        function sunsetHourAngle(dec) {
+            const phi = state.lat * DEG2RAD, h0 = -0.8333 * DEG2RAD;
+            const c = (Math.sin(h0) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec));
+            return Math.abs(c) <= 1 ? Math.acos(c) : null;
+        }
+
+        /** Winkel zwischen Tagkreis und Horizont beim Untergang [°]: sin α = cos φ · sin H0 */
+        function sunsetAngle(dec) {
+            const H = sunsetHourAngle(dec);
+            return H === null ? null : Math.asin(Math.cos(state.lat * DEG2RAD) * Math.sin(H)) * RAD2DEG;
+        }
+
+        /** Dauer, bis die Sonnenscheibe (0,53°) ganz untergegangen ist [min]: Sinkgeschwindigkeit 15°/h · cos φ · cos δ · sin H0 */
+        function sunsetMinutes(dec) {
+            const H = sunsetHourAngle(dec);
+            if (H === null) return null;
+            const rate = 15 * Math.cos(state.lat * DEG2RAD) * Math.cos(dec) * Math.sin(H);   // °/h
+            return rate > 0 ? 0.533 / rate * 60 : null;
         }
 
         /** Satz zu Auf- und Untergang, auch für Polartag und Polarnacht */
@@ -810,27 +845,28 @@
                 title: 'Der Beobachter und sein Himmel',
                 layers: ['dome', 'zenith', 'axis'],
                 view: 'oblique',
-                text: v => `<p>Das Modell zeigt den Himmel so, wie ihn ein Beobachter auf der Erde erlebt. Er steht in
-                    der Mitte der Scheibe. Die Scheibe ist sein <b>Horizont</b>, also alles, was er rundum bis zur Grenze
-                    zwischen Erde und Himmel sieht; die Kompassrose zeigt die Himmelsrichtungen.</p>
-                    <p>Über ihm wölbt sich der Himmel wie eine <b>Halbkugel</b> (gepunktet angedeutet). Ihr höchster Punkt,
-                    senkrecht über dem Beobachter, ist der <b>Zenit</b>.</p>
-                    <p>Weil sich die Erde dreht, scheint sich für den Beobachter der ganze Himmel einmal am Tag um eine
-                    schräge Achse zu drehen, die <b>Himmelsachse</b> (lila gestrichelt). Sie zeigt zum Himmels${v.poleSide.toLowerCase()}pol${
-                    v.poleSide === 'Nord' ? ' in der Nähe des Polarsterns' : ''}. Der Pol steht ${v.lat}° über dem
-                    ${v.poleSide}horizont – so hoch, wie die geografische Breite des Orts angibt.</p>`,
+                text: v => `<p>Wie sieht die Bahn der Sonne am Himmel eigentlich aus? Am Anfang steht ein Beobachter in
+                    der Mitte der Scheibe. Die Scheibe ist sein <b>Horizont</b>, also alles, was er rundum bis zur
+                    Grenze zwischen Erde und Himmel sieht; die Kompassrose zeigt die Himmelsrichtungen.</p>
+                    <p>Über ihm wölbt sich der Himmel wie eine Halbkugel (gepunktet angedeutet). Ihr höchster Punkt,
+                    genau senkrecht über ihm, ist der <b>Zenit</b>.</p>
+                    <p>Weil sich die Erde dreht, scheint sich der ganze Himmel einmal am Tag um eine schräge Achse zu
+                    drehen, die <b>Himmelsachse</b> (lila gestrichelt). Sie zeigt zum Himmels${v.poleSide.toLowerCase()}pol${
+                    v.poleSide === 'Nord' ? ', ganz in der Nähe des Polarsterns' : ''}, und der Pol steht ${v.lat}° über
+                    dem ${v.poleSide}horizont – genau so hoch, wie die geografische Breite des Orts angibt.</p>`,
             },
             {
                 title: 'Die Sonne an einem Tag',
                 layers: ['dome', 'zenith', 'axis', 'circle', 'sun'],
                 event: EquinoxType.Spring, minutes: 6 * 60, playDay: true,
                 view: 'oblique',
-                text: v => `<p>Die Sonne zieht im Lauf eines Tages einen <b>Kreis um die Himmelsachse</b>. Der Kreis steht
-                    quer zur Achse, wie ein Rad um seine Nabe.</p>
-                    <p>Ein Teil des Kreises liegt über dem Horizont: Dort ist die Sonne zu sehen, es ist Tag. Dieses Stück
-                    ist der <b>Tagbogen</b> (hell). Der Rest liegt unter dem Horizont, dann ist Nacht (gestrichelt).</p>
-                    <p>Eingestellt ist der ${v.date}, der Frühlingsanfang: ${v.pct} % des Kreises liegen über dem
-                    Horizont.</p>`,
+                text: v => `<p>Jetzt kommt die Sonne dazu. Im Lauf eines Tages zieht sie einen <b>Kreis um die
+                    Himmelsachse</b>, quer zur Achse wie ein Rad um seine Nabe.</p>
+                    <p>Nur ein Teil des Kreises liegt über dem Horizont. Dieses Stück ist der <b>Tagbogen</b> (hell):
+                    Solange die Sonne darauf läuft, ist Tag. Der Rest liegt unter dem Horizont (gestrichelt), dann ist
+                    Nacht.</p>
+                    <p>Eingestellt ist der ${v.date}, der Frühlingsanfang. ${v.pct} % des Kreises liegen über dem
+                    Horizont, ziemlich genau die Hälfte.</p>`,
             },
             {
                 title: 'Aufgang, Mittag, Untergang',
@@ -838,67 +874,73 @@
                 event: EquinoxType.Spring, minutes: 10 * 60,
                 text: v => `<p>Wo der Kreis den Horizont schneidet, geht die Sonne auf und unter: am ${v.date}
                     ${v.rise ? `${v.rise} und ${v.set}` : 'gar nicht'}.</p>
-                    <p>Am höchsten steht sie mittags genau im ${v.noonDir}, ${v.alt}° über dem Horizont (gepunkteter
-                    Bogen).</p>
-                    <p>Die Zahlen am Kreis sind die Uhrzeiten. In jeder Stunde dreht sich der Himmel um 15° weiter, deshalb
-                    sind die Abstände überall gleich.</p>`,
+                    <p>Dazwischen erreicht sie ihren höchsten Punkt, genau im ${v.noonDir} und ${v.alt}° über dem
+                    Horizont (gepunkteter Bogen).</p>
+                    <p>Die Zahlen am Kreis sind die Uhrzeiten. In jeder Stunde dreht sich der Himmel um 15° weiter,
+                    deshalb liegen sie überall gleich weit auseinander. Dass die 12 trotzdem nicht genau im Süden steht,
+                    hat mit dem wandernden Mittag zu tun (Rundgang „Das Rätsel vom 12. Dezember“ im Modell zur
+                    Tageslänge).</p>`,
             },
             {
                 title: 'Der 21. Juni',
                 layers: ['dome', 'zenith', 'axis', 'circle', 'sun', 'riseSet', 'noon', 'hours', 'cmpEquinox'],
                 event: EquinoxType.Summer, minutes: 10 * 60,
-                text: v => `<p>Am ${v.date} hat sich der Kreis nach ${v.higher ? 'oben' : 'unten'} verschoben. Der graue
-                    Kreis zeigt zum Vergleich den Frühlingsanfang.</p>
-                    <p>${riseSetSentence(v)}</p>`,
+                text: v => `<p>Was ändert sich im Sommer? Am ${v.date} ist der Kreis ein gutes Stück nach
+                    ${v.higher ? 'oben' : 'unten'} gerückt; der graue Kreis zeigt zum Vergleich den Frühlingsanfang.</p>
+                    <p>${riseSetSentence(v)}</p>
+                    <p>Der Tagbogen beginnt und endet jetzt weit im Norden. Die Sonne überstreicht dabei einen großen Teil
+                    des Horizonts.</p>`,
             },
             {
                 title: 'Der 21. Dezember',
                 layers: ['dome', 'zenith', 'axis', 'circle', 'sun', 'riseSet', 'noon', 'hours', 'cmpEquinox', 'cmpJune'],
                 event: EquinoxType.Winter, minutes: 10 * 60,
-                text: v => `<p>Am ${v.date} liegt der Kreis ${v.higher ? 'oben' : 'unten'}, auf der anderen Seite des
-                    grauen Kreises. Orange ist zum Vergleich der 21. Juni eingezeichnet.</p>
-                    <p>${riseSetSentence(v)}</p>`,
+                text: v => `<p>Ein halbes Jahr später liegt der Kreis ${v.higher ? 'oben' : 'unten'}, auf der anderen
+                    Seite des grauen Kreises. Orange ist zum Vergleich der 21. Juni eingezeichnet.</p>
+                    <p>${riseSetSentence(v)}</p>
+                    <p>Nur ein kurzes Stück des Kreises ragt noch über den Horizont – daher die kurzen Wintertage.</p>`,
             },
             {
                 title: 'Wie groß ist der Kreis?',
                 layers: ['dome', 'sphere', 'zenith', 'axis', 'circle', 'sun', 'riseSet', 'noon', 'cmpEquinox', 'cmpJune', 'cmpDec'],
                 playYear: true,
-                text: v => `<p>Im Lauf des Jahres pendelt der Kreis zwischen den beiden Sonnenwenden auf und ab
-                    (orange: 21. Juni, blau: 21. Dezember, grau: Frühlings- und Herbstanfang). Alle Kreise liegen auf der
-                    Himmelskugel (gepunkteter Umriss). Am größten ist der Kreis deshalb, wenn er durch ihre Mitte geht:
-                    zu Frühlings- und Herbstanfang, das ist der Himmelsäquator. Je weiter er nach oben oder unten
-                    wandert, desto kleiner wird er – wie die Breitenkreise auf einem Globus. An den Sonnenwenden ist er
-                    etwa 8 % kleiner, im Juni und im Dezember aber gleich groß. Am ${v.date}: ${v.size} % des
-                    Himmelsäquators.</p>
-                    <p>Für jeden Kreis braucht die Sonne 24 Stunden. Auf dem kleineren Kreis der Sonnenwenden läuft
-                    sie deshalb etwas langsamer: 13,8° statt 15° pro Stunde. Sehen kann man das nicht – wie schnell
-                    die Sonne untergeht oder ein Schatten wandert, hängt viel stärker vom Winkel zum Horizont und von
-                    der Sonnenhöhe ab.</p>
-                    <p><b>Die Antwort auf die Frage oben:</b> Die Bahn im Winter ist kleiner als zu Frühlingsanfang,
-                    aber genauso groß wie im Sommer. Der kurze Wintertag liegt also nicht an der Größe der Bahn: Wir
-                    sehen nur ein viel kürzeres Stück davon, und es liegt tiefer am Himmel.</p>`,
+                text: v => `<p>Läuft die Sonne im Winter auf einer kleineren Bahn? Im Zeitraffer pendelt der Kreis
+                    zwischen den Sonnenwenden auf und ab (orange: 21. Juni, blau: 21. Dezember, grau: Frühlings- und
+                    Herbstanfang). Alle Kreise liegen auf der <b>Himmelskugel</b> (gepunkteter Umriss). Am größten ist
+                    der Kreis, wenn er durch ihre Mitte geht – zu Frühlings- und Herbstanfang, dann ist er der
+                    <b>Himmelsäquator</b>. Je weiter er nach oben oder unten wandert, desto kleiner wird er, wie die
+                    Breitenkreise auf einem Globus: an den Sonnenwenden etwa 8 % kleiner, im Juni und im Dezember aber
+                    gleich groß. Am ${v.date}: ${v.size} % des Himmelsäquators.</p>
+                    <p>Für jeden Kreis braucht die Sonne 24 Stunden, auf den kleineren läuft sie also etwas langsamer:
+                    13,8° statt 15° pro Stunde. Sehen lässt sich das allerdings nicht.</p>
+                    <p><b>Die Antwort auf die Eingangsfrage:</b> Die Bahn im Winter ist kleiner als zu Frühlingsanfang,
+                    aber genauso groß wie im Sommer. Der kurze Wintertag liegt also nicht an der Größe der Bahn. Es ist
+                    nur ein viel kürzeres Stück davon zu sehen, und es liegt tiefer am Himmel.</p>`,
             },
             {
                 title: 'Von der Seite',
                 layers: ['dome', 'sphere', 'zenith', 'axis', 'circle', 'sun', 'riseSet', 'cmpEquinox', 'cmpJune', 'cmpDec'],
                 playYear: true, view: 'east',
-                text: v => `<p>Von Osten gesehen, genau in Höhe des Horizonts, erscheinen alle Kreise als Striche. Sie
-                    liegen parallel zueinander und stehen ${v.tilt}° schräg zum Horizont (90° minus Breite). Der Kreis
+                text: v => `<p>Von Osten gesehen, genau in Höhe des Horizonts, werden aus den Kreisen Striche. Sie liegen
+                    parallel zueinander und stehen ${v.tilt}° schräg zum Horizont (90° minus Breite). Der Kreis
                     verschiebt sich im Lauf des Jahres nur, er kippt nicht.</p>
-                    <p>Die Himmelskugel erscheint von hier als Kreis, und die Tagkreise sind Sehnen darin: Der Strich
-                    durch die Mitte (Himmelsäquator) ist der längste, die Striche der Sonnenwenden sind kürzer.</p>
-                    <p>Ursache ist die geneigte Erdachse, mehr dazu in Abschnitt 2 von
-                    <code>Erklaerung-Sonnenbahn.md</code>. Wie die Himmelsachse mit der Erdachse zusammenhängt, zeigt
-                    <code>Himmelsachse3D.html</code>.</p>`,
+                    <p>Die Himmelskugel erscheint von hier als Kreis, die Tagkreise als Sehnen darin: Der Strich durch
+                    die Mitte, der Himmelsäquator, ist der längste, die Striche der Sonnenwenden sind kürzer.</p>
+                    <p>Warum die Kreise so schräg stehen und im Jahr auf und ab wandern, liegt an der geneigten Erdachse.
+                    Wie sie mit der Himmelsachse zusammenhängt, zeigt das Modell zur Himmelsachse.</p>`,
             },
             {
-                title: 'Selbst ausprobieren',
-                layers: null,
-                view: 'oblique',
-                text: v => `<p>Jetzt sind alle Teile des Modells zu sehen. Mit den Reglern „Tag“ und „Uhrzeit“ lässt sich
-                    jeder Zeitpunkt einstellen; Ziehen dreht die Ansicht, das Mausrad zoomt.</p>
-                    <p>Unter „Ort“ lässt sich die Breite ändern: Am Äquator stehen die Kreise senkrecht und liegen immer
-                    zur Hälfte über dem Horizont, am Pol liegen sie flach – dann gibt es Polartag und Polarnacht.</p>`,
+                title: 'Wie schnell geht die Sonne unter?',
+                layers: ['dome', 'sphere', 'zenith', 'axis', 'circle', 'sun', 'riseSet', 'cmpEquinox', 'cmpJune', 'cmpDec'],
+                playYear: true, view: 'east',
+                text: v => `<p>Aus dieser Ansicht lässt sich noch etwas ablesen: Die Kreise treffen den Horizont
+                    schräg, und je steiler, desto schneller taucht die Sonne ab. Zu Frühlings- und Herbstanfang ist
+                    der Winkel am größten, ${v.tilt}°. An beiden Sonnenwenden ist er flacher, rund ${v.solsticeAngle ??
+                    '–'}°, weil der kleinere Kreis den Horizont seitlicher trifft.</p>
+                    <p>Die Sonnenscheibe ist ein halbes Grad groß. Vom ersten Berühren des Horizonts bis zum letzten
+                    Lichtpunkt vergehen deshalb nur wenige Minuten${v.setMinutes ? `, am ${v.date} ${v.setMinutes}
+                    Minuten bei einem Winkel von ${v.setAngle}°` : ''}. Über das Jahr pendelt das zwischen gut drei
+                    und gut vier Minuten – im Frühling und im Herbst verschwindet die Sonne am schnellsten.</p>`,
             },
             {
                 title: 'Der Schatten eines Stabs',
@@ -907,12 +949,22 @@
                 view: 'oblique',
                 text: v => `<p>In der Mitte steht jetzt ein senkrechter Stab. Sein Schatten zeigt immer von der Sonne weg:
                     morgens nach Westen, mittags nach ${v.shadowNoonDir}, abends nach Osten. Je tiefer die Sonne steht,
-                    desto länger ist er${v.noonShadow ? ` – am ${v.date} ist er mittags ${v.noonShadow}-mal so lang wie
-                    der Stab` : ''}. Morgens und abends reicht er weit über die Scheibe hinaus.</p>
-                    <p>Die gepunktete Linie ist die Spur der Schattenspitze über den Tag, mit den vollen Stunden – so
-                    funktioniert eine Sonnenuhr. Zu Frühlings- und Herbstanfang ist die Spur eine gerade Linie, sonst ist
-                    sie gebogen: Mit dem Regler „Tag“ ausprobieren.</p>
-                    <p>Außerhalb der Tour schaltet das Häkchen „Schatten eines Stabs“ unter dem Bild den Stab ein.</p>`,
+                    desto länger wird er${v.noonShadow ? ` – am ${v.date} ist er mittags ${v.noonShadow}-mal so lang
+                    wie der Stab` : ''}. Morgens und abends reicht er weit über die Scheibe hinaus.</p>
+                    <p>Die gepunktete Linie ist die Spur der Schattenspitze über den Tag, mit den vollen Stunden. Nach
+                    diesem Prinzip funktioniert eine <b>Sonnenuhr</b>. Zu Frühlings- und Herbstanfang ist die Spur eine
+                    gerade Linie, sonst ist sie gebogen.</p>`,
+            },
+            {
+                title: 'Selbst ausprobieren',
+                layers: null,
+                view: 'oblique',
+                text: v => `<p>Damit ist der Rundgang zu Ende, und alle Teile des Modells sind zu sehen. Mit den Reglern
+                    „Tag“ und „Uhrzeit“ lässt sich jeder Zeitpunkt einstellen; Ziehen dreht die Ansicht, das Mausrad
+                    zoomt. Den Stab schaltet das Häkchen „Schatten eines Stabs“ ein.</p>
+                    <p>Mit „Fertig“ gilt wieder der eigene Ort. Ein Ausflug in andere Breiten lohnt sich: Am Äquator
+                    stehen die Kreise senkrecht und liegen immer zur Hälfte über dem Horizont, am Pol liegen sie flach –
+                    dann gibt es Polartag und Polarnacht.</p>`,
             },
         ];
 
@@ -920,9 +972,22 @@
         let tourHtml = '';
         let fixedLayers = null;     // Ebenen aus der Adresse (layers), sonst null = Häkchen
 
-        /** Tour ab Schritt index (0 = erster); showBox = false stellt nur den Zustand des Schritts ein */
+        let tourButton = true;      // Startknopf sichtbar (eingebettet nur mit tour)
+
+        /**
+         * Tour ab Schritt index (0 = erster); showBox = false stellt nur den Zustand des Schritts ein. Mit Kasten
+         * rechnet der Rundgang für TOUR_PLACE, Ort und Felder werden danach wiederhergestellt.
+         */
         function startTour(index = 0, showBox = true) {
-            tour = { index: Math.min(Math.max(index, 0), TOUR.length - 1) };
+            const saved = tour ? tour.saved : null;
+            tour = { index: Math.min(Math.max(index, 0), TOUR.length - 1), saved };
+            if (showBox && !tour.saved) {
+                tour.saved = { lat: document.getElementById('lat').value, lon: document.getElementById('lon').value };
+                setPlaceInputs(TOUR_PLACE.lat, TOUR_PLACE.lon);
+                displayZone = TOUR_ZONE;
+                for (const id of ['lat', 'lon', 'latSlider']) document.getElementById(id).disabled = true;
+                document.body.classList.add('touring');
+            }
             document.getElementById('tour').hidden = !showBox;
             document.getElementById('tourStart').hidden = true;
             for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
@@ -932,10 +997,17 @@
         }
 
         function endTour() {
+            const saved = tour.saved;
             tour = null;
             tourHtml = '';
+            if (saved) {
+                for (const id of ['lat', 'lon', 'latSlider']) document.getElementById(id).disabled = false;
+                document.body.classList.remove('touring');
+                displayZone = null;
+                setPlaceInputs(saved.lat, saved.lon);
+            }
             document.getElementById('tour').hidden = true;
-            document.getElementById('tourStart').hidden = false;
+            document.getElementById('tourStart').hidden = !tourButton;
             for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = false;
             setPlay('year', false);
             setPlay('day', false);
@@ -958,7 +1030,8 @@
             if (step.minutes !== undefined) setMinutes(step.minutes);
             if (step.view) setView(step.view);
             document.getElementById('tourTitle').textContent = step.title;
-            document.getElementById('tourCount').textContent = `Schritt ${tour.index + 1} von ${TOUR.length}`;
+            document.getElementById('tourCount').textContent = `Schritt ${tour.index + 1} von ${TOUR.length}`
+                + (tour.saved ? ' · Mitte Deutschlands (50° N, 10° O), deutsche Uhrzeit' : '');
             document.getElementById('tourBack').disabled = tour.index === 0;
             document.getElementById('tourNext').textContent = tour.index === TOUR.length - 1 ? 'Fertig' : 'Weiter →';
             requestDraw();
@@ -1002,6 +1075,15 @@
             try { return dmsToDecimal(s); } catch (e) { return NaN; }
         }
 
+        // Rundgang mit Kasten rechnet immer für denselben Ort, damit die Texte stimmen
+        const TOUR_PLACE = { lat: 50, lon: 10 };
+
+        function setPlaceInputs(lat, lon) {
+            document.getElementById('lat').value = String(lat);
+            document.getElementById('lon').value = String(lon);
+            readLocationInputs();
+        }
+
         function readLocationInputs() {
             const latInput = document.getElementById('lat'), lonInput = document.getElementById('lon');
             const lat = parseCoordinate(latInput.value), lon = parseCoordinate(lonInput.value);
@@ -1038,17 +1120,16 @@
 
         /** Sprung zu Tagundnachtgleiche/Sonnenwende (EquinoxType 0..3) im eingestellten Jahr */
         function jumpToEvent(type) {
-            const d = julianDayToDate(calculateEquinoxSolstice(state.year, type));
-            const start = new Date(state.year, 0, 1);
-            const local = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-            setDay(Math.round((local - start) / 86400000));
+            const p = zonedParts(julianDayToDate(calculateEquinoxSolstice(state.year, type)), displayZone);
+            setDay(Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(state.year, 0, 1)) / 86400000));
         }
 
         /** Jahr, Tag und Uhrzeit eines Zeitpunkts (Ortszeit des Browsers) einstellen */
         function showDate(date) {
-            setYear(date.getFullYear());
-            setDay(Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - new Date(date.getFullYear(), 0, 1)) / 86400000));
-            setMinutes(date.getHours() * 60 + date.getMinutes());
+            const p = zonedParts(date, displayZone);
+            setYear(p.year);
+            setDay(Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(p.year, 0, 1)) / 86400000));
+            setMinutes(p.hours * 60 + p.minutes);
         }
 
         function showNow() {
@@ -1061,8 +1142,12 @@
          * gilt vor dem Schritt.
          */
         function applyEmbedState(s) {
-            if (s.step || s.tour) {
-                startTour((s.step || 1) - 1, s.tour || !kmEmbed.active);
+            // Startknopf: eigenständig immer, eingebettet nur mit tour; tour mit step startet sofort,
+            // step allein stellt eingebettet nur den Zustand des Schritts ein
+            tourButton = !kmEmbed.active || s.tour;
+            document.getElementById('tourStart').hidden = !tourButton;
+            if (s.step) {
+                startTour(s.step - 1, s.tour || !kmEmbed.active);
                 cameraTween = null;
                 const view = TOUR[tour.index].view;
                 if (view) state.cam = { ...VIEWS[view] };
@@ -1186,9 +1271,9 @@
             // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst Mitte Deutschlands;
             // folgt, wenn ein anderes Modell oder ein anderer Tab einen Ort merkt (embed.js)
             kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
-                document.getElementById('lat').value = String(lat);
-                document.getElementById('lon').value = String(lon);
-                readLocationInputs();
+                // während eines Rundgangs erst danach übernehmen
+                if (tour && tour.saved) { tour.saved.lat = String(lat); tour.saved.lon = String(lon); return; }
+                setPlaceInputs(lat, lon);
             });
             document.getElementById('lat').addEventListener('input', readLocationInputs);
             document.getElementById('lon').addEventListener('input', readLocationInputs);
@@ -1227,7 +1312,7 @@
     niedrig, und schon am Nachmittag wird es dunkel. Wie sieht die Bahn der Sonne am Himmel eigentlich aus – und
     was ändert sich an ihr im Lauf des Jahres? Läuft die Sonne im Winter auf einer kleineren Bahn als im Sommer, oder
     sehen wir nur ein kürzeres Stück davon?</p>
-    <p class="start-tour" id="tourStart" data-embed="hide"><button onclick="startTour()">▶ Schritt für Schritt erklären</button>
+    <p class="start-tour" id="tourStart" hidden><button onclick="startTour()">▶ Rundgang: Läuft die Sonne im Winter auf einer kleineren Bahn?</button>
     <span class="feedback">Blendet die Teile des Modells nach und nach ein.</span></p>
     <p data-embed="hide">Die Scheibe ist der Horizont um einen Beobachter in der Mitte, der Kreis ist die Bahn, auf der die Sonne
     an einem Tag um die Himmelsachse läuft. Der helle Teil über der Scheibe ist der sichtbare <b>Tagbogen</b>,

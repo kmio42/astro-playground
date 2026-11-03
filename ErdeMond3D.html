@@ -100,6 +100,8 @@
 
         /* Geführte Rundgänge */
         .tours { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 0 0 8px; }
+        .tours[hidden], .tours button[hidden] { display: none; }
+        body.touring #kmPlace { display: none; }
         .tours button[aria-pressed="true"] { font-weight: 600; outline: 2px solid #5999ff; outline-offset: -1px; }
         .stage { position: relative; }
         .tour {
@@ -1239,9 +1241,11 @@
         /** Datum/Zeit eines JD als Teile in Lokalzeit oder UTC (Checkbox „Lokalzeit“) */
         function dateParts(jd) {
             const d = julianDayToDate(jd);
-            return useLocalTime
-                ? { y: d.getFullYear(), mo: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes(), wd: d.getDay() }
-                : { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes(), wd: d.getUTCDay() };
+            if (useLocalTime) {
+                const p = zonedParts(d, localZone);
+                return { y: p.year, mo: p.month + 1, d: p.day, h: p.hours, mi: p.minutes, wd: p.weekday };
+            }
+            return { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes(), wd: d.getUTCDay() };
         }
 
         function longDate(jd) {
@@ -1666,10 +1670,43 @@
         };
 
         let tour = null;                   // { id, index, saved }
+        let tourButtons = true;            // Startknöpfe sichtbar (eingebettet nur mit tour)
+
+        // Rundgänge rechnen immer für denselben Ort, damit die Texte stimmen
+        const TOUR_PLACE = { lat: 50, lon: 10 };
+
+        function setPlaceInputs(lat, lon) {
+            document.getElementById('latitude').value = String(lat);
+            document.getElementById('longitude').value = String(lon);
+            validateCoordinate(String(lat), 'latitude');
+            validateCoordinate(String(lon), 'longitude');
+        }
+
+        /** Im Rundgang deutsche Uhrzeit (MEZ/MESZ) statt UTC oder der Zeitzone des Browsers; danach wie vorher */
+        function setTourZone(on, local) {
+            localZone = on ? 'Europe/Berlin' : null;
+            useLocalTime = local;
+            const box = document.getElementById('localTime');
+            box.checked = local;
+            box.disabled = on;
+            fillGregorianDate(datetime);
+            update();
+        }
 
         function startTour(id) {
-            // Anzeigen und Maßstab von vor dem Rundgang merken (ein Wechsel zwischen Rundgängen behält den ersten Stand)
-            const saved = tour ? tour.saved : { layers: Object.assign({}, layers), scale: [bodyScale, distScale] };
+            // Anzeigen, Maßstab und Ort von vor dem Rundgang merken (ein Wechsel zwischen Rundgängen behält den ersten Stand)
+            const saved = tour ? tour.saved : {
+                layers: Object.assign({}, layers), scale: [bodyScale, distScale],
+                lat: document.getElementById('latitude').value, lon: document.getElementById('longitude').value,
+                useLocalTime,
+            };
+            if (!tour) {
+                setPlaceInputs(TOUR_PLACE.lat, TOUR_PLACE.lon);
+                setTourZone(true, true);
+                // ein anderswo gemerkter Ort gilt erst nach dem Rundgang (ui.js)
+                window.kmPlaceHold = (lat, lon) => { saved.lat = String(lat); saved.lon = String(lon); };
+                document.body.classList.add('touring');
+            }
             tour = { id, index: 0, saved };
             document.getElementById('tour').hidden = false;
             showTourStep();
@@ -1682,6 +1719,10 @@
             setPlaying(false);
             setLayers(saved.layers);
             setScale(...saved.scale);
+            window.kmPlaceHold = null;
+            document.body.classList.remove('touring');
+            setTourZone(false, saved.useLocalTime);
+            setPlaceInputs(saved.lat, saved.lon);
             document.getElementById('tour').hidden = true;
             for (const b of document.querySelectorAll('[data-tour]')) b.setAttribute('aria-pressed', 'false');
         }
@@ -1698,7 +1739,8 @@
         function showTourStep() {
             const def = TOURS[tour.id], step = tourStep(), n = def.steps.length;
             for (const b of document.querySelectorAll('[data-tour]')) b.setAttribute('aria-pressed', b.dataset.tour === tour.id);
-            document.getElementById('tourHead').textContent = `${def.title} · Schritt ${tour.index + 1} von ${n}`;
+            document.getElementById('tourHead').textContent = `${def.title} · Schritt ${tour.index + 1} von ${n}`
+                + ' · Mitte Deutschlands (50° N, 10° O), deutsche Uhrzeit';
             document.getElementById('tourTitle').textContent = step.title;
             document.getElementById('tourBack').disabled = tour.index === 0;
             document.getElementById('tourNext').textContent = tour.index === n - 1 ? 'Fertig' : 'Weiter ▶';
@@ -1929,7 +1971,14 @@
          * aus VIEWS), layers (Liste der sichtbaren Anzeigen, data-layer), play.
          */
         function applyEmbedState(s) {
-            if (s.tourName || s.step) {
+            // Startknöpfe: eigenständig alle, eingebettet nur mit tour, mit Namen nur dieser; tour mit step startet
+            // den Rundgang sofort, step allein stellt eingebettet nur den Zustand des Schritts ein
+            tourButtons = !kmEmbed.active || s.tour;
+            document.getElementById('tourButtons').hidden = !tourButtons;
+            if (s.tourName && TOURS[s.tourName]) {
+                for (const b of document.querySelectorAll('#tourButtons [data-tour]')) b.hidden = b.dataset.tour !== s.tourName;
+            }
+            if (s.step) {
                 const id = TOURS[s.tourName] ? s.tourName : 'height';
                 const steps = TOURS[id].steps;
                 const index = Math.min(Math.max((s.step || 1) - 1, 0), steps.length - 1);
@@ -1966,7 +2015,7 @@
         <span id="textureSwitch"></span>
     </p>
 
-    <div class="tours" data-control="extra">
+    <div class="tours" id="tourButtons">
         <b>Geführte Rundgänge:</b>
         <button data-tour="height">Wie hoch steht der Mond?</button>
         <button data-tour="nodes">Knoten und Finsternisse</button>

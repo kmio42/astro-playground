@@ -48,10 +48,11 @@ je näher die Sonne dem Zenit kommt, desto stärker ändert schon ein kleines St
 
 - Einstieg persönlicher machen (eigene Beobachtung, z. B. Schatten auf dem Balkon im Winter und im
   Sommer)?
-- Rundgang einbauen: ein Modell mit `data-tour="ja"` statt des ersten Modells, oder zusätzlich am
-  Ende „Schritt für Schritt“. Schritte: 1 Der Beobachter und sein Himmel, 2 Die Sonne an einem Tag,
-  3 Aufgang, Mittag, Untergang, 4 Der 21. Juni, 5 Der 21. Dezember, 6 Wie groß ist der Kreis?,
-  7 Von der Seite, 8 Selbst ausprobieren, 9 Der Schatten eines Stabs.
+- Nach dem Konzept trägt der Rundgang den Beitrag (`data-tour="ja"`); der Text wird auf Einstieg,
+  Überleitung, Impuls und Stichwörter gekürzt wie in 1a/1b. Schritte (überarbeitet, 10): 1 Der Beobachter
+  und sein Himmel, 2 Die Sonne an einem Tag, 3 Aufgang, Mittag, Untergang, 4 Der 21. Juni, 5 Der
+  21. Dezember, 6 Wie groß ist der Kreis?, 7 Von der Seite, 8 Wie schnell geht die Sonne unter?
+  (Winkel und Dauer des Untergangs), 9 Der Schatten eines Stabs, 10 Selbst ausprobieren.
 - Das zweite Modell könnte direkt mit `data-tour="ja" data-schritt="7"` (Von der Seite) starten.
 - Beitrag 1 erklärt schon, warum Mittag nicht um 12 Uhr ist; der Satz „Mittag ist nicht um
   12 Uhr …“ kann auf Beitrag 1 verweisen.

@@ -151,7 +151,8 @@
         .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
         .tour-nav .end { margin-left: auto; }
         .start-tour { margin: 0 0 14px; }
-        .start-tour button { padding: 6px 14px; font-size: 1em; }
+        .start-tour button { padding: 6px 14px; font-size: 1em; text-align: left; }
+        body.touring #kmPlace { display: none; }
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
@@ -312,9 +313,18 @@
             return (new Date(year, 1, 29).getMonth() === 1) ? 366 : 365;
         }
 
-        /** Kalenderdatum (lokal) des Tages im Jahr */
+        // Zeitzone der Uhrzeiten: die des Browsers, im Rundgang mit festem Ort die deutsche (MEZ/MESZ)
+        let displayZone = null;
+        const TOUR_ZONE = 'Europe/Berlin';
+
+        /** Zeitpunkt zu Tag im Jahr und Uhrzeit [min] in der Zeitzone der Anzeige */
         function dateOfDay(year, day, minutes = 0) {
-            return new Date(year, 0, 1 + Math.floor(day), 0, minutes);
+            return zonedDate(year, 0, 1 + Math.floor(day), 0, minutes, displayZone);
+        }
+
+        /** Option für toLocaleDateString, damit das Datum in der Zeitzone der Anzeige erscheint */
+        function zoneOption() {
+            return displayZone ? { timeZone: displayZone } : {};
         }
 
         function observerLocation() {
@@ -333,9 +343,8 @@
 
         /** Auf-, Untergang und Mittag des eingestellten Tages nach astro.js */
         function riseSetOfDay() {
-            const d = dateOfDay(state.year, state.day);
-            const noonDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
-            const offset = -noonDate.getTimezoneOffset() / 60;
+            const noonDate = dateOfDay(state.year, state.day, 720);
+            const offset = zoneOffsetHours(noonDate, displayZone);
             return { rs: calculateSunRiseSet(julianDayFromDate(noonDate), observerLocation(), offset), offset };
         }
 
@@ -881,7 +890,7 @@
         function zoneName(offset) {
             try {
                 const d = dateOfDay(state.year, state.day, 720);
-                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short' })
+                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short', ...zoneOption() })
                     .formatToParts(d).find(p => p.type === 'timeZoneName');
                 if (part) return part.value;
             } catch (e) { /* ältere Browser */ }
@@ -909,7 +918,7 @@
             const rows = [];
             const row = (k, v, note = '') => rows.push(`<tr><td>${k}</td><td>${v}${note ? ` <span class="note">${note}</span>` : ''}</td></tr>`);
             const head = (k, note) => rows.push(`<tr class="head"><td colspan="2">${k} <span class="note">${note}</span></td></tr>`);
-            row('Zeitpunkt', d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+            row('Zeitpunkt', d.toLocaleDateString('de-DE', { ...zoneOption(), weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
                 + `, ${clock(state.minutes / 60)} ${tz}`);
 
             head('Äquatorsystem', '– an der Erdachse festgemacht');
@@ -933,7 +942,7 @@
                 `von der Sonne aus ${formatNumber(ao.fromSunArcsec, 1)}″, vom Polarstern aus wie ein Haar aus ${twoDigits(ao.hairKm)} km Entfernung`);
             document.getElementById('info').innerHTML = `<table>${rows.join('')}</table>`;
 
-            document.getElementById('dayValue').textContent = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+            document.getElementById('dayValue').textContent = d.toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' });
             document.getElementById('timeValue').textContent = `${clock(state.minutes / 60)} ${tz}`;
             document.getElementById('earthValue').textContent = state.earth < 0.005 ? 'Punkt' : `${formatNumber(state.earth * 100, 0)} %`;
             document.getElementById('frameSpace').classList.toggle('active', state.frame < 0.5);
@@ -950,7 +959,7 @@
             const ao = axisOffset();
             const decDeg = sc.dec * RAD2DEG;
             return {
-                date: dateOfDay(state.year, state.day).toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+                date: dateOfDay(state.year, state.day).toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' }),
                 lat: formatNumber(Math.abs(state.lat), 0),
                 latSide: north ? 'N' : 'S',
                 poleSide: north ? 'Nord' : 'Süd',
@@ -980,21 +989,23 @@
                 title: 'Die Erde von außen',
                 layers: ['earth', 'grid', 'earthAxis', 'sun'],
                 frame: 0, earth: 0.85, view: 'oblique', event: EquinoxType.Summer, playDay: true,
-                text: v => `<p>Das Modell zeigt die Erde von außen. Sie dreht sich in 24 Stunden einmal um ihre
+                text: v => `<p>Warum dreht sich der ganze Himmel um einen Punkt beim Polarstern? Die Antwort beginnt
+                    mit einem Blick von außen auf die Erde. Sie dreht sich in 24 Stunden einmal um ihre
                     <b>Erdachse</b> (lila), die durch Nord- und Südpol geht.</p>
-                    <p>Die Sonne steht in diesem Modell immer rechts, die helle Hälfte der Erde hat gerade Tag. Am
+                    <p>Die Sonne steht in diesem Modell immer rechts; die helle Hälfte der Erde hat gerade Tag. Am
                     ${v.date} ist die ${v.sunHalf} der Sonne zugeneigt.</p>`,
             },
             {
                 title: 'Die Himmelskugel',
                 layers: ['earth', 'grid', 'earthAxis', 'sun', 'sky', 'celEquator', 'poles'],
                 frame: 0, earth: 0.85, view: 'oblique', playDay: true,
-                text: v => `<p>Die Sterne sind so weit weg, dass sie alle gleich weit entfernt scheinen – wie auf einer
-                    riesigen Kugel um die Erde, der <b>Himmelskugel</b> (gepunkteter Umriss).</p>
-                    <p>Verlängert man die Erdachse bis zur Himmelskugel, trifft sie den <b>Himmelsnordpol</b> und den
-                    <b>Himmelssüdpol</b>; dicht am Nordpol steht der Polarstern. Verlängert man die Ebene des
-                    Erdäquators, schneidet sie die Kugel im <b>Himmelsäquator</b> (blau). Pole und Äquator des Himmels
-                    sind also Pole und Äquator der Erde, an den Himmel verlängert.</p>`,
+                text: v => `<p>Die Sterne sind so weit entfernt, dass sie alle gleich weit weg scheinen, wie auf einer
+                    riesigen Kugel um die Erde: der <b>Himmelskugel</b> (gepunkteter Umriss).</p>
+                    <p>Verlängert man die Erdachse bis zu dieser Kugel, trifft sie den <b>Himmelsnordpol</b> und den
+                    <b>Himmelssüdpol</b>. Dicht am Nordpol steht der Polarstern – deshalb scheint er stillzustehen,
+                    während sich alle anderen Sterne um ihn drehen. Die verlängerte Ebene des Erdäquators schneidet die
+                    Kugel im <b>Himmelsäquator</b> (blau). Pole und Äquator des Himmels sind also die der Erde, an den
+                    Himmel verlängert.</p>`,
             },
             {
                 title: 'Ein Beobachter',
@@ -1003,9 +1014,9 @@
                 text: v => `<p>Bei ${v.lat}° ${v.latSide} steht ein Beobachter. Für ihn ist die Erde flach: Er sieht
                     seinen <b>Horizont</b> (grüne Scheibe), der die Erdkugel nur an seinem Standort berührt. Senkrecht
                     über ihm liegt der <b>Zenit</b>, in Verlängerung des Erdradius.</p>
-                    <p>Weil die Erde rund ist, liegt der Horizont an jedem Ort anders im Raum, und er dreht sich mit
-                    der Erde. Höhe und Himmelsrichtung, die der Beobachter misst (<b>Horizontsystem</b>), gelten
-                    deshalb nur für seinen Ort und nur für diesen Augenblick.</p>`,
+                    <p>Weil die Erde rund ist, liegt dieser Horizont an jedem Ort anders im Raum, und er dreht sich mit
+                    der Erde. Höhe und Himmelsrichtung, die der Beobachter misst, gelten deshalb nur für seinen Ort und
+                    nur für diesen Augenblick. Diese Art, den Himmel zu beschreiben, heißt <b>Horizontsystem</b>.</p>`,
             },
             {
                 title: 'Seine Himmelsachse',
@@ -1018,18 +1029,18 @@
                     Breite φ. Der zweite Winkel φ im Erdmittelpunkt zeigt, warum: Der Horizont steht senkrecht auf dem
                     Erdradius, die Achse senkrecht auf dem Äquator – beide sind um 90° gedreht, der Winkel bleibt
                     gleich. Darum steht der Himmels${v.poleSide.toLowerCase()}pol ${v.lat}° über dem
-                    ${v.poleSide}horizont.</p>`,
+                    ${v.poleSide}horizont, und im Süden Europas tiefer als im Norden.</p>`,
             },
             {
                 title: 'Parallel, aber nicht dieselbe Linie',
                 layers: [...ALL_SPACE, 'sun', 'latAngle'],
                 frame: 0, earth: 0.06, view: 'oblique', duration: 2500,
-                text: v => `<p>Ganz genau sind Erdachse und Himmelsachse nicht dieselbe Linie: Sie laufen parallel
-                    nebeneinander, bei ${v.lat}° Breite im Abstand von ${v.offsetKm} km.</p>
-                    <p>Im Modell ist die Himmelskugel aber viel zu klein. Jetzt schrumpft die Erde: Je kleiner sie
-                    gegenüber der Himmelskugel ist, desto enger rücken die beiden Achsen zusammen. Schon von der Sonne
-                    aus wäre der Abstand nur ${v.fromSun}″ (Bogensekunden) groß, vom Polarstern aus so groß wie ein
-                    Haar aus ${v.hairKm} km Entfernung. Am Himmel zeigen beide Achsen deshalb auf denselben Punkt.</p>`,
+                text: v => `<p>Genau genommen sind Erdachse und Himmelsachse zwei verschiedene Linien: Sie laufen
+                    parallel nebeneinander, bei ${v.lat}° Breite im Abstand von ${v.offsetKm} km.</p>
+                    <p>Im Modell ist die Himmelskugel allerdings viel zu klein. Jetzt schrumpft die Erde, und die beiden
+                    Achsen rücken zusammen. In Wirklichkeit wäre der Abstand schon von der Sonne aus nur ${v.fromSun}″
+                    (Bogensekunden) groß, vom Polarstern aus so groß wie ein Haar aus ${v.hairKm} km Entfernung. Am
+                    Himmel zeigen beide Achsen deshalb auf denselben Punkt – für jeden Beobachter auf der Erde.</p>`,
             },
             {
                 title: 'Die Sonne im Äquatorsystem',
@@ -1039,9 +1050,9 @@
                     sie über oder unter dem Himmelsäquator steht, ist ihre <b>Deklination</b> δ, am ${v.date}
                     ${v.dec}°.</p>
                     <p>Während sich die Erde dreht, bleibt δ gleich: Die Sonne läuft am Himmel auf einem Kreis parallel
-                    zum Himmelsäquator, ihrem <b>Tagkreis</b> (orange). Der <b>Stundenwinkel</b> t sagt, wie weit sich die
-                    Erde seit dem Mittag weitergedreht hat, 15° pro Stunde. δ und t bilden das <b>Äquatorsystem</b>: Es
-                    hängt an der Erdachse statt am Horizont.</p>`,
+                    zum Himmelsäquator, ihrem <b>Tagkreis</b> (orange). Der <b>Stundenwinkel</b> t zählt, wie weit sich
+                    die Erde seit dem Mittag weitergedreht hat, 15° pro Stunde. δ und t gelten für alle Orte zugleich,
+                    denn sie hängen an der Erdachse statt am Horizont: das <b>Äquatorsystem</b>.</p>`,
             },
             {
                 title: 'Höhe und Richtung',
@@ -1051,19 +1062,19 @@
                     Horizont und <b>Richtung</b> A, von Norden über Osten gezählt. Gerade sind es h = ${v.alt}° und
                     A = ${v.az}°.</p>
                     <p>Diese Werte ändern sich ständig, weil sich der Horizont mit der Erde dreht: Morgens kippt er der
-                    Sonne entgegen, abends von ihr weg. δ bleibt dabei gleich. Der Teil des Tagkreises über dem
-                    Horizont (durchgezogen) ist der Tagbogen.</p>`,
+                    Sonne entgegen, abends von ihr weg. δ bleibt dabei gleich. Das Stück des Tagkreises über dem Horizont
+                    (durchgezogen) ist der Tagbogen.</p>`,
             },
             {
                 title: 'Blickwechsel: der Himmel dreht sich',
                 layers: ['earth', 'sky', 'celEquator', 'poles', 'observer', 'zenith', 'obsAxis', 'sun', 'dayCircle', 'altitude'],
                 frame: 1, earth: 0.06, view: 'oblique', playDay: true, duration: 2500,
                 text: v => `<p>Jetzt fährt die Kamera zum Beobachter und dreht sich mit ihm. Sein Horizont liegt still,
-                    dafür dreht sich der ganze Himmel um die Himmelsachse – mit Himmelsäquator, Tagkreis und Sonne.
-                    Die Erde ist zu einem Punkt unter dem Horizont geschrumpft.</p>
-                    <p>Das ist das Bild aus <code>Tagbogen3D.html</code>. Beide Ansichten zeigen dasselbe: Ob sich die
-                    Erde dreht oder der Himmel, ist eine Frage des Blickwinkels. Die Himmelsachse ist dieselbe wie
-                    vorher, nur vom Horizont aus gesehen: um ${v.lat}° gegen ihn geneigt.</p>`,
+                    dafür dreht sich der ganze Himmel um die Himmelsachse – mit Himmelsäquator, Tagkreis und Sonne. Die
+                    Erde ist zu einem Punkt unter dem Horizont geschrumpft.</p>
+                    <p>Genau so zeigt es das Modell zum Tagbogen. Beide Ansichten beschreiben dasselbe: Ob sich die Erde
+                    dreht oder der Himmel, ist eine Frage des Standpunkts. Die Himmelsachse ist dieselbe wie vorher, nur
+                    vom Horizont aus gesehen, um ${v.lat}° gegen ihn geneigt.</p>`,
             },
             {
                 title: 'Die Mittagshöhe',
@@ -1073,29 +1084,29 @@
                     Höhe aus zwei Winkeln zusammen: Der Himmelsäquator steht ${v.eqAlt}° über dem
                     ${v.noonSide}horizont (90° − φ, weil die Achse um φ geneigt ist), die Sonne steht δ = ${v.dec}°
                     ${v.decAbove ? 'darüber' : 'darunter'}.</p>
-                    <p>Mittagshöhe = ${v.formula} = ${v.noon}°. Die Formel verbindet beide Systeme: φ kommt vom Ort,
-                    δ von der Sonne, und heraus kommt eine Höhe im Horizontsystem.</p>`,
+                    <p>Mittagshöhe = ${v.formula} = ${v.noon}°. Diese kleine Formel ist die Brücke zwischen beiden
+                    Systemen: φ kommt vom Ort, δ von der Sonne, und heraus kommt eine Höhe über dem Horizont.</p>`,
             },
             {
                 title: 'Durch das Jahr',
                 layers: [...ALL_SPACE, 'sun', 'rays', 'decAngle', 'dayCircle'],
                 frame: 0, earth: 0.55, view: 'side', playYear: true,
-                text: v => `<p>Im Lauf des Jahres ändert sich nur die Deklination: Die Sonne steht im Juni bis zu
-                    23,44° über der Äquatorebene, im Dezember bis zu 23,44° darunter. Der Tagkreis wandert mit ihr auf
-                    und ab, die Achsen behalten ihre Richtung. Am ${v.date}: δ = ${v.dec}°.</p>
-                    <p>In Wirklichkeit wandert nicht die Sonne auf und ab, sondern die Erde läuft mit gleich bleibend
-                    geneigter Achse um die Sonne (<code>Erdposition.html</code>). Für den Winkel zwischen Sonne und
-                    Äquatorebene kommt es auf dasselbe heraus.</p>`,
+                text: v => `<p>Im Lauf des Jahres ändert sich nur die Deklination: Die Sonne steht im Juni bis zu 23,44°
+                    über der Äquatorebene, im Dezember bis zu 23,44° darunter. Der Tagkreis wandert mit ihr auf und ab,
+                    die Achsen behalten ihre Richtung. Am ${v.date}: δ = ${v.dec}°.</p>
+                    <p>In Wirklichkeit wandert natürlich nicht die Sonne auf und ab. Die Erde läuft mit gleichbleibend
+                    geneigter Achse um die Sonne, und für den Winkel zwischen Sonne und Äquatorebene kommt es auf
+                    dasselbe heraus. Wie das von außen aussieht, zeigt ein Blick auf die Bahn der Erde um die Sonne.</p>`,
             },
             {
                 title: 'Selbst ausprobieren',
                 layers: null,
                 frame: 0, earth: 0.85, view: 'oblique',
-                text: v => `<p>Jetzt sind alle Teile zu sehen. Unter dem Bild lässt sich zwischen den beiden
-                    Blickwinkeln umschalten und die Größe der Erde einstellen; Ziehen dreht die Ansicht, das Mausrad
-                    zoomt.</p>
-                    <p>Unter „Ort“ lässt sich die Breite ändern: Am Äquator liegt die Himmelsachse waagerecht im
-                    Horizont, am Pol steht sie senkrecht und zeigt zum Zenit.</p>`,
+                text: v => `<p>Damit ist der Rundgang zu Ende, und alle Teile sind zu sehen. Unter dem Bild lässt sich
+                    zwischen den beiden Blickwinkeln umschalten und die Größe der Erde einstellen; Ziehen dreht die
+                    Ansicht, das Mausrad zoomt.</p>
+                    <p>Mit „Fertig“ gilt wieder der eigene Ort. Ein Ausflug in andere Breiten lohnt sich: Am Äquator
+                    liegt die Himmelsachse waagerecht im Horizont, am Pol steht sie senkrecht und zeigt zum Zenit.</p>`,
             },
         ];
 
@@ -1104,9 +1115,22 @@
 
         let fixedLayers = null;     // Ebenen aus der Adresse (layers), sonst null = Häkchen
 
-        /** Tour ab Schritt index (0 = erster); showBox = false stellt nur den Zustand des Schritts ein */
+        let tourButton = true;      // Startknopf sichtbar (eingebettet nur mit tour)
+
+        /**
+         * Tour ab Schritt index (0 = erster); showBox = false stellt nur den Zustand des Schritts ein. Mit Kasten
+         * rechnet der Rundgang für TOUR_PLACE, Ort und Felder werden danach wiederhergestellt.
+         */
         function startTour(index = 0, showBox = true) {
-            tour = { index: Math.min(Math.max(index, 0), TOUR.length - 1) };
+            const saved = tour ? tour.saved : null;
+            tour = { index: Math.min(Math.max(index, 0), TOUR.length - 1), saved };
+            if (showBox && !tour.saved) {
+                tour.saved = { lat: document.getElementById('lat').value, lon: document.getElementById('lon').value };
+                setPlaceInputs(TOUR_PLACE.lat, TOUR_PLACE.lon);
+                displayZone = TOUR_ZONE;
+                for (const id of ['lat', 'lon', 'latSlider']) document.getElementById(id).disabled = true;
+                document.body.classList.add('touring');
+            }
             document.getElementById('tour').hidden = !showBox;
             document.getElementById('tourStart').hidden = true;
             for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
@@ -1116,10 +1140,17 @@
         }
 
         function endTour() {
+            const saved = tour.saved;
             tour = null;
             tourHtml = '';
+            if (saved) {
+                for (const id of ['lat', 'lon', 'latSlider']) document.getElementById(id).disabled = false;
+                document.body.classList.remove('touring');
+                displayZone = null;
+                setPlaceInputs(saved.lat, saved.lon);
+            }
             document.getElementById('tour').hidden = true;
-            document.getElementById('tourStart').hidden = false;
+            document.getElementById('tourStart').hidden = !tourButton;
             for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = false;
             setPlay('year', false);
             setPlay('day', false);
@@ -1149,7 +1180,8 @@
             animateTo({ frame, earth: step.earth, cam: VIEWS[frame >= 0.5 ? 'observer' : 'space'][state.viewName],
                         duration: step.duration });
             document.getElementById('tourTitle').textContent = step.title;
-            document.getElementById('tourCount').textContent = `Schritt ${tour.index + 1} von ${TOUR.length}`;
+            document.getElementById('tourCount').textContent = `Schritt ${tour.index + 1} von ${TOUR.length}`
+                + (tour.saved ? ' · Mitte Deutschlands (50° N, 10° O), deutsche Uhrzeit' : '');
             document.getElementById('tourBack').disabled = tour.index === 0;
             document.getElementById('tourNext').textContent = tour.index === TOUR.length - 1 ? 'Fertig' : 'Weiter →';
             requestDraw();
@@ -1191,6 +1223,15 @@
             const s = text.trim().replace(',', '.');
             if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
             try { return dmsToDecimal(s); } catch (e) { return NaN; }
+        }
+
+        // Rundgang mit Kasten rechnet immer für denselben Ort, damit die Texte stimmen
+        const TOUR_PLACE = { lat: 50, lon: 10 };
+
+        function setPlaceInputs(lat, lon) {
+            document.getElementById('lat').value = String(lat);
+            document.getElementById('lon').value = String(lon);
+            readLocationInputs();
         }
 
         function readLocationInputs() {
@@ -1235,17 +1276,16 @@
 
         /** Sprung zu Tagundnachtgleiche/Sonnenwende (EquinoxType 0..3) im eingestellten Jahr */
         function jumpToEvent(type) {
-            const d = julianDayToDate(calculateEquinoxSolstice(state.year, type));
-            const start = new Date(state.year, 0, 1);
-            const local = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-            setDay(Math.round((local - start) / 86400000));
+            const p = zonedParts(julianDayToDate(calculateEquinoxSolstice(state.year, type)), displayZone);
+            setDay(Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(state.year, 0, 1)) / 86400000));
         }
 
         /** Jahr, Tag und Uhrzeit eines Zeitpunkts (Ortszeit des Browsers) einstellen */
         function showDate(date) {
-            setYear(date.getFullYear());
-            setDay(Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - new Date(date.getFullYear(), 0, 1)) / 86400000));
-            setMinutes(date.getHours() * 60 + date.getMinutes());
+            const p = zonedParts(date, displayZone);
+            setYear(p.year);
+            setDay(Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(p.year, 0, 1)) / 86400000));
+            setMinutes(p.hours * 60 + p.minutes);
         }
 
         function showNow() {
@@ -1258,7 +1298,11 @@
          * was ausdrücklich angegeben ist, gilt vor dem Schritt. Übergänge springen sofort ans Ziel.
          */
         function applyEmbedState(s) {
-            if (s.step || s.tour) startTour((s.step || 1) - 1, s.tour || !kmEmbed.active);
+            // Startknopf: eigenständig immer, eingebettet nur mit tour; tour mit step startet sofort,
+            // step allein stellt eingebettet nur den Zustand des Schritts ein
+            tourButton = !kmEmbed.active || s.tour;
+            document.getElementById('tourStart').hidden = !tourButton;
+            if (s.step) startTour(s.step - 1, s.tour || !kmEmbed.active);
             if (s.t) showDate(s.t);
             if (s.view) {
                 const observer = s.view.startsWith('observer');
@@ -1393,9 +1437,9 @@
             // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst Mitte Deutschlands;
             // folgt, wenn ein anderes Modell oder ein anderer Tab einen Ort merkt (embed.js)
             kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
-                document.getElementById('lat').value = String(lat);
-                document.getElementById('lon').value = String(lon);
-                readLocationInputs();
+                // während eines Rundgangs erst danach übernehmen
+                if (tour && tour.saved) { tour.saved.lat = String(lat); tour.saved.lon = String(lon); return; }
+                setPlaceInputs(lat, lon);
             });
             document.getElementById('lat').addEventListener('input', readLocationInputs);
             document.getElementById('lon').addEventListener('input', readLocationInputs);
@@ -1438,7 +1482,7 @@
     <p data-embed="hide">Von der Erde aus sehen wir den Himmel um eine schräge Achse kreisen, die Himmelsachse. Im Weltraum dreht sich
     die Erde um ihre Erdachse. Wie hängen beide zusammen – und wie kommt man von Höhe und Himmelsrichtung, die ein
     Beobachter misst (Horizontsystem), zur Deklination, die für die ganze Erde gilt (Äquatorsystem)?</p>
-    <p class="start-tour" id="tourStart" data-embed="hide"><button onclick="startTour()">▶ Schritt für Schritt erklären</button>
+    <p class="start-tour" id="tourStart" hidden><button onclick="startTour()">▶ Rundgang: Warum steht der Polarstern immer an derselben Stelle?</button>
     <span class="feedback">Blendet die Teile des Modells nach und nach ein.</span></p>
     <p data-embed="hide">Die Kugel in der Mitte ist die Erde, der gepunktete Umriss die Himmelskugel. Auf der Erde steht ein Beobachter
     mit seinem Horizont (grüne Scheibe). Unter dem Bild lässt sich umschalten zwischen dem Blick von außen, bei dem

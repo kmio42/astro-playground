@@ -16,9 +16,10 @@
  *   data-ort-fest  „ja“: data-ort gilt immer (Text hängt am Ort); der Leser kann im Modell zu seinem Ort wechseln
  *   data-ansicht   Ansicht, Namen wie in VIEWS der Modellseite (z. B. „east“)
  *   data-schritt   Tourschritt ab 1 als Startzustand (Ebenen, Zeit, Ansicht wie in der Tour der Modellseite)
- *   data-tour      „ja“: Tour-Kasten mit Weiter/Zurück im Modell zeigen; bei Modellen mit mehreren Rundgängen
- *                  deren Name (erdemond: „height“, „nodes“, „apsides“; tageslaenge: „tageslaenge“, „mittag“ –
- *                  dort erscheint ein Knopf „Rundgang“, mit data-schritt startet er sofort)
+ *   data-tour      „ja“: Startknopf des Rundgangs im Modell zeigen; bei Modellen mit mehreren Rundgängen deren Name
+ *                  (nur dieser Knopf; erdemond: „height“, „nodes“, „apsides“; tageslaenge: „tageslaenge“, „mittag“).
+ *                  Mit data-schritt startet der Rundgang sofort bei diesem Schritt; data-schritt ohne data-tour
+ *                  stellt nur den Zustand des Schritts ein
  *   data-ebenen    sichtbare Ebenen, Namen der Modellseite, z. B. „dome,zenith,axis,circle,sun“
  *   data-abspielen „tag“, „monat“ oder „jahr“
  *   data-bedienung „voll“ (Standard), „min“ (nur Datum und Uhrzeit) oder „keine“ (nur das Bild)

@@ -4,6 +4,7 @@
         var latitude = 0;  // Breitengrad Ort [°]
         var longitude = 0; // Längengrad Ort [°], Ost positiv
         var useLocalTime = false;
+        var localZone = null;   // Zeitzone der Lokalzeit (IANA-Name), null = die des Browsers; Rundgänge setzen 'Europe/Berlin'
 
         /**
          * Beobachtungsort aus den Eingabefeldern als Objekt für astro.js (Winkel in Radiant, Höhe 0 m)
@@ -21,6 +22,38 @@
         }
 
         /**
+         * Abstand zu UT [h] in einer Zeitzone (IANA-Name wie 'Europe/Berlin') zum Zeitpunkt date;
+         * ohne Namen die Zeitzone des Browsers
+         */
+        function zoneOffsetHours(date, zone) {
+            if (!zone) return -date.getTimezoneOffset() / 60;
+            const p = {};
+            for (const part of new Intl.DateTimeFormat('en-US', {
+                timeZone: zone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+                hour: 'numeric', minute: 'numeric', second: 'numeric',
+            }).formatToParts(date)) p[part.type] = Number(part.value);
+            const wall = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+            return (wall - Math.floor(date.getTime() / 1000) * 1000) / 3600000;
+        }
+
+        /** Zeitpunkt zu einer Uhrzeit in einer Zeitzone (Monat 0-basiert, Überlauf wie bei Date erlaubt) */
+        function zonedDate(year, month, day, hours = 0, minutes = 0, zone) {
+            if (!zone) return new Date(year, month, day, hours, minutes);
+            const wall = Date.UTC(year, month, day, hours, minutes);
+            let t = wall - zoneOffsetHours(new Date(wall), zone) * 3600000;
+            t = wall - zoneOffsetHours(new Date(t), zone) * 3600000;     // zweiter Schritt um die Umstellung herum
+            return new Date(t);
+        }
+
+        /** Kalendertag und Uhrzeit eines Zeitpunkts in einer Zeitzone: { year, month (0-basiert), day, hours, minutes } */
+        function zonedParts(date, zone) {
+            const shifted = new Date(date.getTime() + zoneOffsetHours(date, zone) * 3600000);
+            return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth(), day: shifted.getUTCDate(),
+                     hours: shifted.getUTCHours(), minutes: shifted.getUTCMinutes(),
+                     seconds: shifted.getUTCSeconds() + shifted.getUTCMilliseconds() / 1000, weekday: shifted.getUTCDay() };
+        }
+
+        /**
          * Sternzeit in Greenwich in Stunden [0, 24)
          */
         function siderealTimeHours(jd) {
@@ -33,7 +66,7 @@
          * exakt der Kalendertag der Lokalzeit.
          */
         function dayUtcOffset() {
-            return useLocalTime ? -datetime.getTimezoneOffset() / 60 : 0;
+            return useLocalTime ? zoneOffsetHours(datetime, localZone) : 0;
         }
 
         /**
@@ -41,7 +74,7 @@
          */
         function timeZoneLabel() {
             if (!useLocalTime) return 'UTC';
-            const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short' })
+            const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short', ...(localZone ? { timeZone: localZone } : {}) })
                 .formatToParts(datetime).find(p => p.type === 'timeZoneName');
             return part ? part.value : 'Lokalzeit';
         }
@@ -144,12 +177,12 @@
 
         function fillGregorianDate(date) {
             if (useLocalTime) {
-                const y = date.getFullYear();
-                const mo = (date.getMonth()+1).toString().padStart(2,'0');
-                const d = date.getDate().toString().padStart(2,'0');
-                document.getElementById('date').value = `${y}-${mo}-${d}`;
-                document.getElementById('time').value = date.getHours().toString().padStart(2,'0')+':'+date.getMinutes().toString().padStart(2,'0');
-                document.getElementById('seconds').value = (date.getSeconds() + date.getMilliseconds() / 1000).toFixed(3);
+                const p = zonedParts(date, localZone);
+                const mo = (p.month + 1).toString().padStart(2, '0');
+                const d = p.day.toString().padStart(2, '0');
+                document.getElementById('date').value = `${p.year}-${mo}-${d}`;
+                document.getElementById('time').value = p.hours.toString().padStart(2, '0') + ':' + p.minutes.toString().padStart(2, '0');
+                document.getElementById('seconds').value = p.seconds.toFixed(3);
             } else {
                 document.getElementById('date').value = date.toISOString().substring(0, 10);
                 document.getElementById('time').value = date.getUTCHours().toString().padStart(2, '0')+':'+date.getUTCMinutes().toString().padStart(2, '0');
@@ -240,9 +273,10 @@
             const dateInput = document.getElementById('date').value;
             const timeInput = document.getElementById('time').value;
             const secondInput = document.getElementById('seconds').value;
+            const [y, mo, d] = dateInput.split('-').map(Number), [h, mi] = timeInput.split(':').map(Number);
             const datetime_new = useLocalTime
-                ? new Date(`${dateInput}T${timeInput}`)   // local time
-                : new Date(`${dateInput}T${timeInput}Z`); // UTC
+                ? zonedDate(y, mo - 1, d, h, mi, localZone)  // Lokalzeit
+                : new Date(`${dateInput}T${timeInput}Z`);    // UTC
             if (isNaN(datetime_new.getTime())) return;
             const seconds = parseFloat(secondInput);
             if (isNaN(seconds)) return;
@@ -563,6 +597,8 @@
                 // Seiten mit embed.js: Ort mit Vorgabe aus der Adresse, Ortszeile im Einbettmodus, folgt einem
                 // anderswo gemerkten Ort; Zeitpunkt aus der Adresse (t)
                 kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
+                    // Rundgang mit festem Ort: die Seite übernimmt den neuen Ort erst danach
+                    if (window.kmPlaceHold) { window.kmPlaceHold(lat, lon); return; }
                     document.getElementById('latitude').value = String(lat);
                     document.getElementById('longitude').value = String(lon);
                     validateCoordinate(String(lat), 'latitude');

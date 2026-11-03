@@ -9,7 +9,7 @@
  *                     fixedPlace  true mit „ortfest“: lat/lon gelten auch gegenüber dem gemerkten Ort
  *                     view      Name einer Ansicht
  *                     step      Tourschritt ab 1
- *                     tour      true mit „tour“: Tour-Kasten zeigen (eigenständig immer, wenn step gesetzt ist)
+ *                     tour      true mit „tour“: Startknopf des Rundgangs zeigen, mit step den Rundgang sofort starten
  *                     tourName  Name eines Rundgangs bei Seiten mit mehreren (tour=nodes), sonst null
  *                     layers    Liste sichtbarer Ebenen (Namen der Seite)
  *                     play      'day', 'month' oder 'year'
