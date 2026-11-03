@@ -133,6 +133,7 @@
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
+    <script src="embed.js"></script>
     <script>
 
     /////////////////////////////////////////////////////////////////
@@ -896,8 +897,8 @@
             const slider = document.getElementById('dateSlider');
             slider.max = orbitData.N - 1;
             if (fraction === null) {
-                // Beim ersten Aufruf: aktueller Zeitpunkt, falls im Jahr
-                const now = julianDayFromDate(new Date());
+                // Beim ersten Aufruf: Zeitpunkt aus der Adresse (t) oder aktueller Zeitpunkt, falls im Jahr
+                const now = julianDayFromDate(kmEmbed.state.t || new Date());
                 const idx = Math.round((now - orbitData.jd[0]) / stepDays);
                 selectedIndex = (idx >= 0 && idx < orbitData.N) ? idx : 0;
             } else {
@@ -919,6 +920,7 @@
             }
             button.textContent = '⏸ Anhalten';
             playTimer = setInterval(() => {
+                if (!kmEmbed.visible) return;       // außerhalb des Bildes pausieren
                 setSelectedIndex((selectedIndex + 3) % orbitData.N);
             }, 30);
         }
@@ -933,7 +935,7 @@
 
         window.onload = function () {
             const yearInput = document.getElementById('year');
-            yearInput.value = new Date().getUTCFullYear();
+            yearInput.value = (kmEmbed.state.t || new Date()).getUTCFullYear();
             yearInput.addEventListener('change', () => {
                 const year = parseInt(yearInput.value, 10);
                 if (Number.isFinite(year)) loadYear(year);
@@ -958,28 +960,33 @@
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawOrbit(); drawCharts(); });
 
             loadYear(Number(yearInput.value));
+
+            // Startzustand aus der Adresse: view=earth (Ausschnitt um die Erde, folgt ihr), play (Abspielen)
+            if (kmEmbed.state.view === 'earth') zoomToEarth();
+            if (kmEmbed.state.play) togglePlay();
+            kmEmbed.ready();
         };
     </script>
 </head>
 <body>
-    <h1>Mondbahn um die Sonne</h1>
-    <p>Der Mond umkreist die Erde in rund 29,5 Tagen, während die Erde in einem Jahr um die Sonne läuft. Von der Sonne aus betrachtet beschreibt der Mond deshalb keine Schleifen, sondern eine leicht gewellte Bahn entlang der Erdbahn: Bei Vollmond ist er etwas weiter außen, bei Neumond etwas weiter innen. Da der Abstand Erde–Mond (≈ 384 400 km) nur etwa 1/400 des Abstands zur Sonne beträgt, ist diese Welle in einer maßstäblichen Gesamtansicht nicht zu erkennen. Mit der Überhöhung wird der Abstand Erde–Mond künstlich vergrößert, mit dem Mausrad lässt sich in die maßstäbliche Bahn hineinzoomen.</p>
-    <p>Alle Zeiten in Weltzeit (UTC). Die Bahn wird stundenweise mit <code>calculateMoonPosition()</code> (Meeus, Kap. 45) und der Sonnenposition aus <code>astro.js</code> berechnet und in die Ebene der Ekliptik projiziert.</p>
+    <h1 data-embed="hide">Mondbahn um die Sonne</h1>
+    <p data-embed="hide">Der Mond umkreist die Erde in rund 29,5 Tagen, während die Erde in einem Jahr um die Sonne läuft. Von der Sonne aus betrachtet beschreibt der Mond deshalb keine Schleifen, sondern eine leicht gewellte Bahn entlang der Erdbahn: Bei Vollmond ist er etwas weiter außen, bei Neumond etwas weiter innen. Da der Abstand Erde–Mond (≈ 384 400 km) nur etwa 1/400 des Abstands zur Sonne beträgt, ist diese Welle in einer maßstäblichen Gesamtansicht nicht zu erkennen. Mit der Überhöhung wird der Abstand Erde–Mond künstlich vergrößert, mit dem Mausrad lässt sich in die maßstäbliche Bahn hineinzoomen.</p>
+    <p data-embed="hide">Alle Zeiten in Weltzeit (UTC). Die Bahn wird stundenweise mit <code>calculateMoonPosition()</code> (Meeus, Kap. 45) und der Sonnenposition aus <code>astro.js</code> berechnet und in die Ebene der Ekliptik projiziert.</p>
 
-    <div class="controls">
-        <label>Jahr <input type="number" id="year" step="1"></label>
+    <div class="controls" data-control="extra">
         <label>Überhöhung Erde–Mond
             <input type="range" id="exaggeration" min="0" max="100" step="0.5">
             <span class="value" id="exaggerationText"></span>
         </label>
         <label><input type="checkbox" id="showPhases" checked> Neu-/Vollmond</label>
     </div>
-    <div class="controls">
+    <div class="controls" data-control="basic">
+        <label>Jahr <input type="number" id="year" step="1"></label>
         <label>Zeitpunkt <input type="range" id="dateSlider" min="0" step="1"></label>
         <span class="value" id="dateText"></span>
         <button id="playButton" onclick="togglePlay()">▶ Abspielen</button>
     </div>
-    <div class="controls">
+    <div class="controls" data-control="extra">
         <button onclick="resetView()">Gesamtansicht</button>
         <button onclick="zoomToEarth()">Ausschnitt um die Erde</button>
         <label><input type="checkbox" id="followEarth"> Ansicht folgt der Erde</label>

@@ -74,7 +74,9 @@
             border-radius: 6px;
             margin-bottom: 12px;
         }
-        .controls label { white-space: nowrap; }
+        .controls label { white-space: nowrap; max-width: 100%; }
+        .controls select { max-width: 100%; }
+        .controls label:has(select) { display: inline-flex; flex-wrap: wrap; gap: 0 0.4em; align-items: baseline; }
         .controls input[type="number"] { width: 6em; }
         .controls input[type="text"] { width: 9em; }
         .controls input[type="range"] { vertical-align: middle; width: min(200px, 50vw); margin-left: -12px; }
@@ -138,6 +140,7 @@
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
+    <script src="embed.js"></script>
     <script>
 
     /////////////////////////////////////////////////////////////////
@@ -149,6 +152,7 @@
         let horizonAltitude = -0.8333;   // Höhe des Sonnenmittelpunkts bei Auf-/Untergang [°]
         let hoverIndex = null;    // Tag unter dem Mauszeiger (Index im Jahr)
         let selectedIndex = 0;    // Tag für die Kennzahlen
+        let selectDate = null;    // Tag aus der Adresse (t), sonst heute
 
         /**
          * Abstand der Anzeigezeit zu UT [h] für einen Kalendertag (Monat 0-basiert, Tag darf überlaufen)
@@ -222,8 +226,9 @@
          * Aktueller Zeitpunkt als Position im Jahr (Tagesindex + Tagesbruchteil) und Uhrzeit [h],
          * null wenn er nicht im angezeigten Jahr liegt
          */
-        function nowPosition() {
-            const jd = julianDayFromDate(new Date());
+        /** Index und Lage eines Zeitpunkts (Standard: jetzt) im berechneten Jahr, null außerhalb */
+        function nowPosition(date = new Date()) {
+            const jd = julianDayFromDate(date);
             const d = yearData;
             if (jd < d.start[0] || jd >= d.end) return null;
             let i = d.n - 1;
@@ -715,7 +720,7 @@
             const oldYear = yearData ? yearData.year : null;
             yearData = computeYear(input.year, input.location);
             if (!keepSelection || oldYear !== input.year) {
-                const now = nowPosition();
+                const now = nowPosition(selectDate || new Date());
                 selectedIndex = now ? now.index : 0;
             }
             selectedIndex = Math.min(selectedIndex, yearData.n - 1);
@@ -725,6 +730,7 @@
         }
 
         function showToday() {
+            selectDate = null;
             document.getElementById('year').value = new Date().getFullYear();
             recompute(false);
         }
@@ -753,10 +759,9 @@
         }
 
         window.onload = function () {
-            // Ort wie auf den anderen Seiten aus localStorage, sonst wie in der NOAA-Tabelle (50° N, 8° O)
-            document.getElementById('lat').value = localStorage.getItem('latitude') || '50';
-            document.getElementById('lon').value = localStorage.getItem('longitude') || '8';
-            document.getElementById('year').value = new Date().getFullYear();
+            // Jahr und Tag der Kennzahlen aus der Adresse (t), sonst heute
+            selectDate = kmEmbed.state.t;
+            document.getElementById('year').value = (selectDate || new Date()).getFullYear();
 
             for (const id of ['lat', 'lon', 'year']) {
                 document.getElementById(id).addEventListener('input', () => recompute(true));
@@ -777,7 +782,16 @@
             new ResizeObserver(drawCharts).observe(document.body);
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawCharts);
 
-            recompute(false);
+            // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst wie in der NOAA-Tabelle
+            // (50° N, 8° O); folgt, wenn ein anderes Modell oder ein anderer Tab einen Ort merkt (embed.js)
+            let first = true;
+            kmEmbed.usePlace({ lat: 50, lon: 8 }, (lat, lon) => {
+                document.getElementById('lat').value = String(lat);
+                document.getElementById('lon').value = String(lon);
+                recompute(!first);
+                first = false;
+            });
+            kmEmbed.ready();
 
             // Markierung der aktuellen Zeit jede Minute nachführen; Tageswechsel wählt den neuen Tag
             setInterval(() => {
@@ -790,11 +804,11 @@
     </script>
 </head>
 <body>
-    <h1>Tageslänge im Jahr</h1>
-    <p>Wie viele Minuten Tageslicht kommen jeden Tag hinzu – und wie verteilen sie sich auf den Morgen und den Abend? Die <b>Zunahme</b> ist die Änderung gegenüber dem Vortag: Am Morgen zählt, um wie viel früher die Sonne aufgeht, am Abend, um wie viel später sie untergeht. Beide zusammen ergeben die Zunahme der Tageslänge, negative Werte sind eine Abnahme.</p>
-    <p>Morgen und Abend tragen nicht gleich viel bei, weil sich auch der Mittag (der Höchststand der Sonne) im Lauf des Jahres verschiebt (<a href="https://de.wikipedia.org/wiki/Zeitgleichung">Zeitgleichung</a>). Deshalb liegt der früheste Sonnenuntergang schon Mitte Dezember und der späteste Sonnenaufgang erst Anfang Januar, obwohl der kürzeste Tag am 21. Dezember ist.</p>
+    <h1 data-embed="hide">Tageslänge im Jahr</h1>
+    <p data-embed="hide">Wie viele Minuten Tageslicht kommen jeden Tag hinzu – und wie verteilen sie sich auf den Morgen und den Abend? Die <b>Zunahme</b> ist die Änderung gegenüber dem Vortag: Am Morgen zählt, um wie viel früher die Sonne aufgeht, am Abend, um wie viel später sie untergeht. Beide zusammen ergeben die Zunahme der Tageslänge, negative Werte sind eine Abnahme.</p>
+    <p data-embed="hide">Morgen und Abend tragen nicht gleich viel bei, weil sich auch der Mittag (der Höchststand der Sonne) im Lauf des Jahres verschiebt (<a href="https://de.wikipedia.org/wiki/Zeitgleichung">Zeitgleichung</a>). Deshalb liegt der früheste Sonnenuntergang schon Mitte Dezember und der späteste Sonnenaufgang erst Anfang Januar, obwohl der kürzeste Tag am 21. Dezember ist.</p>
 
-    <div class="controls">
+    <div class="controls" data-embed="hide">
         <label>Breite <input type="text" id="lat"></label>
         <input type="range" id="latSlider" min="-90" max="90" step="0.1" aria-label="Breite">
         <label>Länge (Ost +) <input type="text" id="lon"></label>
@@ -802,7 +816,8 @@
         <button onclick="saveLocation()">Ort merken</button>
         <span class="feedback" id="locationFeedback"></span>
     </div>
-    <div class="controls">
+    <div id="kmPlace" data-control="place" hidden></div>
+    <div class="controls" data-control="basic">
         <label>Jahr <input type="number" id="year" step="1"></label>
         <label>Zeit
             <select id="timeMode">
@@ -814,7 +829,7 @@
         <span class="feedback" id="zoneText"></span>
         <button onclick="showToday()">Heute</button>
     </div>
-    <div class="controls">
+    <div class="controls" data-control="extra">
         <label>Auf-/Untergang bei
             <select id="horizon">
                 <option value="-0.8333">−0°50′: Oberrand sichtbar am Horizont (üblich)</option>
@@ -834,7 +849,7 @@
         <div class="tooltip" id="gainTooltip"></div>
     </div>
     <p class="hint">Minuten pro Tag. Die Zunahme ist am größten um die Tagundnachtgleichen (März, September) und null an den Sonnenwenden. Die Sommerzeit ändert sie nicht.</p>
-    <p class="hint"><b>Warum liegt die stärkste Zunahme nicht genau auf der Tagundnachtgleiche?</b> Die Zunahme hängt von zwei Dingen ab: wie schnell sich der Sonnenstand ändert (am schnellsten an der Tagundnachtgleiche) und wie stark die Tageslänge darauf reagiert (dort am schwächsten). Beides gleicht sich fast aus, das Maximum ist deshalb sehr flach – bei 50° N ändert sich die Zunahme eine Woche lang nur um Bruchteile einer Sekunde. So verschieben schon kleine Effekte das Datum um einige Tage: die elliptische Erdbahn (die Erde läuft im März langsamer werdend, im September schneller werdend um die Sonne) und die Lichtbrechung am Horizont (Tag und Nacht sind schon einige Tage vor der Tagundnachtgleiche gleich lang). Die beiden heben sich teilweise auf: Mit Auf-/Untergang bei 0° bleibt nur die Erdbahn übrig, und das Maximum rückt weiter weg (50° N: 15. statt 18. März). Ab etwa 61° Breite wächst die Zunahme sogar bis kurz vor Polartag bzw. Polarnacht.</p>
+    <p class="hint" data-embed="hide"><b>Warum liegt die stärkste Zunahme nicht genau auf der Tagundnachtgleiche?</b> Die Zunahme hängt von zwei Dingen ab: wie schnell sich der Sonnenstand ändert (am schnellsten an der Tagundnachtgleiche) und wie stark die Tageslänge darauf reagiert (dort am schwächsten). Beides gleicht sich fast aus, das Maximum ist deshalb sehr flach – bei 50° N ändert sich die Zunahme eine Woche lang nur um Bruchteile einer Sekunde. So verschieben schon kleine Effekte das Datum um einige Tage: die elliptische Erdbahn (die Erde läuft im März langsamer werdend, im September schneller werdend um die Sonne) und die Lichtbrechung am Horizont (Tag und Nacht sind schon einige Tage vor der Tagundnachtgleiche gleich lang). Die beiden heben sich teilweise auf: Mit Auf-/Untergang bei 0° bleibt nur die Erdbahn übrig, und das Maximum rückt weiter weg (50° N: 15. statt 18. März). Ab etwa 61° Breite wächst die Zunahme sogar bis kurz vor Polartag bzw. Polarnacht.</p>
 
     <h2>Sonnenaufgang und Sonnenuntergang</h2>
     <div class="legend">
@@ -852,6 +867,6 @@
     <h2>Kennzahlen</h2>
     <div id="outputTable"></div>
 
-    <p class="hint">Berechnung mit <code>calculateSunRiseSet()</code> aus <code>astro.js</code> (Meeus, Kap. 15). Die übliche Höhe −0°50′ enthält die Lichtbrechung (34′) und den Sonnenradius (16′). Die Lokalzeit ist die Zeitzone des Browsers, auch wenn der Ort woanders liegt.</p>
+    <p class="hint" data-embed="hide">Berechnung mit <code>calculateSunRiseSet()</code> aus <code>astro.js</code> (Meeus, Kap. 15). Die übliche Höhe −0°50′ enthält die Lichtbrechung (34′) und den Sonnenradius (16′). Die Lokalzeit ist die Zeitzone des Browsers, auch wenn der Ort woanders liegt.</p>
 </body>
 </html>

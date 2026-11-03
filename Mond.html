@@ -128,6 +128,7 @@
     <script src="render.js"></script>
     <script src="moonRender.js"></script>
     <script src="ui.js"></script>
+    <script src="embed.js"></script>
     <script>
 
         const moonImage = new Image();
@@ -699,15 +700,16 @@
                 { label: '1 siderischer Monat',step: 27.321661*86400000 },
                 { label: '1 synodischer Monat',step: 29.530589*86400000 },
             ]);
+            kmEmbed.ready();
         });
     </script>
 </head>
 <body>
-    <h1>Der Mond</h1>
+    <h1 data-embed="hide">Der Mond</h1>
 
-    <p>Nach dem Vorhaben, die Bewegung der Erde um die Sonne zu verstehen (siehe <a href="https://blog.kmueller.dev/sternzeit-und-erdposition/">hier</a>), beschäftigt sich dieser Eintrag mit der Bewegung des Mondes um die Erde.
+    <p data-embed="hide">Nach dem Vorhaben, die Bewegung der Erde um die Sonne zu verstehen (siehe <a href="https://blog.kmueller.dev/sternzeit-und-erdposition/">hier</a>), beschäftigt sich dieser Eintrag mit der Bewegung des Mondes um die Erde.
     Dabei gibt es deutlich mehr Aspekte zu berücksichtigen:</p>
-    <ul>
+    <ul data-embed="hide">
         <li>Der Mond bewegt sich auf einer nahezu elliptischen Bahn um die Erde.
             Der unterschiedliche Abstand zwischen Erde und Mond führt zu einer Variation der scheinbaren Größe des Mondes am Himmel.
             Wenn der Mond näher an der Erde ist, erscheint er größer, wenn er weiter entfernt ist, kleiner.
@@ -727,14 +729,15 @@
             Die Beleuchtung in verschiedenen Mondphasen hat besonders Einfluss auf die Ansicht von Gebirgen und Kratern.
         </li>
     </ul>
-    <p>Mit dem folgenden Rechner lassen sich einige dieser Aspekte der Mondbewegung und -erscheinung nachvollziehen.
+    <p data-embed="hide">Mit dem folgenden Rechner lassen sich einige dieser Aspekte der Mondbewegung und -erscheinung nachvollziehen.
     Die Berechnungen basieren auf den Algorithmen aus dem Buch "Astronomische Algorithmen" von Jean Meeus.
     Für die Bildliche Darstellung wurde auf eine Textur aus dem <a href="https://svs.gsfc.nasa.gov/4720">CGI Moon Kit</a> der Nasa verwendet, das Rendering
     ist bewusst einfach gehalten (keine Nutzung der Höheninformation, keine Rendering-Engine), um es später besser auf Mikrocontroller portieren zu können.
     Im Vergleich mit einem Computerprogramm wie Stellarium fallen leichte Unterschiede auf: Es ist davon auszugehen, dass dort genauere Modelle verwendet werden.</p>
 
-    <div id="locationControls"></div>
-    <div id="timeControls"></div>
+    <div id="locationControls" data-embed="hide"></div>
+    <div id="kmPlace" data-control="place" hidden></div>
+    <div id="timeControls" data-control="basic"></div>
 
     <div class="workspace">
         <div class="figures">
@@ -758,7 +761,7 @@
                     <canvas id="moon" width="500" height="500" role="img" aria-label="Mond als Foto mit berechnetem Schatten"></canvas>
                     <canvas id="moon1" width="500" height="500" role="img" aria-label="Mond aus der LROC-Textur berechnet"></canvas>
                 </div>
-                <div class="options">
+                <div class="options" data-control="extra">
                     <label><input type="checkbox" id="parallacticAngle" checked> Parallaktischen Winkel berücksichtigen</label>
                     <label><input type="checkbox" id="libration" checked> Libration berücksichtigen</label>
                 </div>
@@ -775,13 +778,13 @@
                 <figcaption>Bahn des Mondes am Himmel, 12 Stunden vor bis 12 Stunden nach dem eingestellten Zeitpunkt (Höhe über dem Horizont und Azimut, gestrichelt: nördliche Himmelshälfte); der Punkt zeigt die aktuelle Position.</figcaption>
             </figure>
         </div>
-        <div class="time-panel"><div id="timeButtons"></div></div>
+        <div class="time-panel" data-control="basic"><div id="timeButtons"></div></div>
     </div>
 
     <div id="outputTable"></div>
 
-    <h2>Hintergründe und Begriffe</h2>
-    <table class="glossary">
+    <h2 data-embed="hide">Hintergründe und Begriffe</h2>
+    <table class="glossary" data-embed="hide">
        <!-- <tr>
             <td><b>Julianisches Datum</b></td>
             <td>Das Julianische Datum (JD) ist eine kontinuierliche Zählung von Tagen und Bruchteilen eines Tages seit dem 1. Januar 4713 v. Chr. um 12:00 Uhr UTC. Es wird in der Astronomie verwendet, um Zeitpunkte präzise zu beschreiben, da es die Komplexität von Kalendern und Zeitzonen vermeidet.</td>

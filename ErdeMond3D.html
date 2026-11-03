@@ -180,9 +180,13 @@
         /* Formulare aus ui.js (Farbe kommt dort aus --surface-2) */
         #locationControls > div, #timeControls > div { overflow-x: auto; }
         #timeControls .ui-now { display: none; }      /* „Jetzt“ gibt es schon in der Abspielleiste */
+        /* Eingebettet (embed.js): Höhe aus der Breite statt aus vh, sonst wächst das iframe mit sich selbst */
+        html[data-embed] .viewport { height: auto; aspect-ratio: 4 / 3; max-height: 760px; }
+        html[data-embed].km-fullscreen .viewport { aspect-ratio: auto; height: min(85vh, 1200px); max-height: none; }
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
+    <script src="embed.js"></script>
     <script src="orbit3d.js"></script>
     <script src="gl3d.js"></script>
 
@@ -1744,7 +1748,13 @@
             updateTable();
         }
 
+        let frameStopped = false;
         function frame(now) {
+            if (!kmEmbed.visible) {             // außerhalb des Bildes oder Tab verborgen: anhalten
+                frameStopped = true;
+                lastFrame = 0;
+                return;
+            }
             const dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
             lastFrame = now;
             if (playing && dt > 0) {
@@ -1902,13 +1912,51 @@
             update();
             // Anfangsansicht: schräg, Sonne von rechts hinten, damit Phasen und Bahnneigung sichtbar sind
             setFocus('system', false, VIEWS.overview.angles());
+            applyEmbedState(kmEmbed.state);
+            kmEmbed.onVisibility(visible => {
+                if (visible && frameStopped) { frameStopped = false; requestAnimationFrame(frame); }
+            });
             requestAnimationFrame(frame);
+            kmEmbed.ready();
         };
+
+        // Abspielen aus der Adresse (play): Tag in 24 s, Monat in 30 s, Jahr in 12 s
+        const EMBED_SPEEDS = { day: 0.0416667, month: 1, year: 30.436875 };
+
+        /**
+         * Startzustand aus der Adresse (embed.js); t und Ort setzt schon initUI(). Rundgang tour=height|nodes|apsides
+         * mit step (ab 1); eingebettet ohne den Parameter tour nur Zustand des Schritts ohne Kasten. Dann view (Namen
+         * aus VIEWS), layers (Liste der sichtbaren Anzeigen, data-layer), play.
+         */
+        function applyEmbedState(s) {
+            if (s.tourName || s.step) {
+                const id = TOURS[s.tourName] ? s.tourName : 'height';
+                const steps = TOURS[id].steps;
+                const index = Math.min(Math.max((s.step || 1) - 1, 0), steps.length - 1);
+                if (s.tour || !kmEmbed.active) {
+                    startTour(id);
+                    if (index > 0) { tour.index = index; showTourStep(); }
+                } else {
+                    applyTourStep(steps[index], TOURS[id]);
+                }
+            }
+            if (s.view && VIEWS[s.view]) applyView(s.view);
+            if (s.layers) {
+                const values = {};
+                for (const cb of document.querySelectorAll('[data-layer]')) values[cb.dataset.layer] = s.layers.includes(cb.dataset.layer);
+                setLayers(values);
+            }
+            if (s.play && EMBED_SPEEDS[s.play]) {
+                setSpeed(EMBED_SPEEDS[s.play]);
+                setPlaying(true);
+            }
+            if (camera.animation) camera.update(camera.animation.start + camera.animation.duration + 1);   // ohne Kamerafahrt
+        }
     </script>
 </head>
 <body>
-    <h1>Erde und Mond in 3D</h1>
-    <p class="hint">
+    <h1 data-embed="hide">Erde und Mond in 3D</h1>
+    <p class="hint" data-embed="hide">
         Erde und Mond zum eingestellten Zeitpunkt, mit Ekliptik, Mondbahn, Knoten und Apsiden. Das Sonnenlicht kommt aus
         der Richtung des gelben Pfeils.
         <b>Ziehen</b> dreht die Ansicht, <b>Mausrad</b> oder zwei Finger zoomen, <b>rechte Maustaste</b> oder
@@ -1918,7 +1966,7 @@
         <span id="textureSwitch"></span>
     </p>
 
-    <div class="tours">
+    <div class="tours" data-control="extra">
         <b>Geführte Rundgänge:</b>
         <button data-tour="height">Wie hoch steht der Mond?</button>
         <button data-tour="nodes">Knoten und Finsternisse</button>
@@ -1945,7 +1993,7 @@
     </div>
 
     <div class="controls">
-        <div class="group">
+        <div class="group" data-control="basic">
             <button id="play">▶ Abspielen</button>
             <select id="speed" aria-label="Geschwindigkeit">
                 <option value="0.0000115741">Echtzeit</option>
@@ -1961,14 +2009,14 @@
             <label><input type="checkbox" id="reverse"> rückwärts</label>
             <button id="now">Jetzt</button>
         </div>
-        <div class="group">
+        <div class="group" data-control="extra">
             <b>Ziel</b>
             <button data-focus="system" aria-pressed="true">System</button>
             <button data-focus="earth">Erde</button>
             <button data-focus="moon">Mond</button>
             <label><input type="checkbox" id="follow" checked> mitführen</label>
         </div>
-        <div class="group">
+        <div class="group" data-control="extra">
             <b>Ansicht</b>
             <button data-view="overview">Übersicht</button>
             <button data-view="top">von oben</button>
@@ -1977,7 +2025,7 @@
             <button data-view="earthToMoon">Erde → Mond</button>
             <button data-view="moonToEarth">Mond → Erde</button>
         </div>
-        <div class="group">
+        <div class="group" data-control="extra">
             <b>Springen</b>
             <button id="jumpBack" title="voriges Ereignis">◀</button>
             <select id="jumpKind" aria-label="Ereignis">
@@ -1994,12 +2042,12 @@
             </select>
             <button id="jumpNext" title="nächstes Ereignis">▶</button>
         </div>
-        <div class="group">
+        <div class="group" data-control="extra">
             <label>Körper <input type="range" id="bodyScale" min="1" max="8" step="0.5" value="4"></label><output id="bodyScaleOut"></output>
             <label>Abstand <input type="range" id="distScale" min="0.25" max="1" step="0.05" value="1"></label><output id="distScaleOut"></output>
             <button id="trueScale">maßstäblich</button>
         </div>
-        <div class="group">
+        <div class="group" data-control="extra">
             <b>Anzeigen</b>
             <label><input type="checkbox" data-layer="ecliptic" checked> Ekliptik</label>
             <label><input type="checkbox" data-layer="moonPlane" checked> Mondbahnebene</label>
@@ -2032,7 +2080,7 @@
         <span class="area" style="--c:#bf291f">Kernschatten</span>
         <span class="area" style="--c:#737385">Halbschatten</span>
     </div>
-    <p class="hint">
+    <p class="hint" data-embed="hide">
         Punkte auf der Bahn: Ort des Mondes in ganzen Tagen vor und nach dem Zeitpunkt.
         Erde und Mond sind in der Grundeinstellung 4-fach vergrößert, das Größenverhältnis bleibt richtig.
         Die Atmosphäre ist dicker gezeichnet und der Erdschein heller, als sie wirklich sind.
@@ -2047,18 +2095,19 @@
             <div id="outputTable"></div>
         </div>
         <div>
-            <h2>Zeit</h2>
-            <div id="timeControls"></div>
-            <div id="timeButtons"></div>
-            <details>
+            <h2 data-control="basic">Zeit</h2>
+            <div id="kmPlace" data-control="place" hidden></div>
+            <div id="timeControls" data-control="basic"></div>
+            <div id="timeButtons" data-control="basic"></div>
+            <details data-embed="hide">
                 <summary>Beobachtungsort</summary>
                 <div id="locationControls"></div>
             </details>
         </div>
     </div>
 
-    <h2 id="einstellungen">Einstellungen</h2>
-    <table class="glossary">
+    <h2 id="einstellungen" data-embed="hide">Einstellungen</h2>
+    <table class="glossary" data-embed="hide">
         <tr><td>Maus und Finger</td><td>Ziehen dreht die Ansicht um das Ziel, Mausrad oder zwei Finger zoomen, rechte
             Maustaste, Umschalt+Ziehen oder zwei Finger verschieben. Doppelklick auf Erde oder Mond macht ihn zum Ziel.
             „Oben“ ist immer der Nordpol der Ekliptik, so verliert man die Orientierung nicht.</td></tr>
@@ -2096,8 +2145,8 @@
             her. Am Ende (oder mit ✕) kommen Anzeigen und Maßstab wieder wie vorher.</td></tr>
     </table>
 
-    <h2>Begriffe</h2>
-    <table class="glossary">
+    <h2 data-embed="hide">Begriffe</h2>
+    <table class="glossary" data-embed="hide">
         <tr><td>Ekliptik</td><td>Die Ebene, in der die Erde um die Sonne läuft. Von der Erde aus gesehen wandert die Sonne
             im Lauf eines Jahres einmal entlang der Ekliptik um den Himmel. Die Längen werden ab dem Frühlingspunkt ♈︎
             gezählt, dort steht die Sonne zu Frühlingsbeginn.</td></tr>
@@ -2134,8 +2183,8 @@
             Mondfinsternis. Das kommt etwa zweimal im Jahr vor.</td></tr>
     </table>
 
-    <h2>Quellen</h2>
-    <p class="hint">
+    <h2 data-embed="hide">Quellen</h2>
+    <p class="hint" data-embed="hide">
         Positionen und Orientierung nach Jean Meeus, <i>Astronomische Algorithmen</i> (<code>astro.js</code>).
         Mond: Farbkarte (LROC) und Höhen (LOLA) aus dem <a href="https://svs.gsfc.nasa.gov/4720">CGI Moon Kit</a> der NASA.
         Erde: <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/">Blue Marble Next Generation</a>

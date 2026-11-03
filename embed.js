@@ -10,8 +10,9 @@
  *                     view      Name einer Ansicht
  *                     step      Tourschritt ab 1
  *                     tour      true mit „tour“: Tour-Kasten zeigen (eigenständig immer, wenn step gesetzt ist)
+ *                     tourName  Name eines Rundgangs bei Seiten mit mehreren (tour=nodes), sonst null
  *                     layers    Liste sichtbarer Ebenen (Namen der Seite)
- *                     play      'day' oder 'year'
+ *                     play      'day', 'month' oder 'year'
  *                     controls  'full' (Standard), 'min' (nur Datum/Uhrzeit), 'none' (nur das Bild)
  *   kmEmbed.active  true mit dem Parameter „embed“ (die Seite steckt in einem iframe, siehe modelle.js)
  *   kmEmbed.id      Name des Modells für die Nachrichten an die umgebende Seite (Parameter „id“)
@@ -109,8 +110,9 @@
             view: params.get('view') || null,
             step: step(),
             tour: params.has('tour'),
+            tourName: (params.get('tour') || '').trim() || null,
             layers: layers(),
-            play: choice('play', ['day', 'year']),
+            play: choice('play', ['day', 'month', 'year']),
             controls: choice('controls', ['full', 'min', 'none']) || 'full',
         },
         ready() {

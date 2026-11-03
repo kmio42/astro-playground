@@ -559,8 +559,19 @@
                 fillGregorianDate(datetime);
                 update();   // Tageswerte gelten jetzt für den Kalendertag der Lokalzeit
             });
-            loadData();
-            datetime = new Date();
+            if (window.kmEmbed) {
+                // Seiten mit embed.js: Ort mit Vorgabe aus der Adresse, Ortszeile im Einbettmodus, folgt einem
+                // anderswo gemerkten Ort; Zeitpunkt aus der Adresse (t)
+                kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
+                    document.getElementById('latitude').value = String(lat);
+                    document.getElementById('longitude').value = String(lon);
+                    validateCoordinate(String(lat), 'latitude');
+                    validateCoordinate(String(lon), 'longitude');
+                });
+            } else {
+                loadData();
+            }
+            datetime = window.kmEmbed && kmEmbed.state.t ? new Date(kmEmbed.state.t) : new Date();
             fillGregorianDate(datetime);
             changeGregorianDate();
             document.getElementById('date').addEventListener('input', changeGregorianDate);

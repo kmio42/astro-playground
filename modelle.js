@@ -16,12 +16,16 @@
  *   data-ort-fest  „ja“: data-ort gilt immer (Text hängt am Ort); der Leser kann im Modell zu seinem Ort wechseln
  *   data-ansicht   Ansicht, Namen wie in VIEWS der Modellseite (z. B. „east“)
  *   data-schritt   Tourschritt ab 1 als Startzustand (Ebenen, Zeit, Ansicht wie in der Tour der Modellseite)
- *   data-tour      „ja“: Tour-Kasten mit Weiter/Zurück im Modell zeigen
+ *   data-tour      „ja“: Tour-Kasten mit Weiter/Zurück im Modell zeigen; bei Modellen mit mehreren Rundgängen
+ *                  deren Name (erdemond: „height“, „nodes“, „apsides“)
  *   data-ebenen    sichtbare Ebenen, Namen der Modellseite, z. B. „dome,zenith,axis,circle,sun“
- *   data-abspielen „tag“ oder „jahr“
+ *   data-abspielen „tag“, „monat“ oder „jahr“
  *   data-bedienung „voll“ (Standard), „min“ (nur Datum und Uhrzeit) oder „keine“ (nur das Bild)
  *   data-farben    „hell“ (Standard), „dunkel“ oder „auto“ (nach dem System des Lesers)
  *   data-hoehe     Seitenverhältnis Breite/Höhe bis zur ersten Höhenmeldung, z. B. „3/4“
+ *   data-poster    „ja“: erst ein Vorschaubild mit Knopf „Modell laden“, das Modell lädt nach dem Klick
+ *                  (Standard bei großen Modellen wie erdemond); „nein“: gleich laden. Ein Bild im Platzhalter
+ *                  ersetzt das mitgelieferte Vorschaubild.
  *
  * Die Modellseiten liegen im selben Ordner wie diese Datei und müssen dieselbe Herkunft haben wie die Seite:
  * Die Höhe kommt per postMessage nur von dort, und der gemerkte Ort im localStorage gilt für beide.
@@ -38,10 +42,18 @@
     const MODELS = {
         tagbogen: { page: 'Tagbogen3D.html', title: '3D-Modell: Tagbogen der Sonne', ratio: '660/1000' },
         himmelsachse: { page: 'Himmelsachse3D.html', title: '3D-Modell: Erdachse und Himmelsachse', ratio: '660/1100' },
+        erdposition: { page: 'Erdposition.html', title: 'Modell: Erdposition und Sternzeit', ratio: '660/2800' },
+        mond: { page: 'Mond.html', title: 'Modell: Mondbahn, Mondphase und Mondlauf am Himmel', ratio: '660/3800' },
+        tageslaenge: { page: 'Tageslaenge.html', title: 'Diagramm: Tageslänge im Jahr', ratio: '660/1850' },
+        mondbahn: { page: 'Mondbahn.html', title: 'Diagramm: Bahnen von Erde und Mond um die Sonne', ratio: '660/3200' },
+        // WebGL mit 3,6 MB Texturen: erst nach Klick laden, auf schmalen Bildschirmen und mit „Daten sparen“ die
+        // kleinen Texturen (Parameter klein, 1,7 MB)
+        erdemond: { page: 'ErdeMond3D.html', title: '3D-Modell: Erde und Mond', ratio: '660/2300',
+                    poster: 'posters/erdemond.jpg', posterRatio: '4/3', size: '3,6 MB', small: { param: 'klein', size: '1,7 MB' } },
     };
 
     const THEMES = { hell: 'light', dunkel: 'dark', auto: 'auto' };
-    const PLAY = { tag: 'day', jahr: 'year' };
+    const PLAY = { tag: 'day', monat: 'month', jahr: 'year' };
     const CONTROLS = { voll: 'full', min: 'min', keine: 'none' };
     const YES = ['', 'ja', 'true', '1'];
 
@@ -53,7 +65,15 @@
         .km-modell iframe:fullscreen { background: #fff; }
         .km-modell .km-modell-link { margin: 2px 0 0; text-align: right; font-size: 0.85em; }
         .km-modell .km-modell-link button { padding: 0; border: 0; background: none; color: inherit; font: inherit;
-            text-decoration: underline; cursor: pointer; }`;
+            text-decoration: underline; cursor: pointer; }
+        .km-modell-poster { position: relative; display: block; width: 100%; padding: 0; border: 0; margin: 0;
+            aspect-ratio: var(--km-ratio, 4/3); background: #0e0e14 center / cover no-repeat; cursor: pointer;
+            overflow: hidden; color: #fff; font: inherit; }
+        .km-modell-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+        .km-modell-poster span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            padding: 10px 18px; border-radius: 8px; background: rgba(14, 14, 20, 0.82); white-space: nowrap;
+            font-size: 1.05em; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); }
+        .km-modell-poster:hover span, .km-modell-poster:focus-visible span { background: rgba(40, 70, 140, 0.92); }`;
     document.head.appendChild(style);
 
     /** „50,10“, „50.5, 10.2“ oder „50,5; 10,2“ → [Breite, Länge] als Texte, sonst null */
@@ -83,7 +103,11 @@
         if (d.ortFest !== undefined && YES.includes(d.ortFest.trim())) p.set('ortfest', '');
         if (d.ansicht) p.set('view', d.ansicht.trim());
         if (d.schritt) p.set('step', d.schritt.trim());
-        if (d.tour !== undefined && YES.includes(d.tour.trim())) p.set('tour', '');
+        if (d.tour !== undefined) {
+            const tour = d.tour.trim();
+            if (YES.includes(tour)) p.set('tour', '');
+            else if (tour !== 'nein') p.set('tour', tour);
+        }
         if (d.ebenen) p.set('layers', d.ebenen.replace(/\s+/g, ''));
         const play = PLAY[(d.abspielen || '').trim()];
         if (play) p.set('play', play);
@@ -103,6 +127,8 @@
 
         const state = stateParams(el);
         const pageUrl = new URL(model.page, BASE);
+        const alt = el.querySelector('img[alt]');
+        const title = alt && alt.alt ? alt.alt : model.title;
 
         const embed = new URLSearchParams(state);
         if (el.id) embed.set('id', el.id);
@@ -110,17 +136,12 @@
         if (theme) embed.set('theme', theme);
         const controls = CONTROLS[(el.dataset.bedienung || '').trim()];
         if (controls) embed.set('controls', controls);
+        const small = model.small && (matchMedia('(max-width: 700px)').matches
+            || (navigator.connection && navigator.connection.saveData));
+        if (small) embed.set(model.small.param, '');
         embed.set('v', VERSION);
         const frameUrl = new URL(pageUrl);
         frameUrl.search = 'embed&' + embed.toString().replace(/=(?=&|$)/g, '');
-
-        const iframe = document.createElement('iframe');
-        iframe.src = frameUrl.href;
-        const alt = el.querySelector('img[alt]');
-        iframe.title = alt && alt.alt ? alt.alt : model.title;
-        iframe.loading = 'lazy';
-        iframe.allow = 'fullscreen';
-        iframe.style.setProperty('--km-ratio', (el.dataset.hoehe || model.ratio).trim());
 
         const own = new URL(pageUrl);
         own.search = state.toString().replace(/=(?=&|$)/g, '');
@@ -131,17 +152,55 @@
         a.target = '_blank';
         a.rel = 'noopener';
         a.textContent = 'Eigene Seite ↗';
-        if (document.fullscreenEnabled && iframe.requestFullscreen) {
-            const full = document.createElement('button');
-            full.type = 'button';
-            full.textContent = 'Vollbild';
-            full.addEventListener('click', () => iframe.requestFullscreen().catch(() => {}));
-            link.append(full, ' · ');
-        }
         link.appendChild(a);
 
-        el.replaceChildren(iframe, link);
-        frames.push(iframe);
+        function showFrame(lazy) {
+            const iframe = document.createElement('iframe');
+            iframe.src = frameUrl.href;
+            iframe.title = title;
+            if (lazy) iframe.loading = 'lazy';
+            iframe.allow = 'fullscreen';
+            iframe.style.setProperty('--km-ratio', (el.dataset.hoehe || model.ratio).trim());
+            if (document.fullscreenEnabled && iframe.requestFullscreen) {
+                const full = document.createElement('button');
+                full.type = 'button';
+                full.textContent = 'Vollbild';
+                full.addEventListener('click', () => iframe.requestFullscreen().catch(() => {}));
+                link.prepend(full, ' · ');
+            }
+            frames.push(iframe);
+            return iframe;
+        }
+
+        const posterWanted = el.dataset.poster;      // fehlt: wie beim Modell vorgesehen
+        const usePoster = posterWanted === undefined ? !!model.poster : YES.includes(posterWanted.trim());
+        if (!usePoster) {
+            el.replaceChildren(showFrame(true), link);
+            return;
+        }
+
+        // Vorschaubild mit Knopf; erst der Klick lädt das Modell
+        const poster = document.createElement('button');
+        poster.type = 'button';
+        poster.className = 'km-modell-poster';
+        poster.style.setProperty('--km-ratio', model.posterRatio || model.ratio);
+        const img = alt ? alt.cloneNode() : document.createElement('img');
+        if (!alt) {
+            img.src = model.poster ? new URL(model.poster, BASE).href + '?v=' + VERSION : '';
+            img.alt = '';
+        }
+        if (img.src) poster.appendChild(img);
+        const size = small ? model.small.size : model.size;
+        const label = document.createElement('span');
+        label.textContent = `▶ Modell laden${size ? ` (${size})` : ''}`;
+        poster.appendChild(label);
+        poster.setAttribute('aria-label', `${title} laden${size ? `, ${size}` : ''}`);
+        poster.addEventListener('click', () => {
+            const iframe = showFrame(false);
+            el.replaceChildren(iframe, link);
+            iframe.focus();
+        });
+        el.replaceChildren(poster, link);
     }
 
     window.addEventListener('message', ev => {

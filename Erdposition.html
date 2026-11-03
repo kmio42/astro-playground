@@ -117,6 +117,7 @@
     <script src="astro.js"></script>
     <script src="render.js"></script>
     <script src="ui.js"></script>
+    <script src="embed.js"></script>
     <script>
 
     /////////////////////////////////////////////////////////////////
@@ -561,17 +562,19 @@
                 { label: '1 Tag',      step: 86400000 },
                 { label: '1 Sterntag', step: 86164100 },
             ]);
+            kmEmbed.ready();
         });
     </script>
 </head>
 <body>
-    <h1>Sternzeit und Erdposition</h1>
-    <p>Inspiriert von der Frage, welche Bahn die Sonne am Himmel zieht und wann sie untergeht, ist dieses kleine Erde-Sonne-Modell entstanden. Aus einer externen Perspektive lassen sich die Auswirkungen der Erdrotation, der geneigten Erdachse und der elliptischen Bewegung um die Sonne deutlich besser verstehen und nachvollziehen als aus der Sicht der bewegten Erde selbst. Neben der Betrachtung der Sonnenbahn ist die Ausrichtung von Erde und Sonne auch entscheidend für die sichtbaren Sternbilder im Verlauf des Jahres und dient als Orientierung im Universum.
+    <h1 data-embed="hide">Sternzeit und Erdposition</h1>
+    <p data-embed="hide">Inspiriert von der Frage, welche Bahn die Sonne am Himmel zieht und wann sie untergeht, ist dieses kleine Erde-Sonne-Modell entstanden. Aus einer externen Perspektive lassen sich die Auswirkungen der Erdrotation, der geneigten Erdachse und der elliptischen Bewegung um die Sonne deutlich besser verstehen und nachvollziehen als aus der Sicht der bewegten Erde selbst. Neben der Betrachtung der Sonnenbahn ist die Ausrichtung von Erde und Sonne auch entscheidend für die sichtbaren Sternbilder im Verlauf des Jahres und dient als Orientierung im Universum.
     </p>
-    <p>Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Die Angaben beziehen sich auf Weltzeit (UTC). Mit „Lokalzeit“ werden Datum und Uhrzeit sowie Sonnenauf-, -untergang und -durchgang in der Zeitzone des Browsers angegeben (einschließlich Sommerzeit); Auf-, Untergang und Durchgang gelten dann für den lokalen Kalendertag. Die Knöpfe für Modifikation der Zeit können gedrückt gehalten werden.</p>
+    <p data-embed="hide">Das Modell berechnet Erdposition und Richtung eines gegebenen Meridians für einen Zeitpunkt. Die Angaben beziehen sich auf Weltzeit (UTC). Mit „Lokalzeit“ werden Datum und Uhrzeit sowie Sonnenauf-, -untergang und -durchgang in der Zeitzone des Browsers angegeben (einschließlich Sommerzeit); Auf-, Untergang und Durchgang gelten dann für den lokalen Kalendertag. Die Knöpfe für Modifikation der Zeit können gedrückt gehalten werden.</p>
 
-    <div id="locationControls"></div>
-    <div id="timeControls"></div>
+    <div id="locationControls" data-embed="hide"></div>
+    <div id="kmPlace" data-control="place" hidden></div>
+    <div id="timeControls" data-control="basic"></div>
 
     <div class="workspace">
         <div class="figures">
@@ -584,14 +587,14 @@
                 <figcaption>Ausrichtung der Erde zur Sonne</figcaption>
             </figure>
         </div>
-        <div class="time-panel"><div id="timeButtons"></div></div>
+        <div class="time-panel" data-control="basic"><div id="timeButtons"></div></div>
     </div>
 
     <div id="outputTable"></div>
 
 
-<h2>Hintergründe und Begriffe</h2>
-<table class="glossary">
+<h2 data-embed="hide">Hintergründe und Begriffe</h2>
+<table class="glossary" data-embed="hide">
 <tr>
 <td>Sternzeit</td>
 <td>Die Erde dreht sich sowohl um ihre eigene Achse, als auch um die Sonne. Die Sternzeit berücksichtigt nur die Drehung um die eigene Achse - jeden Tag zur gleichen Sternzeit hat die Erde die gleiche Blickrichtung ins Universum (die Position auf der Bahn um die Sonne wird vernachlässigt). Ein Sterntag ist ca. 4 Minuten kürzer als ein normaler Tag und lässt sich in 24 Sternzeitstunden teilen. Die Sternzeit ist ortsabhängig.
