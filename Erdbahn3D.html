@@ -198,11 +198,12 @@
             show: { exaggerate: false, ecliptic: true, marks: true, axis: true, grid: true, coast: true, parallel: true },
         };
 
-        // Ansichten: Kamera und Ziel; earth folgt der Erde, Blick quer zur Linie Sonne–Erde
+        // Ansichten: Kamera und Ziel. Wie in Erdposition.html liegt das Perihel rechts und das Aphel links
+        // (apsisAz: Blickrichtung zur Apsidenlinie [°]); earth folgt der Erde, Blick quer zur Linie Sonne–Erde
         const VIEWS = {
-            oblique: { cam: { az: 200, el: 28, dist: 3.6 } },
-            top:     { cam: { az: 180, el: 90, dist: 4.6 } },
-            edge:    { cam: { az: 200, el: 3, dist: 3.6 } },
+            oblique: { cam: { el: 28, dist: 3.6 }, apsisAz: 20 },
+            top:     { cam: { el: 90, dist: 4.6 }, apsisAz: 0 },
+            edge:    { cam: { el: 3, dist: 3.6 }, apsisAz: 20 },
             earth:   { cam: { el: 12, dist: 1.0 }, relAz: 0 },
         };
 
@@ -362,6 +363,22 @@
             }
         }
 
+        /**
+         * Die beiden Brennpunkte der Ellipse: die Sonne und ein Punkt auf der Apsidenlinie Richtung Aphel, im
+         * Abstand Aphel- minus Periheldistanz. In Wirklichkeit 5 Mio. km vom Sonnenmittelpunkt, rund sieben
+         * Sonnenradien; im Modell ist die Sonne viel zu groß, deshalb liegt er ohne Übertreibung in ihrer Scheibe.
+         */
+        function drawFoci(S) {
+            if (!visible('marks')) return;
+            const c = colors;
+            const peri = earthPosition(S.ev.peri.time), aph = earthPosition(S.ev.aph.time);
+            const second = V.scale(V.norm(aph), V.len(aph) - V.len(peri));
+            for (const p of [[0, 0, 0], second]) scene.dot(p, 2.5, c.text, { ring: c.surface });
+            if (V.len(second) > SUN_R * 1.3) {
+                scene.label(second, 'zweiter Brennpunkt', c['text-2'], { size: 11, dy: -12, halo: c['surface-2'] });
+            }
+        }
+
         /** Zwei Fächer: der Weg der Erde in 30 Tagen nach Perihel und nach Aphel */
         function drawSectors(S) {
             for (const ap of [S.ev.peri, S.ev.aph]) {
@@ -465,6 +482,7 @@
             // Sonne und Erde von hinten nach vorn
             const bodies = [{ z: scene.project([0, 0, 0])[2], draw: drawSun }, { z: scene.project(S.earth)[2], draw: () => drawEarth(S) }];
             bodies.sort((a, b) => b.z - a.z).forEach(b => b.draw());
+            drawFoci(S);
             updateInfo(S);
             tour.render(tourValues(S));
         }
@@ -613,7 +631,8 @@
                 title: 'Näher dran und trotzdem Winter',
                 layers: [...BASE, 'marks'], view: 'top', exaggerate: true, apsis: 'peri', minutes: 12 * 60,
                 text: v => `<p>Die Bahn ist kein genauer Kreis, sondern eine leichte <b>Ellipse</b>; hier ist die
-                    Abweichung zehnfach übertrieben. Am ${v.periDate} ist die Erde der Sonne am nächsten
+                    Abweichung zehnfach übertrieben. Die Sonne steht in einem ihrer beiden <b>Brennpunkte</b> (Punkte),
+                    nicht in der Mitte. Am ${v.periDate} ist die Erde der Sonne am nächsten
                     (<b>Perihel</b>, ${v.periDist} Mio. km), am ${v.aphDate} am weitesten entfernt (<b>Aphel</b>,
                     ${v.aphDist} Mio. km).</p>
                     <p>Im Januar kommt deshalb rund ${v.moreSun} % mehr Sonnenstrahlung an als im Juli – und trotzdem ist
@@ -777,12 +796,19 @@
         let currentView = 'oblique';
         const viewButtons = {};
 
+        /** Azimut der Kamera, bei dem das Perihel im Bild rechts liegt, plus offset [°] */
+        function viewAzimuth(offset) {
+            const p = earthPosition(eventsOfYear(state.year).peri.time);
+            return ((180 - Math.atan2(p[1], p[0]) * RAD2DEG + offset) % 360 + 360) % 360;
+        }
+
         /** Ansicht wählen; earth folgt danach der Erde */
         function setView(name, instant = false) {
             const v = VIEWS[name];
             if (!v) return;
             currentView = name;
             let target = [0, 0, 0], cam = { ...v.cam };
+            if (v.apsisAz !== undefined) cam.az = viewAzimuth(v.apsisAz);
             if (v.relAz !== undefined) {
                 const earth = earthPosition(currentJd());
                 const L = Math.atan2(earth[1], earth[0]) * RAD2DEG;
@@ -864,7 +890,7 @@
 
         window.onload = function () {
             scene = new canvas3d.Scene(document.getElementById('view'),
-                { cam: { ...VIEWS.oblique.cam }, aspect: 0.66, minHeight: 360, maxHeight: 680, minDist: 0.3, maxDist: 8 });
+                { cam: { ...VIEWS.oblique.cam, az: 0 }, aspect: 0.66, minHeight: 360, maxHeight: 680, minDist: 0.3, maxDist: 8 });
             scene.enableInteraction(() => {
                 if (state.follow) {
                     const earth = earthPosition(currentJd());
@@ -904,6 +930,7 @@
 
             scene.resize();
             showNow();
+            setView('oblique', true);
             applyEmbedState(kmEmbed.state);
             new ResizeObserver(() => { scene.resize(); draw(); }).observe(document.getElementById('view'));
             kmEmbed.onVisibility(visible => {
@@ -1001,8 +1028,11 @@
 
     <h2 data-embed="hide">Wie lese ich das?</h2>
     <ul class="hint" data-embed="hide">
-        <li>Die Sonne steht in der Mitte, die Erde läuft gegen den Uhrzeigersinn um sie herum (von Norden gesehen).
-        Sonne und Erde sind stark vergrößert; die Abstände stimmen, die Ellipse lässt sich zehnfach übertreiben.</li>
+        <li>Die Sonne steht in einem der beiden <b>Brennpunkte</b> der Ellipse (Punkte), die Erde läuft gegen den
+        Uhrzeigersinn um sie herum (von Norden gesehen). Wie in <code>Erdposition.html</code> liegt das Perihel rechts.
+        Sonne und Erde sind stark vergrößert; die Abstände stimmen, die Ellipse lässt sich zehnfach übertreiben. Der
+        zweite Brennpunkt liegt in Wirklichkeit 5 Mio. km vom Sonnenmittelpunkt entfernt, rund sieben Sonnenradien –
+        nur weil die Sonne im Modell viel zu groß ist, liegt er hier in ihrer Scheibe.</li>
         <li>Die <b>Erdachse</b> (lila) zeigt immer in dieselbe Richtung. Die dunkle Seite der Erde hat Nacht; der rote
         Breitenkreis des eingestellten Orts ist auf der Tagseite durchgezogen, auf der Nachtseite gestrichelt – sein
         Anteil im Licht entspricht der Tageslänge.</li>
