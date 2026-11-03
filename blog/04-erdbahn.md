@@ -1,41 +1,131 @@
 # Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?
 
-<!-- Beitrag 4. Gliederung, noch kein Text. Quelle: Erklaerung-Sonnenbahn.md §2 (Neigung), §6 (Erdbahn) -->
+<!-- Beitrag 4 der Reihe (Wegweiser: Teil 5). Modelle: Erdbahn3D.html (Rundgang „erdbahn“, 9 Schritte),
+     Tageslaenge.html (Rundgang „zeitgleichung“, 5 Schritte). Zahlen: 2026, MEZ. -->
 
-## Einstieg
+*Teil 5 der Reihe „Sonne, Erde, Mond“. Zuletzt: „Warum steht der Polarstern immer an derselben Stelle?“*
 
-Anfang Januar ist die Erde der Sonne am nächsten – 5 Millionen Kilometer näher als im Juli. Trotzdem
-ist bei uns Winter.
+Anfang Januar ist die Erde der Sonne so nah wie im ganzen Jahr nicht – rund fünf Millionen Kilometer näher
+als im Juli. Und trotzdem ist bei uns Winter. Wie passt das zusammen?
 
-## Gliederung
+Im letzten Teil blieb eine Frage offen: Warum steht die Sonne im Juni so viel weiter nördlich am Himmel als
+im Dezember? Beide Fragen lassen sich nur mit einem Blick von ganz weit draußen beantworten, auf die ganze
+Bahn der Erde um die Sonne.
 
-1. **Die geneigte Erdachse:** 23,44°, zeigt immer in dieselbe Richtung (Polarstern); im Juni ist die
-   Nordhalbkugel zur Sonne geneigt, im Dezember die Südhalbkugel. Daher pendelt die Deklination aus
-   Beitrag 3.
-2. **Ekliptik:** die Ebene der Erdbahn; von der Erde aus der Weg der Sonne durch die Sternbilder.
-   Drittes Koordinatensystem nach Horizont und Äquator.
-3. **Eine leichte Ellipse:** Perihel 3. Januar (147,1 Mio. km), Aphel 6. Juli (152,1 Mio. km).
-4. **Schneller in Sonnennähe:** zweites Keplersches Gesetz; Winterhalbjahr 7,5 Tage kürzer.
-5. **Auflösung der Zeitgleichung (Rätsel aus Beitrag 1):** Der Mittag wandert aus zwei Gründen.
-   - *Ellipse:* Im Januar läuft die Erde schneller um die Sonne; sie muss sich etwas weiter drehen,
-     bis die Sonne wieder im Süden steht. Eine Welle mit einem Jahr Periode, etwa ±7,7 min.
-   - *Neigung:* Die Sonne läuft entlang der Ekliptik, die Uhr zählt aber am Äquator; der schräge Weg
-     wirkt mal schneller, mal langsamer. Eine Welle mit einem halben Jahr Periode, etwa ±9,9 min.
-   - Kasten mit der Näherungsformel (Summe der beiden Wellen); die Modelle brauchen sie nicht, die
-     Zeitgleichung ergibt sich dort von selbst aus dem Sonnenstand.
+## Ein Jahr von außen
 
-## Modelle
+Das Modell zeigt die Sonne in der Mitte und die Erde auf ihrer Bahn. Beide sind stark vergrößert,
+maßstabsgetreu wäre die Erde nicht einmal einen Bildpunkt groß. Der Rundgang zeigt die Erde zu den
+Sonnenwenden und Tagundnachtgleichen aus der Nähe und schließlich die Bahn von oben.
 
-- `erdbahn` (`Erdbahn3D.html`) mit `data-tour="ja"`, 9 Schritte: 1 Ein Jahr von außen, 2 Die schräge Achse,
-  3 Juni: der Norden neigt sich zur Sonne, 4 Dezember: der Norden neigt sich weg, 5 Tag und Nacht gleich
-  lang, 6 Näher dran und trotzdem Winter (Perihel/Aphel, rund 7 % mehr Strahlung im Januar), 7 Schneller
-  in Sonnennähe (30,3 und 29,3 km/s, Halbjahre 186,4 und 178,9 Tage), 8 Ein Tag ist mehr als eine
-  Umdrehung (Überleitung zur Zeitgleichung), 9 Selbst ausprobieren.
-- Danach `tageslaenge` mit `data-tour="zeitgleichung"` für die beiden Anteile der Zeitgleichung.
+<div class="km-modell" id="erdbahn" data-modell="erdbahn" data-tour="erdbahn">
+<ul>
+<li>Die Erde läuft in gut 365 Tagen einmal um die Sonne. Ihre Bahn liegt in einer Ebene, der Ekliptik.</li>
+<li>Die Erdachse steht 23,44° schräg zur Bahnebene und zeigt das ganze Jahr in dieselbe Richtung, zum
+Polarstern.</li>
+<li>Am 21. Juni neigt sich der Nordpol zur Sonne: Bei 50° N dauert der Tag 16 h 22 min, rund um den
+Nordpol geht die Sonne nicht unter. Am 21. Dezember neigt er sich weg: 8 h 04 min.</li>
+<li>Zu den Tagundnachtgleichen läuft die Grenze zwischen Tag und Nacht durch beide Pole; überall sind Tag
+und Nacht etwa gleich lang.</li>
+<li>Die Bahn ist eine leichte Ellipse mit der Sonne in einem Brennpunkt. Am 3. Januar ist die Erde der
+Sonne am nächsten (Perihel, 147,1 Mio. km), am 6. Juli am fernsten (Aphel, 152,1 Mio. km). Im Januar kommt
+rund 7 % mehr Sonnenstrahlung an – die Neigung der Achse wiegt aber viel schwerer.</li>
+<li>In Sonnennähe läuft die Erde schneller (30,3 statt 29,3 km/s). Das Sommerhalbjahr der Nordhalbkugel
+dauert deshalb 186,4 Tage, das Winterhalbjahr nur 178,9.</li>
+</ul>
+<p><a href="Erdbahn3D.html">3D-Modell: Die Bahn der Erde um die Sonne (eigene Seite öffnen)</a></p>
+</div>
+
+## Die Neigung macht die Jahreszeiten
+
+Die Auflösung ist damit klar: Die Jahreszeiten entstehen durch die geneigte Achse, nicht durch den Abstand
+zur Sonne. Im Sommer steht die Sonne hoch, ihre Strahlen treffen steil auf, und sie scheint lange. Im
+Winter ist es umgekehrt – und das wiegt die paar Prozent mehr Strahlung im Januar bei Weitem auf. Auf der
+Südhalbkugel fallen Sonnennähe und Sommer übrigens zusammen.
+
+Von der Erde aus erscheint dieselbe Bewegung umgekehrt: Die Sonne scheint im Lauf eines Jahres einmal
+entlang der **Ekliptik** um den Himmel zu wandern, schräg zum Himmelsäquator. Ihr Abstand vom
+Äquator ist die Deklination aus dem letzten Teil – darum pendelt sie zwischen +23,44° und −23,44°.
+
+## Das Rätsel vom 12. Dezember, aufgelöst
+
+Im zweiten Teil wanderte der Mittag übers Jahr hin und her, und daraus folgte, dass der früheste
+Sonnenuntergang schon um den 12. Dezember liegt. Jetzt lassen sich die Ursachen zeigen: die Ellipse, weil
+die Erde in Sonnennähe schneller läuft, und die schräge Achse, weil die Sonne entlang der Ekliptik, die Uhr
+aber entlang des Äquators zählt.
+
+<div class="km-modell" id="zeitgleichung" data-modell="tageslaenge" data-tour="zeitgleichung">
+<ul>
+<li>Die Zeitgleichung verschiebt den Mittag: Mitte Februar ist er 14 Minuten später als im Mittel,
+Mitte Mai 4 Minuten früher, Ende Juli 7 Minuten später und Anfang November 16 Minuten früher.</li>
+<li>Erste Ursache, die Ellipse: Anfang Januar läuft die Erde schneller, sie muss sich jeden Tag etwas
+weiter drehen, bis die Sonne wieder im Süden steht. Eine Welle mit einem Jahr Periode, bis zu 8 Minuten.</li>
+<li>Zweite Ursache, die Neigung: Um die Tagundnachtgleichen kommt die Sonne in Ost-West-Richtung langsamer
+voran, um die Sonnenwenden schneller. Zwei Wellen im Jahr, bis zu 10 Minuten.</li>
+<li>Um Weihnachten steigen beide gleichzeitig an: Der Mittag rückt jeden Tag eine halbe Minute nach
+hinten – daher der früheste Sonnenuntergang am 12. Dezember.</li>
+</ul>
+<p><a href="Tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
+</div>
+
+> **Zum Nachrechnen:** Eine gängige Näherung für die Zeitgleichung, also wie weit eine Sonnenuhr vorgeht, ist
+> 9,87 min · sin 2B − 7,53 min · cos B − 1,5 min · sin B mit B = 360° · (Tag des Jahres − 81) / 365.
+> Das erste Glied ist die Neigung (zwei Wellen im Jahr), die beiden anderen zusammen die Ellipse (eine
+> Welle). Am 3. November ergibt das +16 Minuten, am 11. Februar −15. Die Modelle brauchen diese Formel
+> nicht: Bei ihnen ergibt sich die Zeitgleichung von selbst aus dem Stand der Sonne.
+
+Auf Fotos der Sonne – nur mit Sonnenfilter! – lässt sich die Ellipse sogar nachweisen: Mit demselben
+Objektiv aufgenommen, ist die Sonnenscheibe im Januar gut 3 % größer als im Juli.
+
+## Bleibt das immer so?
+
+Die Achse zeigt zum Polarstern, das Perihel liegt Anfang Januar, die Neigung beträgt 23,44° – das klingt
+nach festen Größen. Für ein Menschenleben sind sie das auch. Über Jahrtausende gerät dagegen alles in
+Bewegung. Davon handelt der nächste Teil.
+
+## Stichwörter
+
+- **Ekliptik:** die Ebene der Erdbahn; von der Erde aus der Weg der Sonne durch die Sternbilder im Lauf eines
+  Jahres.
+- **Achsneigung:** der Winkel zwischen Erdachse und der Senkrechten auf der Bahnebene, 23,44°.
+- **Ellipse, Brennpunkt:** die Form der Erdbahn; die Sonne steht in einem der beiden Brennpunkte.
+- **Perihel, Aphel:** der sonnennächste und der sonnenfernste Punkt der Bahn.
+- **Zweites Keplersches Gesetz:** In Sonnennähe läuft ein Planet schneller als in Sonnenferne.
+- **Zeitgleichung:** die Abweichung des Mittags von seinem Mittelwert, entstanden aus Ellipse und Neigung.
+
+*Die Modelle und Texte dieser Reihe sind mit großer Unterstützung von Claude Code entstanden, einem
+KI-Werkzeug zum Programmieren. Wie diese Zusammenarbeit lief, was gut klappte und wo es hakte, beschreibt
+ein eigener Beitrag.*
+
+---
 
 ## Notizen
 
-- Für Punkt 5: `tageslaenge` mit `data-tour="zeitgleichung"` (5 Schritte: Schlangenlinie, Ellipse, Neigung,
-  beides zusammen mit dem 12. Dezember, Sonnenuhr). Näherungsformel für den Kasten: Smart, Meeus 27.3.
-- Kein Rundgang vorhanden; `Erdposition.html` hat keinen. Lohnt sich einer?
-- Frage zum nächsten Beitrag: „Bleibt das immer so? Die Achse, die Ellipse, der Kalender …“ → Beitrag 5.
+- Zwei Modelle in einem Beitrag; `erdbahn` ist schlank (Canvas 2D), `tageslaenge` ebenfalls – kein
+  Vorschaubild nötig.
+- Der Kasten mit der Näherungsformel als eigener Block in WordPress.
+- Der Hinweis auf den Sonnenfilter ist wichtig und muss stehen bleiben, falls der Impuls bleibt.
+
+## Material aus der früheren Langfassung
+
+| | Datum (2026) | Entfernung |
+|---|---|---:|
+| Perihel (sonnennächster Punkt) | 3. Januar | 147,1 Mio. km |
+| Aphel (sonnenfernster Punkt) | 6. Juli | 152,1 Mio. km |
+
+Exzentrizität 0,0167. Nach dem zweiten Keplerschen Gesetz überstreicht die Verbindungslinie Sonne–Erde in
+gleichen Zeiten gleiche Flächen; im Perihel läuft die Erde mit etwa 30,3 km/s, im Aphel mit 29,3 km/s.
+
+| Astronomische Jahreszeit (Nordhalbkugel) | Beginn 2026 (MEZ) | Dauer |
+|------------------------------------------|-------------------|------:|
+| Frühling | 20. März, 15:45 | 92,7 Tage |
+| Sommer | 21. Juni, 9:24 | 93,7 Tage |
+| Herbst | 23. September, 1:05 | 89,9 Tage |
+| Winter | 21. Dezember, 21:50 | 89,0 Tage |
+
+Sommerhalbjahr (Frühling + Sommer) 186,4 Tage, Winterhalbjahr 178,9 Tage – 7,5 Tage weniger. Auf der
+Südhalbkugel ist der Sommer die kürzere Jahreshälfte.
+
+Die ungleiche Geschwindigkeit ist einer der beiden Gründe für die Zeitgleichung: Im Januar läuft die Erde ein
+Stück weiter um die Sonne als im Durchschnitt, die Erde muss sich etwas länger drehen, bis die Sonne wieder
+im Süden steht – der Mittag wandert nach hinten.

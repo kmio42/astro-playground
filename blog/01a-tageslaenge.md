@@ -86,3 +86,20 @@ ein eigener Beitrag.*
 - Die Stichpunkte im Platzhalter erscheinen nur, wenn das Modell nicht lädt (Feed, E-Mail, ohne
   JavaScript).
 - Ich-Form nur, wo es um eigenes Erleben geht; sonst vermeiden.
+
+## Material aus der früheren Langfassung
+
+**Wie schnell werden die Tage länger?** Die Tageslänge folgt über das Jahr ungefähr einer Sinuskurve: An
+den Sonnenwenden ändert sie sich kaum („Sonnenstillstand“, Solstitium), um die Tagundnachtgleichen am
+schnellsten – bei 50° N um bis zu 3,8 Minuten pro Tag, in Kiel um über 4 Minuten.
+
+Feinheit: An den Tagundnachtgleichen ist der Tag nicht genau 12 Stunden lang, sondern etwa 12 h 10 min,
+weil Auf- und Untergang am oberen Rand der Sonne gezählt werden und die Luft die Sonne am Horizont anhebt.
+Genau 12 Stunden Tag hat man bei uns schon um den 17. März und erst wieder um den 26. September. (Die
+Lichtbrechung ist aus der Reihe herausgenommen; nur als Hintergrund.)
+
+**Dämmerung:** Die bürgerliche Dämmerung (bis 6° unter dem Horizont) dauert bei 50° N im März und
+September etwa 32 Minuten, im Dezember etwa 38, im Juni etwa 44 Minuten – sie hängt vom Winkel ab, unter
+dem die Sonnenbahn den Horizont schneidet. Im Juni sinkt die Sonne bei 50° N nicht einmal 18° unter den
+Horizont; es gibt keine astronomische Nacht. Das gilt im Hochsommer für ganz Deutschland nördlich von etwa
+48,6° N.

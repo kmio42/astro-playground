@@ -1,59 +1,115 @@
-# Die Sonnenbahn im Jahreslauf: der Tagbogen
+# Läuft die Sonne im Winter auf einer kleineren Bahn?
 
-<!-- Beitrag 2. Text aus dem Pilotbeitrag. Quelle:
-     Erklaerung-Sonnenbahn.md §1. Zahlen: 50° N, MEZ (ohne Sommerzeit), 2026 -->
+<!-- Beitrag 2 der Reihe (Wegweiser: Teil 3). Modell: Tagbogen3D.html, Rundgang (10 Schritte). Zahlen: 50° N,
+     10° O, 2026, MEZ (ohne Sommerzeit). -->
 
-An jedem Tag zieht die Sonne einen Bogen über den Himmel: Sie geht irgendwo im Osten auf, steht
-mittags genau im Süden am höchsten und geht irgendwo im Westen unter. Im Sommer steht sie mittags
-hoch, und es ist bis spät am Abend hell; im Winter bleibt sie niedrig, und schon am Nachmittag wird
-es dunkel. Läuft die Sonne im Winter auf einer kleineren Bahn als im Sommer, oder sehen wir nur ein
-kürzeres Stück davon?
+*Teil 3 der Reihe „Sonne, Erde, Mond“. Bisher: „Warum werden die Tage im Herbst so schnell kürzer?“ und
+„Das Rätsel vom 12. Dezember“.*
 
-Das Modell zeigt den Himmel so, wie ihn ein Beobachter erlebt. Die Scheibe ist sein Horizont, der
-Kreis ist die Bahn, auf der die Sonne an einem Tag um die Himmelsachse läuft. Der helle Teil über der
-Scheibe ist der sichtbare **Tagbogen**, der gestrichelte Teil darunter die Nacht. Mit dem Regler
-„Tag“ durch das Jahr schieben und zusehen, wie der Kreis nach oben und unten wandert. Ziehen dreht
-die Ansicht; zum Zoomen erst ins Bild klicken, dann das Mausrad benutzen.
+Im Sommer steht die Sonne mittags hoch, und es ist bis spät am Abend hell; im Winter bleibt sie niedrig,
+und schon am Nachmittag wird es dunkel. Läuft die Sonne im Winter auf einer kleineren Bahn als im Sommer,
+oder ist nur ein kürzeres Stück davon zu sehen?
 
-<div class="km-modell" id="tagbogen-juni" data-modell="tagbogen" data-datum="2026-06-21 10:00"><a href="Tagbogen3D.html">3D-Modell: Tagbogen der Sonne am 21. Juni (eigene Seite öffnen)</a></div>
+In den ersten beiden Teilen ging es um Uhrzeiten: wann die Sonne auf- und untergeht und wann Mittag ist.
+Diesmal geht der Blick an den Himmel – welchen Weg nimmt die Sonne dort eigentlich?
 
-Die Werte für 50° nördlicher Breite:
+## Der Himmel eines Beobachters
 
-| Tag (2026) | Aufgang | Mittag | Untergang | Tageslänge | Mittagshöhe | Aufgang / Untergang |
+Das Modell zeigt den Himmel so, wie ihn ein Beobachter auf der Erde erlebt: in der Mitte die Scheibe
+seines Horizonts, darüber die Bahn der Sonne. Der Rundgang baut es Schritt für Schritt auf und rechnet
+für die Mitte Deutschlands. Ziehen dreht die Ansicht; zum Zoomen erst ins Bild klicken, dann das Mausrad
+benutzen.
+
+<div class="km-modell" id="tagbogen" data-modell="tagbogen" data-tour="ja">
+<ul>
+<li>Der Himmel scheint sich einmal am Tag um eine schräge Achse zu drehen, die Himmelsachse. Sie zeigt
+zum Polarstern und steht so hoch über dem Nordhorizont, wie die geografische Breite angibt (50°).</li>
+<li>Die Sonne läuft an einem Tag auf einem Kreis um diese Achse. Das Stück über dem Horizont ist der
+Tagbogen.</li>
+<li>Am 21. Juni liegt der Kreis höher: Die Sonne geht im Nordosten auf, steht mittags 63° hoch und geht
+im Nordwesten unter. Am 21. Dezember liegt er tiefer: Aufgang im Südosten, Mittagshöhe 17°.</li>
+<li>Die Kreise der beiden Sonnenwenden sind gleich groß, nur etwa 8 % kleiner als der zu Frühlings- und
+Herbstanfang. Der kurze Wintertag kommt also nicht von einer kleineren Bahn: Es liegt nur ein viel
+kürzeres Stück davon über dem Horizont.</li>
+<li>Von der Seite gesehen sind die Kreise parallele Striche, 40° gegen den Horizont geneigt. Die Bahn
+verschiebt sich im Jahr nur, sie kippt nicht.</li>
+<li>Die Sonnenscheibe verschwindet beim Untergang in drei bis gut vier Minuten, im Frühling und Herbst am
+schnellsten.</li>
+<li>Der Schatten eines senkrechten Stabs zeigt immer von der Sonne weg; die Spur seiner Spitze über den
+Tag ist das Prinzip der Sonnenuhr.</li>
+</ul>
+<p><a href="Tagbogen3D.html">3D-Modell: Tagbogen der Sonne (eigene Seite öffnen)</a></p>
+</div>
+
+## Ein Kreis, der wandert
+
+Die Antwort auf die Eingangsfrage ist also: weder noch – oder beides ein bisschen. Die Bahn im Winter ist
+kleiner als zu Frühlingsanfang, aber genauso groß wie im Sommer. Entscheidend ist, wie viel von ihr über
+dem Horizont liegt: im Juni rund zwei Drittel, im Dezember nur ein Drittel.
+
+| Tag (2026, MEZ) | Aufgang | Mittag | Untergang | Tageslänge | Mittagshöhe | Aufgang / Untergang |
 |------------|--------:|-------:|----------:|-----------:|------------:|---------------------|
-| 20. März (Frühlingsanfang) | 6:23 | 12:27 | 18:33 | 12 h 10 min | 40° | Osten / Westen (89° / 271°) |
-| 21. Juni (Sommeranfang) | 4:11 | 12:22 | 20:33 | 16 h 22 min | 63° | Nordosten / Nordwesten (51° / 310°) |
-| 23. September (Herbstanfang) | 6:08 | 12:12 | 18:16 | 12 h 08 min | 40° | Osten / Westen (89° / 271°) |
-| 21. Dezember (Winteranfang) | 8:16 | 12:18 | 16:20 | 8 h 04 min | 17° | Südosten / Südwesten (127° / 233°) |
+| 20. März | 6:23 | 12:27 | 18:33 | 12 h 10 min | 40° | Osten / Westen |
+| 21. Juni | 4:11 | 12:22 | 20:33 | 16 h 22 min | 63° | Nordosten / Nordwesten |
+| 23. September | 6:08 | 12:12 | 18:16 | 12 h 08 min | 40° | Osten / Westen |
+| 21. Dezember | 8:16 | 12:18 | 16:20 | 8 h 04 min | 17° | Südosten / Südwesten |
 
-Richtungen von Norden über Osten gezählt (90° = Osten, 180° = Süden). Mit Sommerzeit ist im Juni eine
-Stunde dazuzurechnen (Mittag dann 13:22).
+Im Sommer überstreicht die Sonne zwischen Auf- und Untergang rund 260° des Horizonts, im Winter nur gut
+100°. Mit Sommerzeit ist im Juni eine Stunde dazuzurechnen.
 
-Im Sommer überstreicht die Sonne zwischen Auf- und Untergang rund 260° des Horizonts, im Winter nur
-gut 100°. Mittag ist nicht um 12 Uhr und nicht jeden Tag zur gleichen Zeit.
+Wer im Winter einmal darauf achtet, wo genau die Sonne untergeht, und im Sommer an derselben Stelle
+wieder hinschaut, wird staunen, wie weit der Punkt am Horizont gewandert ist.
 
-Von Osten gesehen, genau in Höhe des Horizonts, erscheinen die Kreise als Striche. Sie liegen parallel
-zueinander: Der Kreis verschiebt sich im Lauf des Jahres nur, er kippt nicht.
+## Warum wandert der Kreis?
 
-<div class="km-modell" id="tagbogen-osten" data-modell="tagbogen" data-datum="2026-12-21 12:00" data-ansicht="east"><a href="Tagbogen3D.html">3D-Modell: Tagbogen der Sonne am 21. Dezember, von Osten gesehen (eigene Seite öffnen)</a></div>
+Bleibt die Frage, warum der Kreis im Lauf des Jahres auf und ab wandert und warum er so schräg zum
+Horizont steht. Die Antwort liegt in der Achse, um die sich der Himmel dreht – und die hat mit der
+Erdachse mehr zu tun, als man zunächst denkt. Darum geht es im nächsten Teil.
 
-**Wie schnell wandert der Schatten?** Das hängt vor allem von der Sonnenhöhe ab. Mittags ändert sich
-die Himmelsrichtung der Sonne bei 50° N im Juni um etwa 30° pro Stunde, im März um 20° und im
-Dezember um 14°. Im Sommer wandert der Schatten mittags also doppelt so schnell herum wie im Winter –
-je näher die Sonne dem Zenit kommt, desto stärker ändert schon ein kleines Stück Weg ihre Richtung.
+## Stichwörter
+
+- **Horizont:** die Grenze zwischen Erde und Himmel rund um einen Beobachter.
+- **Zenit:** der Punkt genau senkrecht über dem Beobachter.
+- **Himmelsachse:** die Achse, um die sich der Himmel scheinbar einmal am Tag dreht; sie zeigt zum
+  Polarstern.
+- **Tagbogen:** das Stück der täglichen Sonnenbahn über dem Horizont.
+- **Himmelsäquator:** der größte Kreis um die Himmelsachse; auf ihm läuft die Sonne zu Frühlings- und
+  Herbstanfang.
+- **Sonnenuhr:** zeigt die Zeit mit dem Schatten eines Stabs, der von der Sonne weg zeigt.
+
+*Die Modelle und Texte dieser Reihe sind mit großer Unterstützung von Claude Code entstanden, einem
+KI-Werkzeug zum Programmieren. Wie diese Zusammenarbeit lief, was gut klappte und wo es hakte, beschreibt
+ein eigener Beitrag.*
 
 ---
 
 ## Notizen
 
-- Einstieg persönlicher machen (eigene Beobachtung, z. B. Schatten auf dem Balkon im Winter und im
-  Sommer)?
-- Nach dem Konzept trägt der Rundgang den Beitrag (`data-tour="ja"`); der Text wird auf Einstieg,
-  Überleitung, Impuls und Stichwörter gekürzt wie in 1a/1b. Schritte (überarbeitet, 10): 1 Der Beobachter
-  und sein Himmel, 2 Die Sonne an einem Tag, 3 Aufgang, Mittag, Untergang, 4 Der 21. Juni, 5 Der
-  21. Dezember, 6 Wie groß ist der Kreis?, 7 Von der Seite, 8 Wie schnell geht die Sonne unter?
-  (Winkel und Dauer des Untergangs), 9 Der Schatten eines Stabs, 10 Selbst ausprobieren.
-- Das zweite Modell könnte direkt mit `data-tour="ja" data-schritt="7"` (Von der Seite) starten.
-- Beitrag 1 erklärt schon, warum Mittag nicht um 12 Uhr ist; der Satz „Mittag ist nicht um
-  12 Uhr …“ kann auf Beitrag 1 verweisen.
-- Frage zum nächsten Beitrag: „Warum wandert der Kreis überhaupt? Und warum steht er schräg?“ → Beitrag 3.
+- Richtungen für die Tabelle (falls genauer gewünscht): 20. März 89° / 271°, 21. Juni 51° / 310°,
+  23. September 89° / 271°, 21. Dezember 127° / 233°, von Norden über Osten gezählt.
+- Ein zweites Modell könnte direkt beim Schritt „Von der Seite“ starten: `data-tour="ja" data-schritt="7"`.
+- Wegweiser: durchgehende Zählung (Teil 3) statt der Dateinummer.
+
+## Material aus der früheren Langfassung
+
+**Wie schnell wandert der Schatten?** Das hängt vor allem von der Sonnenhöhe ab. Mittags ändert sich die
+Himmelsrichtung der Sonne bei 50° N im Juni um etwa 30° pro Stunde, im März um 20° und im Dezember um 14°.
+Im Sommer wandert der Schatten mittags also doppelt so schnell herum wie im Winter.
+
+**Winkel zum Horizont:** An den Tagundnachtgleichen ist er am steilsten, 90° − Breite (bei 50° N: 40°), zu
+beiden Sonnenwenden flacher (rund 33°). Am Äquator geht die Sonne fast senkrecht unter, in Skandinavien im
+Sommer sehr flach, nördlich des Polarkreises streift sie nur noch am Horizont entlang.
+
+**Wie lange dauert der Untergang?** Vom ersten Berühren des Horizonts bis zum letzten Lichtpunkt:
+
+| Breite | Tagundnachtgleiche | Sonnenwende Juni | Sonnenwende Dezember |
+|--------|-------------------:|-----------------:|---------------------:|
+| 0° (Äquator) | ca. 2 min | | |
+| 48° N | 3,2 min | 4,0 min | 3,9 min |
+| 50° N | 3,3 min | 4,3 min | 4,2 min |
+| 54° N | 3,6 min | 5,0 min | 4,9 min |
+
+Zu den Sonnenwenden kommen zwei Gründe zusammen: Die Sonne läuft auf dem kleineren Tagkreis etwas
+langsamer (13,8° statt 15° pro Stunde), und ihre Bahn trifft den Horizont flacher. Bei 50° N sinkt sie
+dadurch etwa 7,6° statt 9,6° pro Stunde – rund 8 % davon macht die Kreisgröße aus, den größeren Rest der
+flachere Winkel.

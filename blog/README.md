@@ -22,10 +22,10 @@ danach der Mond.
 |-----:|---------|--------------------------|------------------|-------|
 | 1a | [Tageslänge](01a-tageslaenge.md) | Warum werden die Tage im Herbst so schnell kürzer? | `tageslaenge`, Rundgang `tageslaenge` | Entwurf |
 | 1b | [Mittag](01b-mittag.md) | Warum geht die Sonne am 12. Dezember am frühesten unter? | `tageslaenge`, Rundgang `mittag` | Entwurf |
-| 2 | [Tagbogen](02-tagbogen.md) | Läuft die Sonne im Winter auf einer kleineren Bahn? | `tagbogen`, Rundgang (9 Schritte, wird überarbeitet) | Entwurf (aus dem Pilotbeitrag) |
-| 3 | [Himmelsachse](03-himmelsachse.md) | Warum steht der Polarstern immer an derselben Stelle? | `himmelsachse`, Rundgang (11 Schritte, wird überarbeitet) | Gliederung |
-| 4 | [Erdbahn](04-erdbahn.md) | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `Erdbahn3D.html` (neu), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | Gliederung |
-| 5 | [Jahrhunderte](05-jahrhunderte.md) | Was sich über Jahrhunderte ändert | `Erdbahn3D.html`, Rundgang `jahrhunderte` | Gliederung |
+| 2 | [Tagbogen](02-tagbogen.md) | Läuft die Sonne im Winter auf einer kleineren Bahn? | `tagbogen`, Rundgang (10 Schritte) | Entwurf |
+| 3 | [Himmelsachse](03-himmelsachse.md) | Warum steht der Polarstern immer an derselben Stelle? | `himmelsachse`, Rundgang (11 Schritte) | Entwurf |
+| 4 | [Erdbahn](04-erdbahn.md) | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `erdbahn` (Erdbahn3D.html), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | Entwurf |
+| 5 | [Jahrhunderte](05-jahrhunderte.md) | Zeigt die Erdachse immer zum Polarstern? | `erdbahn`, Rundgang `jahrhunderte` | Entwurf |
 | 6 ff. | [Mond](06-mond.md) | (später festlegen) | `erdemond`, `mond`, `mondbahn` | Ideen |
 | – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Vorgeschichte im Entwurf, sonst Stoff |
 
@@ -33,8 +33,9 @@ danach der Mond.
   Mittag; die Ursachen der Zeitgleichung kommen in Teil 4.
 - Teil 2 nimmt aus der früheren Langfassung auch Winkel und Dauer des Untergangs auf. Die
   Lichtbrechung entfällt. `Sichtbarkeit.html` gehört nicht zur Reihe.
-- `Erklaerung-Sonnenbahn.md` geht in diesen Entwürfen auf und wird danach gelöscht. Ihre Übersicht
-  „welche Seite zeigt was“ kommt auf `index.html`.
+- Die frühere Langfassung `Erklaerung-Sonnenbahn.md` ist in diesen Entwürfen aufgegangen (Text und jeweils
+  ein Abschnitt „Material aus der früheren Langfassung“) und gelöscht; ihre Übersicht „welche Seite zeigt
+  was“ steht auf `index.html`.
 
 ## Stil
 
@@ -119,4 +120,4 @@ Sobald der Erfahrungsbericht erschienen ist, wird „ein eigener Beitrag“ zum 
    - In einem eigenen JS-Modul: was nur der Zeitraffer braucht (Kap. 21, 31).
    - Zeitraffer von −8000 bis +12 000.
    (erledigt: `longterm.js`, Rundgang `jahrhunderte` in `Erdbahn3D.html`)
-7. Den Inhalt von `Erklaerung-Sonnenbahn.md` vollständig übernehmen, dann die Datei löschen.
+7. Den Inhalt von `Erklaerung-Sonnenbahn.md` vollständig übernehmen, dann die Datei löschen (erledigt).

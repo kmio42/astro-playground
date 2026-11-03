@@ -51,6 +51,10 @@
         .file { color: var(--muted); font-family: monospace; font-size: 0.85em; margin-left: 0.4em; }
         .desc { margin: 4px 0 0; }
         .extra { margin: 4px 0 0; font-size: 0.9em; }
+        table.topics { border-collapse: collapse; width: 100%; font-size: 0.92em; }
+        table.topics th, table.topics td { text-align: left; vertical-align: top; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); }
+        table.topics th { color: var(--muted); font-weight: 600; }
+        .table-wrap { overflow-x: auto; }
     </style>
 </head>
 <body>
@@ -75,7 +79,14 @@
         </li>
         <li>
             <a class="main" href="Tageslaenge.html">Tageslänge im Jahr</a><span class="file">Tageslaenge.html</span>
-            <p class="desc">Zunahme der Tageslänge am Morgen und Abend, Auf-, Untergangs- und Mittagszeiten über ein Jahr.</p>
+            <p class="desc">Zunahme der Tageslänge am Morgen und Abend, Auf-, Untergangs- und Mittagszeiten über ein Jahr,
+                Dämmerung, Zeitgleichung mit den Anteilen von Ellipse und Achsneigung; drei Rundgänge.</p>
+        </li>
+        <li>
+            <a class="main" href="Erdbahn3D.html">Die Bahn der Erde um die Sonne</a><span class="file">Erdbahn3D.html</span>
+            <p class="desc">Schematisches 3D-Modell: Erde mit geneigter Achse auf ihrer elliptischen Bahn, Jahrespunkte,
+                Perihel und Aphel, beide Brennpunkte; Zeitraffer über Jahrtausende mit Präzession und wanderndem
+                Himmelsnordpol; zwei Rundgänge (Jahreszeiten, Änderungen über Jahrhunderte).</p>
         </li>
         <li>
             <a class="main" href="Erdposition.html">Sternzeit und Erdposition</a><span class="file">Erdposition.html</span>
@@ -89,6 +100,36 @@
                 Gebäuden und Gelände erstellt; dazu Raum mit Fenstern und Jahresübersicht.</p>
         </li>
     </ul>
+
+    <h2>Welche Seite zeigt was?</h2>
+    <div class="table-wrap">
+    <table class="topics">
+        <tr><th>Thema</th><th>Seite</th><th>Was man dort sieht</th></tr>
+        <tr><td>Tageslänge, Auf- und Untergang, Dämmerung</td><td><a href="Tageslaenge.html">Tageslaenge.html</a></td>
+            <td>Jahresdiagramme der Zeiten und der täglichen Zunahme am Morgen und Abend, Farbbänder für die Dämmerung, Kennzahlen</td></tr>
+        <tr><td>Mittag und Zeitgleichung</td><td><a href="Tageslaenge.html">Tageslaenge.html</a>, <a href="Erdposition.html">Erdposition.html</a></td>
+            <td>Mittagslinie über das Jahr, Zeitgleichung mit den Anteilen von Ellipse und Neigung; Zeitgleichung für einen Tag</td></tr>
+        <tr><td>Tagkreis der Sonne im Jahreslauf</td><td><a href="Tagbogen3D.html">Tagbogen3D.html</a></td>
+            <td>Horizont, Tagkreis mit Stunden, Auf- und Untergangsrichtung, Mittagshöhe, Vergleichskreise, Winkel und Dauer des Untergangs, Schatten eines Stabs</td></tr>
+        <tr><td>Tagbögen am eigenen Horizont</td><td><a href="Sichtbarkeit.html">Sichtbarkeit.html</a></td>
+            <td>Rundumblick mit Sonnenbahnen am 21. jedes Monats und Stundenlinien (Analemma); Auf- und Untergangsrichtungen auf der Karte</td></tr>
+        <tr><td>Horizontsystem und Äquatorsystem</td><td><a href="Himmelsachse3D.html">Himmelsachse3D.html</a></td>
+            <td>Erde mit Beobachter, Himmelsachse parallel zur Erdachse, Polhöhe gleich Breite, Deklination, Höhe und Richtung, Mittagshöhe</td></tr>
+        <tr><td>Erdbahn, Achsneigung, Jahreszeiten</td><td><a href="Erdbahn3D.html">Erdbahn3D.html</a>, <a href="Erdposition.html">Erdposition.html</a></td>
+            <td>Bahn mit Jahrespunkten, Perihel und Aphel, Tag- und Nachtseite der Erde, Länge der Halbjahre</td></tr>
+        <tr><td>Änderungen über Jahrhunderte</td><td><a href="Erdbahn3D.html">Erdbahn3D.html</a></td>
+            <td>Zeitraffer 8001 v. Chr. bis 12 000: Präzession und Polarsterne, wanderndes Perihel, Achsneigung, Exzentrizität</td></tr>
+        <tr><td>Entfernung zur Sonne im Jahr</td><td><a href="Mondbahn.html">Mondbahn.html</a></td>
+            <td>Bahn von Erde und Mond um die Sonne, Diagramm der Entfernung zur Sonne</td></tr>
+        <tr><td>Ekliptik und Äquator räumlich</td><td><a href="ErdeMond3D.html">ErdeMond3D.html</a></td>
+            <td>Ekliptik- und Äquatorebene, Sonnenrichtung, Ansicht von der Sonne</td></tr>
+        <tr><td>Werte auf der Konsole</td><td><code>cpp/beispiele/</code></td>
+            <td>Sonnenstand, Zeitgleichung, Auf- und Untergang, Jahrespunkte, Perihel, ΔT (C++)</td></tr>
+    </table>
+    </div>
+    <p class="hint">Grundlage der Berechnungen: Jean Meeus, <i>Astronomische Algorithmen</i> (unter anderem Kapitel 7
+        Kalender, 15 Auf- und Untergang, 21 Präzession und Schiefe der Ekliptik, 24 Sonnenposition, 26 Äquinoktien und
+        Solstitien, 27 Zeitgleichung, 31 Bahnelemente, 37 Perihel und Aphel).</p>
 
     <h2>Mond</h2>
     <ul class="pages">

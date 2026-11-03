@@ -83,3 +83,16 @@ ein eigener Beitrag.*
   Tagbogen Teil 3.
 - Die Ursachen der Zeitgleichung kommen in Teil 4 (Erdbahn), mit der Näherungsformel im Kasten.
 - Aussage Spanien: Madrid (3,7° W) hat im Sommer gegen 14:15 Uhr Mittag; im Rundgang steht „nach 14 Uhr“.
+
+## Material aus der früheren Langfassung
+
+„Mittag“ heißt: Die Sonne steht genau im Süden und hat ihren höchsten Stand. Drei Gründe, warum das nicht um
+12:00 Uhr passiert: der Längengrad (MEZ gilt für 15° O; pro Grad weiter westlich 4 Minuten später, bei
+10° O im Mittel 12:20 Uhr, in Aachen 12:36 Uhr, in Görlitz 12:00 Uhr), die Zeitgleichung (am spätesten
+Mitte Februar, 2026 um 12:34 Uhr am 11. Februar; am frühesten Anfang November, 12:04 Uhr am 3. November;
+eine Sonnenuhr geht mal 14 Minuten nach, mal 16 vor) und die Sommerzeit (alles eine Stunde später).
+
+Extreme rund um die Sonnenwenden: frühester Sonnenuntergang um den 12. Dezember (16:18 Uhr MEZ), spätester
+Sonnenaufgang um den 31. Dezember (8:19 Uhr); im Sommer frühester Aufgang um den 17. Juni, spätester
+Untergang um den 25. Juni. Die Abende werden also schon vor Weihnachten wieder länger, die Morgen erst nach
+Neujahr.
