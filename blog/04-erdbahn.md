@@ -32,6 +32,7 @@ ist bei uns Winter.
 
 ## Notizen
 
-- Für Punkt 5 fehlt ein Diagramm, das die Zeitgleichung in die zwei Wellen zerlegt.
+- Für Punkt 5: `tageslaenge` mit `data-tour="zeitgleichung"` (5 Schritte: Schlangenlinie, Ellipse, Neigung,
+  beides zusammen mit dem 12. Dezember, Sonnenuhr). Näherungsformel für den Kasten: Smart, Meeus 27.3.
 - Kein Rundgang vorhanden; `Erdposition.html` hat keinen. Lohnt sich einer?
 - Frage zum nächsten Beitrag: „Bleibt das immer so? Die Achse, die Ellipse, der Kalender …“ → Beitrag 5.

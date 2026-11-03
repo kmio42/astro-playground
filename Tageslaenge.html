@@ -23,6 +23,8 @@
             --astro: #d3dbe8;
             --night: #c6cfdf;
             --mark: rgba(42, 120, 214, 0.13);
+            --ecc: #7a5af5;
+            --obl: #0f9aa8;
         }
         @media (prefers-color-scheme: dark) {
             :root:not([data-theme="light"]) {
@@ -43,6 +45,8 @@
                 --astro: #1a1d25;
                 --night: #131519;
                 --mark: rgba(57, 135, 229, 0.2);
+                --ecc: #a08cff;
+                --obl: #2bb8c6;
             }
         }
         :root[data-theme="dark"] {
@@ -63,6 +67,8 @@
             --astro: #1a1d25;
             --night: #131519;
             --mark: rgba(57, 135, 229, 0.2);
+            --ecc: #a08cff;
+            --obl: #2bb8c6;
         }
         body {
             max-width: 1000px;
@@ -260,6 +266,15 @@
             const d = levels[horizonAltitude];
             d.sun = levels[sunAltitude];
             d.twilight = TWILIGHT.map(t => levels[t.altitude]);
+            // Zeitgleichung nach Ursachen (Smart) am Mittag jedes Tages, als Verschiebung des Mittags:
+            // positiv = Mittag später als im Mittel (Vorzeichen umgekehrt zur üblichen Zeitgleichung)
+            d.eot = { total: [], ecc: [], obl: [] };
+            for (let i = 0; i < d.n; i++) {
+                const parts = calculateEquationOfTimeParts(d.start[i] + 0.5);
+                d.eot.total.push(-parts.total);
+                d.eot.ecc.push(-parts.eccentricity);
+                d.eot.obl.push(-parts.obliquity);
+            }
             return d;
         }
 
@@ -409,6 +424,7 @@
                 muted: cssColor('--muted'), grid: cssColor('--grid'), axis: cssColor('--axis'),
                 length: cssColor('--length'), rise: cssColor('--rise'), set: cssColor('--set'),
                 day: cssColor('--day'), civil: cssColor('--civil'), nautical: cssColor('--nautical'),
+                ecc: cssColor('--ecc'), obl: cssColor('--obl'),
                 astro: cssColor('--astro'), night: cssColor('--night'),
             };
         }
@@ -510,6 +526,26 @@
                 directLabels: true,
                 breakOnJump: true,   // z. B. Untergang nach Mitternacht in hohen Breiten
             },
+        };
+
+        charts.eot = {
+            canvasId: 'eotChart',
+            tooltipId: 'eotTooltip',
+            series: () => {
+                const all = {
+                    total: { name: 'Verschiebung des Mittags', label: 'Summe', values: yearData.eot.total, color: 'text', width: 2.5 },
+                    ecc: { name: 'Anteil der Ellipse', label: 'Ellipse', values: yearData.eot.ecc, color: 'ecc', width: 2 },
+                    obl: { name: 'Anteil der Neigung', label: 'Neigung', values: yearData.eot.obl, color: 'obl', width: 2 },
+                };
+                return ((tour && tourStepDef().eot) || ['total', 'ecc', 'obl']).map(k => all[k]);
+            },
+            range: () => [-17.5, 17.5],   // fest, damit die Schritte des Rundgangs vergleichbar bleiben
+            ticks: (lo, hi) => niceTicks(lo, hi, 7),
+            tickFormat: t => (t > 0 ? '+' : '') + t.toLocaleString('de-DE'),
+            unit: 'min',
+            format: gainString,
+            zeroLine: true,
+            directLabels: true,
         };
 
         function chartLayout(chart, w, h) {
@@ -742,6 +778,7 @@
             if (!yearData) return;
             drawChart(charts.gain);
             drawChart(charts.times);
+            drawChart(charts.eot);
         }
 
         function placeTooltip(tooltip, canvas, mx, my) {
@@ -852,6 +889,13 @@
         /** Uhrzeit im Fließtext: "8:19" */
         function clockText(hours) {
             return clockString(hours).replace(/^0(?=\d)/, '');
+        }
+
+        /** Wendepunkte der Zeitgleichung: Februar, Mai, Juli, November */
+        function eotExtremes(d) {
+            const t = d.eot.total;
+            return { feb: argExtreme(t, 0, dayIndex(3, 1), 1), may: argExtreme(t, dayIndex(3, 1), dayIndex(6, 1), -1),
+                     jul: argExtreme(t, dayIndex(6, 1), dayIndex(9, 1), 1), nov: argExtreme(t, dayIndex(9, 1), d.n - 1, -1) };
         }
 
         function meanOf(arr) {
@@ -989,6 +1033,91 @@
                             größer der Unterschied zwischen Sommer und Winter – in Kiel kommen im März über vier Minuten
                             am Tag hinzu.</p>
                             <p>Ein Klick ins Diagramm zeigt die Werte eines Tages in den Kennzahlen.</p>`,
+                    },
+                ],
+            },
+            zeitgleichung: {
+                title: 'Warum wandert der Mittag?',
+                timeMode: 'cet',
+                steps: [
+                    {
+                        title: 'Die Schlangenlinie, vergrößert',
+                        show: ['eot'],
+                        eot: ['total'],
+                        select: d => argExtreme(d.eot.total, 0, dayIndex(2, 31), 1),
+                        text: d => {
+                            const e = eotExtremes(d);
+                            return `<p>Dieses Diagramm zeigt, wie weit sich der Mittag im Lauf des Jahres verschiebt: oben
+                                später als im Mittel, unten früher. Die Kurve heißt <b>Zeitgleichung</b> und ist für alle
+                                Orte gleich.</p>
+                                <p>Sie hat vier Wendepunkte: am ${dateText(e.feb)} ist der Mittag
+                                ${minutesText(d.eot.total[e.feb])} später, am ${dateText(e.may)}
+                                ${minutesText(-d.eot.total[e.may])} früher, am ${dateText(e.jul)} wieder
+                                ${minutesText(d.eot.total[e.jul])} später und am ${dateText(e.nov)} sogar
+                                ${minutesText(-d.eot.total[e.nov])} früher. Zwei verschieden hohe Berge, zwei verschieden
+                                tiefe Täler – das sieht nicht nach einer einzigen Ursache aus.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Erste Ursache: die Ellipse',
+                        show: ['eot'],
+                        eot: ['ecc'],
+                        select: d => argExtreme(d.eot.ecc, 0, dayIndex(5, 30), 1),
+                        text: d => {
+                            const i = argExtreme(d.eot.ecc, 0, dayIndex(5, 30), 1);
+                            return `<p>Die Erde läuft auf einer leichten <b>Ellipse</b> um die Sonne. Anfang Januar ist sie
+                                ihr am nächsten und am schnellsten. An einem Tag kommt sie dann auf ihrer Bahn ein Stück
+                                weiter als im Mittel, und sie muss sich etwas länger drehen, bis die Sonne wieder im Süden
+                                steht. Tag für Tag rutscht der Mittag so ein wenig nach hinten.</p>
+                                <p>Das summiert sich bis zum ${dateText(i)} auf ${minutesText(d.eot.ecc[i])}; im Sommer, wenn
+                                die Erde langsamer läuft, geht es ebenso weit zurück. Eine Welle mit einem Jahr
+                                Periode.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Zweite Ursache: die schräge Achse',
+                        show: ['eot'],
+                        eot: ['obl'],
+                        select: d => argExtreme(d.eot.obl, dayIndex(3, 1), dayIndex(5, 30), -1),
+                        text: d => {
+                            const i = argExtreme(d.eot.obl, dayIndex(3, 1), dayIndex(5, 30), -1);
+                            return `<p>Die zweite Ursache ist die geneigte Erdachse. Im Lauf des Jahres wandert die Sonne
+                                am Himmel entlang der <b>Ekliptik</b>, die Uhr zählt aber gewissermaßen entlang des
+                                Himmelsäquators – und beide stehen 23,4° schräg zueinander.</p>
+                                <p>Um die Tagundnachtgleichen läuft die Sonne schräg nach oben oder unten und kommt in
+                                Ost-West-Richtung langsamer voran: Sie erreicht den Süden jeden Tag etwas früher, am
+                                ${dateText(i)} schon ${minutesText(-d.eot.obl[i])} vor der Zeit. Um die Sonnenwenden läuft
+                                sie parallel zum Äquator und kommt schneller voran, der Mittag rückt nach hinten. Zwei
+                                Wellen im Jahr.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Beides zusammen',
+                        show: ['eot'],
+                        eot: ['total', 'ecc', 'obl'],
+                        select: d => argMinMax(d.length)[0],
+                        marks: d => { const s = argMinMax(d.length)[0]; return [[s - 10, Math.min(s + 10, d.n - 1)]]; },
+                        text: d => {
+                            const e = eotExtremes(d), s = argMinMax(d.length)[0];
+                            const perDay = (d.eot.total[s + 1] - d.eot.total[s - 1]) / 2 * 60;
+                            return `<p>Zusammengezählt ergeben beide Wellen die Schlangenlinie (dazu kommt ein kleines
+                                gemischtes Glied von unter einer Minute). Im Februar und Anfang November ziehen beide in
+                                dieselbe Richtung, daher die großen Ausschläge; im Mai und im Juli heben sie sich teilweise
+                                auf.</p>
+                                <p>Und um Weihnachten steigen beide Wellen gleichzeitig an: Der Mittag rückt jeden Tag um
+                                ${Math.round(perDay)} Sekunden nach hinten. Genau das steckt hinter dem frühesten
+                                Sonnenuntergang am 12. Dezember.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Die Sonnenuhr geht falsch – richtig',
+                        show: ['eot', 'times'],
+                        text: () => `<p>Eine Sonnenuhr zeigt genau diese wahre Sonnenzeit. Dass sie im Februar eine
+                            Viertelstunde nachgeht und im November eine Viertelstunde vorgeht, ist also kein Fehler, sondern
+                            die Bahn der Erde. Darunter noch einmal die Auf- und Untergänge mit der Mittagslinie: dieselbe
+                            Schlangenlinie, nur kleiner gezeichnet.</p>
+                            <p>Mit „Fertig“ gilt wieder der eigene Ort. Die Zeitgleichung bleibt dabei dieselbe; nur die
+                            mittlere Lage des Mittags hängt vom Längengrad ab.</p>`,
                     },
                 ],
             },
@@ -1140,7 +1269,7 @@
             tourMarks = null;
             document.body.classList.remove('touring');
             for (const c of document.querySelectorAll('.controls input, .controls select, .controls button')) c.disabled = false;
-            for (const id of ['secGain', 'secTimes', 'secTable']) el(id).hidden = false;
+            for (const id of ['secGain', 'secTimes', 'secEot', 'secTable']) el(id).hidden = false;
             el('tour').hidden = true;
             el('tourStart').hidden = !tourButtons;
             el('lat').value = saved.lat;
@@ -1165,10 +1294,11 @@
             const def = TOURS[tour.name], step = tourStepDef();
             el('timeMode').value = def.timeMode;
             el('horizon').value = step.horizon || '-0.8333';
-            const show = step.show || ['gain', 'times', 'table'];
+            const show = step.show || ['gain', 'times', 'eot', 'table'];
             el('secGain').hidden = !show.includes('gain');
             el('secTimes').hidden = !show.includes('times');
             el('secTable').hidden = !show.includes('table');
+            el('secEot').hidden = !show.includes('eot');
             recompute(true);
             const d = yearData;
             if (step.select) selectedIndex = Math.min(Math.max(step.select(d), 0), d.n - 1);
@@ -1335,6 +1465,7 @@
 
             setupChartInteraction(charts.gain);
             setupChartInteraction(charts.times);
+            setupChartInteraction(charts.eot);
             new ResizeObserver(drawCharts).observe(document.body);
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawCharts);
 
@@ -1414,6 +1545,7 @@
     <div class="tour-start" id="tourStart">
         <button data-tour="tageslaenge" onclick="startTour('tageslaenge')">▶ Rundgang: Warum werden die Tage im Herbst so schnell kürzer?</button>
         <button data-tour="mittag" onclick="startTour('mittag')">▶ Rundgang: Das Rätsel vom 12. Dezember</button>
+        <button data-tour="zeitgleichung" onclick="startTour('zeitgleichung')">▶ Rundgang: Warum wandert der Mittag?</button>
     </div>
     <div class="tour" id="tour" hidden>
         <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
@@ -1462,6 +1594,20 @@
     <p class="hint">Uhrzeit in der gewählten Zeit, der Kreis markiert die aktuelle Uhrzeit. Mit Sommerzeit springen die Kurven Ende März und Ende Oktober um eine Stunde. Klick ins Diagramm wählt einen Tag für die Kennzahlen.</p>
     <p class="hint"><b>Dämmerung:</b> Die Sonne ist schon untergegangen, aber der Himmel ist noch nicht dunkel. Sie heißt bürgerlich, solange die Sonne höchstens 6° unter dem Horizont steht (draußen ist es hell genug zum Lesen), nautisch bis 12° (über dem Meer ist der Horizont noch zu erkennen) und astronomisch bis 18° (danach ist der Himmel ganz dunkel). Morgens dasselbe in umgekehrter Reihenfolge.</p>
 
+    </section>
+
+    <section id="secEot">
+    <h2>Zeitgleichung: Wie weit sich der Mittag verschiebt</h2>
+    <div class="legend">
+        <span style="--c: var(--text)">Verschiebung des Mittags</span>
+        <span style="--c: var(--ecc)">Anteil der Ellipse</span>
+        <span style="--c: var(--obl)">Anteil der Neigung</span>
+    </div>
+    <div class="figure">
+        <canvas id="eotChart" class="chart" role="img" aria-label="Diagramm: Zeitgleichung über das Jahr in Minuten, mit den Anteilen der elliptischen Erdbahn und der Neigung der Erdachse"></canvas>
+        <div class="tooltip" id="eotTooltip"></div>
+    </div>
+    <p class="hint">Minuten gegenüber dem mittleren Mittag, für alle Orte gleich; positiv heißt, der Mittag ist später und eine Sonnenuhr geht nach. Aufgeteilt nach der Formel von Smart (Meeus, Formel 27.3) in den Anteil der elliptischen Erdbahn und den der Neigung der Erdachse; die Summe enthält zusätzlich ein gemischtes Glied unter einer Minute. In der Astronomie wird die Zeitgleichung meist mit umgekehrtem Vorzeichen angegeben (wahre minus mittlere Sonnenzeit).</p>
     </section>
 
     <section id="secTable">

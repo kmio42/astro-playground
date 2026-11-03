@@ -416,6 +416,24 @@
         return E;
     }
 
+    /**
+     * Zeitgleichung nach Smart (Formel 27.3), getrennt nach Ursachen: E = y·sin 2L0 − 2e·sin M
+     * + 4ey·sin M·cos 2L0 − ½y²·sin 4L0 − 5/4·e²·sin 2M mit y = tan²(ε/2). Die Glieder mit e allein stammen
+     * aus der Exzentrizität der Erdbahn, die mit y allein aus der Schiefe der Ekliptik; dazu ein kleines
+     * gemischtes Glied. Abweichung von calculateEquationOfTime unter 0,1 min.
+     * @param jd Julianischer Tag
+     * @return { eccentricity, obliquity, mixed, total } [min], wahre minus mittlere Sonnenzeit
+     */
+    function calculateEquationOfTimeParts(jd) {
+        const sun = sunArguments(julianCenturies(jd));
+        const y = Math.tan(calculateObliquity(jd) / 2) ** 2;
+        const toMinutes = RAD2DEG * 4;                     // 1° entspricht 4 Zeitminuten
+        const eccentricity = (-2 * sun.e * Math.sin(sun.M) - 1.25 * sun.e * sun.e * Math.sin(2 * sun.M)) * toMinutes;
+        const obliquity = (y * Math.sin(2 * sun.L0) - 0.5 * y * y * Math.sin(4 * sun.L0)) * toMinutes;
+        const mixed = 4 * sun.e * y * Math.sin(sun.M) * Math.cos(2 * sun.L0) * toMinutes;
+        return { eccentricity, obliquity, mixed, total: eccentricity + obliquity + mixed };
+    }
+
     // ---------------------------------------------------------------
     //  Koordinatentransformation (Kapitel 10, 12, 13, 39)
     // ---------------------------------------------------------------
@@ -1470,7 +1488,7 @@
         calculateGreenwichSiderealTime, calculateLocalSiderealTime,
         // Sonne und Erdbahn
         calculateObliquity, calculateSunPosition, calculateEarthTrueAnomaly, calculateEarthEccentricity,
-        calculateEquationOfTime, calculateEquinoxSolstice, calculateNextEarthApsis,
+        calculateEquationOfTime, calculateEquationOfTimeParts, calculateEquinoxSolstice, calculateNextEarthApsis,
         // Koordinaten
         calculateEquatorial, calculateHorizontal, calculateParallacticAngle, calculateTopocentric,
         calculateRefraction,

@@ -319,7 +319,7 @@ andere Höhen liefert `calculateRefraction` sie nach Formel 15.4.
 | Kalender | `calculateEaster` (Ostersonntag) |
 | Zeit | `JulianDay::fromCalendar`, `fromTm`, `fromUnixTime`, `fromDynamicalTime`, `toUnixTime`, `midnight`, `deltaT`, `taiMinusUtc`, `dynamicalTime` |
 | Sternzeit | `calculateGreenwichSiderealTime`, `calculateLocalSiderealTime` |
-| Sonne, Erdbahn | `calculateSunPosition`, `calculateObliquity`, `calculateEquationOfTime`, `calculateEarthTrueAnomaly`, `calculateEarthEccentricity`, `calculateNextEarthApsis`, `calculateEquinoxSolstice` |
+| Sonne, Erdbahn | `calculateSunPosition`, `calculateObliquity`, `calculateEquationOfTime`, `calculateEquationOfTimeParts`, `calculateEarthTrueAnomaly`, `calculateEarthEccentricity`, `calculateNextEarthApsis`, `calculateEquinoxSolstice` |
 | Koordinaten | `calculateEquatorial`, `calculateHorizontal`, `calculateTopocentric`, `calculateParallacticAngle`, `calculateRefraction` |
 | Mond | `calculateMoonPosition`, `calculateMoonPositionSimple`, `calculateMoonIlluminatedFraction`, `calculateMoonOrientation`, `calculateMoonAscendingNode`, `calculateNextMoonApsis`, `calculateNextMoonNode` |
 | Auf-/Untergang | `calculateSunRiseSet`, `calculateMoonRiseSet` |

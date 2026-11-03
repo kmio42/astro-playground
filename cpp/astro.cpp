@@ -428,6 +428,27 @@ double calculateEquationOfTime(const JulianDay jd, const bool withEarthTilt) {
     return E;
 }
 
+/**
+ * Zeitgleichung nach Smart (Formel 27.3), getrennt nach Ursachen: E = y·sin 2L0 − 2e·sin M
+ * + 4ey·sin M·cos 2L0 − ½y²·sin 4L0 − 5/4·e²·sin 2M mit y = tan²(ε/2). Die Glieder mit e allein stammen
+ * aus der Exzentrizität der Erdbahn, die mit y allein aus der Schiefe der Ekliptik; dazu ein kleines
+ * gemischtes Glied. Abweichung von calculateEquationOfTime unter 0,1 min.
+ * @param jd Julianischer Tag
+ * @return Anteile und Summe [min], wahre minus mittlere Sonnenzeit
+ */
+EquationOfTimeParts calculateEquationOfTimeParts(const JulianDay jd) {
+    const SunArguments sun = sunArguments(jd.centuries());
+    const double t = tan(calculateObliquity(jd).rad() / 2);
+    const double y = t * t;
+    const double toMinutes = RAD2DEG * 4;               // 1° entspricht 4 Zeitminuten
+    EquationOfTimeParts parts;
+    parts.eccentricity = (-2 * sun.e * sin(sun.M) - 1.25 * sun.e * sun.e * sin(2 * sun.M)) * toMinutes;
+    parts.obliquity = (y * sin(2 * sun.L0) - 0.5 * y * y * sin(4 * sun.L0)) * toMinutes;
+    parts.mixed = 4 * sun.e * y * sin(sun.M) * cos(2 * sun.L0) * toMinutes;
+    parts.total = parts.eccentricity + parts.obliquity + parts.mixed;
+    return parts;
+}
+
 // ---------------------------------------------------------------
 //  Koordinatentransformation (Kapitel 10, 12, 13, 39)
 // ---------------------------------------------------------------

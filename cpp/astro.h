@@ -29,6 +29,7 @@
  * 24  Koordinaten der Sonne (niedrige Genauigk.)   24.1–24.5                 calculateSunPosition, calculateEarthEccentricity
  * 26  Äquinoktien und Solstitien                   Tab. 26.2, 26.3           calculateEquinoxSolstice
  * 27  Zeitgleichung (ohne Nutation)                27.1, 27.2                calculateEquationOfTime
+ *     Zeitgleichung nach Smart, nach Ursachen     27.3                      calculateEquationOfTimeParts
  * 29  Keplergleichung                              29.1, 29.5                calculateEarthTrueAnomaly
  * 37  Planeten in Perihel und Aphel (nur Erde)                               calculateNextEarthApsis
  * 39  Parallaxe                                    39.2, 39.3                calculateTopocentric
@@ -340,6 +341,13 @@ Ecliptic calculateSunPosition(JulianDay jd);            // Geozentrische Positio
 Angle calculateEarthTrueAnomaly(JulianDay jd);          // Wahre Anomalie der Erde ν
 double calculateEarthEccentricity(JulianDay jd);        // Exzentrizität der Erdbahn [1]
 double calculateEquationOfTime(JulianDay jd, bool withEarthTilt);  // Zeitgleichung [min]
+struct EquationOfTimeParts {
+    double eccentricity;    // Anteil der Exzentrizität der Erdbahn [min]
+    double obliquity;       // Anteil der Schiefe der Ekliptik [min]
+    double mixed;           // gemischtes Glied [min]
+    double total;           // Summe = Zeitgleichung nach Smart [min]
+};
+EquationOfTimeParts calculateEquationOfTimeParts(JulianDay jd);  // Zeitgleichung nach Ursachen (Smart)
 
 // Koordinatentransformation; vom Beobachtungsort wird nur die Breite (Topozentrisch: und die Höhe)
 // benötigt, die Länge steckt in der lokalen Sternzeit

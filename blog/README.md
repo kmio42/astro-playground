@@ -106,9 +106,9 @@ Sobald der Erfahrungsbericht erschienen ist, wird „ein eigener Beitrag“ zum 
 1. Stilprobe: die Rundgänge `tageslaenge` und `mittag` in `Tageslaenge.html` mit Startknopf, dazu
    die Entwürfe 1a und 1b.
 2. Prüfen des Stils (erledigt, Stil freigegeben).
-3. Die vorhandenen Rundgänge (Tagbogen, Himmelsachse, Erde-Mond) im neuen Stil, mit Startknopf.
-4. Diagramm der Zeitgleichung mit den Anteilen Ellipse und Neigung (Formel nach Smart, Meeus 28.3)
-   in `Tageslaenge.html`, dazu der Rundgang `zeitgleichung`.
+3. Die vorhandenen Rundgänge (Tagbogen, Himmelsachse, Erde-Mond) im neuen Stil, mit Startknopf (erledigt; Texte von Erde-Mond folgen mit den Mond-Beiträgen).
+4. Diagramm der Zeitgleichung mit den Anteilen Ellipse und Neigung (Formel nach Smart, Meeus 27.3)
+   in `Tageslaenge.html`, dazu der Rundgang `zeitgleichung` (erledigt).
 5. `Erdbahn3D.html`:
    - Canvas 2D, schematisch, gemeinsamer Code in `canvas3d.js`;
    - Küstenlinien von Natural Earth 1:110 Mio. (gemeinfrei);
