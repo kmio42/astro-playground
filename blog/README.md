@@ -27,7 +27,7 @@ danach der Mond.
 | 4 | [Erdbahn](04-erdbahn.md) | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `Erdbahn3D.html` (neu), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | Gliederung |
 | 5 | [Jahrhunderte](05-jahrhunderte.md) | Was sich über Jahrhunderte ändert | `Erdbahn3D.html`, Rundgang `jahrhunderte` | Gliederung |
 | 6 ff. | [Mond](06-mond.md) | (später festlegen) | `erdemond`, `mond`, `mondbahn` | Ideen |
-| – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Stoff sammeln |
+| – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Vorgeschichte im Entwurf, sonst Stoff |
 
 - Teil 1 bleibt bei Alltagsbeobachtungen. 1b löst das Rätsel vom 12. Dezember mit dem wandernden
   Mittag; die Ursachen der Zeitgleichung kommen in Teil 4.
