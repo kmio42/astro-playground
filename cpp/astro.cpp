@@ -37,23 +37,47 @@ static inline constexpr double horner(const double x, const double c0, const C..
  * @param day Tag [1..31]
  * @param hours Uhrzeit [h]
  */
-JulianDay JulianDay::fromCalendar(int year, int month, const int day, const double hours) {
+JulianDay JulianDay::fromCalendar(int year, int month, const int day, const double hours, const Calendar calendar) {
     // Januar und Februar zählen als 13. und 14. Monat des Vorjahres
     if (month <= 2) {
         year -= 1;
         month += 12;
     }
 
-    const int A = year / 100;
+    // Abrunden statt Abschneiden: gilt auch für Daten vor −4712 (negative Julianische Tage)
+    const double A = floor(year / 100.0);
     // Julianischer Kalender bis 4.10.1582: B = 0
-    const bool julian = (year < 1582) || (year == 1582 && month < 10) || (year == 1582 && month == 10 && day <= 4);
-    const int B = julian ? 0 : 2 - A + A / 4;
+    const bool julian = calendar == Calendar::Julian || (calendar == Calendar::Automatic &&
+        ((year < 1582) || (year == 1582 && month < 10) || (year == 1582 && month == 10 && day <= 4)));
+    const double B = julian ? 0 : 2 - A + floor(A / 4);
 
     // Formel 7.1
-    return JulianDay(static_cast<int>(365.25 * (year + 4716))
-                     + static_cast<int>(30.6001 * (month + 1))
-                     + day + B - 1524.5
-                     + hours / 24.0);
+    return JulianDay(floor(365.25 * (year + 4716)) + floor(30.6001 * (month + 1)) + day + B - 1524.5 + hours / 24.0);
+}
+
+/**
+ * Kalenderdatum zu einem Julianischen Tag (Kapitel 7, Umkehrung von Formel 7.1); mit Abrunden auch für
+ * negative Julianische Tage.
+ * @param jd Julianischer Tag
+ * @param calendar Automatic (julianisch vor dem 15.10.1582, danach gregorianisch), Julian oder Gregorian
+ * @return Kalendertag, in den jd fällt (Jahr astronomisch gezählt)
+ */
+CalendarDate calendarDateFromJulianDay(const JulianDay jd, const Calendar calendar) {
+    const double Z = floor(jd.value() + 0.5);
+    double A = Z;
+    if (calendar == Calendar::Gregorian || (calendar == Calendar::Automatic && Z >= 2299161)) {
+        const double alpha = floor((Z - 1867216.25) / 36524.25);
+        A = Z + 1 + alpha - floor(alpha / 4);
+    }
+    const double B = A + 1524;
+    const double C = floor((B - 122.1) / 365.25);
+    const double D = floor(365.25 * C);
+    const double E = floor((B - D) / 30.6001);
+    CalendarDate date;
+    date.day = static_cast<int>(B - D - floor(30.6001 * E));
+    date.month = static_cast<int>(E < 14 ? E - 1 : E - 13);
+    date.year = static_cast<int>(date.month > 2 ? C - 4716 : C - 4715);
+    return date;
 }
 
 /**
@@ -324,9 +348,10 @@ JulianDay JulianDay::fromDynamicalTime(const double jde) {
  * @return ε0
  */
 Angle calculateObliquity(const JulianDay jd) {
-    const double T = jd.centuries();
-    // 23°26′21″.448 − 46″.8150 T − 0″.00059 T² + 0″.001813 T³
-    return Angle::fromDms(23, 26, horner(T, 21.448, -46.8150, -0.00059, 0.001813));
+    const double U = jd.centuries() / 100.0;
+    // Formel 21.3 nach Laskar, gilt etwa ±10 000 Jahre um 2000; U in 10 000 Julianischen Jahren
+    return Angle::fromDms(23, 26, horner(U, 21.448, -4680.93, -1.55, 1999.25, -51.38, -249.67, -39.05, 7.12,
+                                         27.87, 5.79, 2.45));
 }
 
 // Mittlere Größen der Sonne bei niedriger Genauigkeit (Kapitel 24)

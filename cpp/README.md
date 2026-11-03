@@ -317,7 +317,7 @@ andere Höhen liefert `calculateRefraction` sie nach Formel 15.4.
 | Bereich | Funktionen |
 |---|---|
 | Kalender | `calculateEaster` (Ostersonntag) |
-| Zeit | `JulianDay::fromCalendar`, `fromTm`, `fromUnixTime`, `fromDynamicalTime`, `toUnixTime`, `midnight`, `deltaT`, `taiMinusUtc`, `dynamicalTime` |
+| Zeit | `JulianDay::fromCalendar` (wahlweise `Calendar::Julian`/`Gregorian`), `calendarDateFromJulianDay`, `fromTm`, `fromUnixTime`, `fromDynamicalTime`, `toUnixTime`, `midnight`, `deltaT`, `taiMinusUtc`, `dynamicalTime` |
 | Sternzeit | `calculateGreenwichSiderealTime`, `calculateLocalSiderealTime` |
 | Sonne, Erdbahn | `calculateSunPosition`, `calculateObliquity`, `calculateEquationOfTime`, `calculateEquationOfTimeParts`, `calculateEarthTrueAnomaly`, `calculateEarthEccentricity`, `calculateNextEarthApsis`, `calculateEquinoxSolstice` |
 | Koordinaten | `calculateEquatorial`, `calculateHorizontal`, `calculateTopocentric`, `calculateParallacticAngle`, `calculateRefraction` |

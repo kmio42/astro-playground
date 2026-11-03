@@ -118,4 +118,5 @@ Sobald der Erfahrungsbericht erschienen ist, wird „ein eigener Beitrag“ zum 
      Laskar 22.3 und der Kalender vor 1582.
    - In einem eigenen JS-Modul: was nur der Zeitraffer braucht (Kap. 21, 31).
    - Zeitraffer von −8000 bis +12 000.
+   (erledigt: `longterm.js`, Rundgang `jahrhunderte` in `Erdbahn3D.html`)
 7. Den Inhalt von `Erklaerung-Sonnenbahn.md` vollständig übernehmen, dann die Datei löschen.

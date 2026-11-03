@@ -29,17 +29,29 @@
             if (!zone) return -date.getTimezoneOffset() / 60;
             const p = {};
             for (const part of new Intl.DateTimeFormat('en-US', {
-                timeZone: zone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+                timeZone: zone, hourCycle: 'h23', era: 'short', year: 'numeric', month: 'numeric', day: 'numeric',
                 hour: 'numeric', minute: 'numeric', second: 'numeric',
-            }).formatToParts(date)) p[part.type] = Number(part.value);
-            const wall = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-            return (wall - Math.floor(date.getTime() / 1000) * 1000) / 3600000;
+            }).formatToParts(date)) p[part.type] = part.value;
+            // Jahre vor Christus kommen als positive Zahl mit Ära „BC“; astronomisch: 1 v. Chr. = Jahr 0
+            const year = /^B/.test(p.era) ? 1 - Number(p.year) : Number(p.year);
+            const wall = new Date(Date.UTC(2000, 0, 1, Number(p.hour), Number(p.minute), Number(p.second)));
+            wall.setUTCFullYear(year, Number(p.month) - 1, Number(p.day));
+            return (wall.getTime() - Math.floor(date.getTime() / 1000) * 1000) / 3600000;
         }
 
-        /** Zeitpunkt zu einer Uhrzeit in einer Zeitzone (Monat 0-basiert, Überlauf wie bei Date erlaubt) */
+        /**
+         * Zeitpunkt zu einer Uhrzeit in einer Zeitzone (Monat 0-basiert, Überlauf wie bei Date erlaubt).
+         * Jahre 0–99 und negative Jahre werden wörtlich genommen (Date deutet 0–99 sonst als 1900–1999).
+         */
         function zonedDate(year, month, day, hours = 0, minutes = 0, zone) {
-            if (!zone) return new Date(year, month, day, hours, minutes);
-            const wall = Date.UTC(year, month, day, hours, minutes);
+            if (!zone) {
+                const d = new Date(2000, 0, 1, hours, minutes);
+                d.setFullYear(year, month, day);
+                return d;
+            }
+            const u = new Date(Date.UTC(2000, 0, 1, hours, minutes));
+            u.setUTCFullYear(year, month, day);
+            const wall = u.getTime();
             let t = wall - zoneOffsetHours(new Date(wall), zone) * 3600000;
             t = wall - zoneOffsetHours(new Date(t), zone) * 3600000;     // zweiter Schritt um die Umstellung herum
             return new Date(t);

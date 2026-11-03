@@ -172,6 +172,7 @@
     <script src="embed.js"></script>
     <script src="canvas3d.js"></script>
     <script src="coastlines.js"></script>
+    <script src="longterm.js"></script>
     <script>
         const { V } = canvas3d;
 
@@ -194,7 +195,10 @@
             lon: 10,
             playYear: false,
             playDay: false,
-            follow: null,        // { relAz } solange die Kamera der Erde folgt
+            follow: null,        // { relAz, lift } solange die Kamera der Erde folgt
+            epoch: false,        // Zeitraffer über Jahrtausende: Jahr −8000 … +12 000, Bezug auf die Sterne (J2000)
+            epochYear: 0,        // Jahr im Zeitraffer, beim Abspielen mit Bruchteil
+            playEpoch: false,
             show: { exaggerate: false, ecliptic: true, marks: true, axis: true, grid: true, coast: true, parallel: true },
         };
 
@@ -205,11 +209,13 @@
             top:     { cam: { el: 90, dist: 4.6 }, apsisAz: 0 },
             edge:    { cam: { el: 3, dist: 3.6 }, apsisAz: 20 },
             earth:   { cam: { el: 12, dist: 1.0 }, relAz: 0 },
+            pole:    { cam: { el: 52, dist: 1.8 }, relAz: 0, lift: 2.6 * EARTH_R },   // Erdachse mit Himmelsnordpol
         };
 
         /**
          * Ist eine Ebene sichtbar? Im Rundgang bestimmt der Schritt, sonst die Häkchen.
-         * Ebenen: ecliptic, marks, axis, polaris, grid, coast, parallel, place, sectors
+         * Ebenen: ecliptic, marks, axis, polaris, grid, coast, parallel, place, sectors, stars (Weg des Himmelsnordpols
+         * und Sterne in seiner Nähe, nur im Zeitraffer)
          */
         function visible(layer) {
             const step = tour && tour.step;
@@ -217,6 +223,7 @@
             if (fixedLayers) return fixedLayers.includes(layer);
             switch (layer) {
                 case 'polaris': case 'sectors': return false;
+                case 'stars': return state.epoch;
                 case 'place': return state.show.parallel;
                 default: return state.show[layer] ?? true;
             }
@@ -236,8 +243,24 @@
         let displayZone = null;
         const TOUR_ZONE = 'Europe/Berlin';
 
+        /** Tage im Jahr (gregorianisch, auch vor 1582 und für negative Jahre) */
         function daysInYear(year) {
-            return (new Date(year, 1, 29).getMonth() === 1) ? 366 : 365;
+            return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365;
+        }
+
+        /** Jahr als Text: 2026, 8001 v. Chr. (astronomisch −8000) */
+        function formatYear(year) {
+            return year > 0 ? String(year) : `${1 - year} v. Chr.`;
+        }
+
+        /** JD des 1. Januar 0 Uhr UT (gregorianisch) */
+        function yearStartJd(year) {
+            return julianDayFromCalendar(year, 1, 1, 0, 'gregorian');
+        }
+
+        /** Drehung um die Ekliptikachse vom Äquinoktium des Datums zu den Sternen (J2000), nur im Zeitraffer */
+        function frameRotation(jd) {
+            return state.epoch ? -generalPrecession(jd) : 0;
         }
 
         /** Zeitpunkt zu Tag im Jahr und Uhrzeit [min] in der Zeitzone der Anzeige */
@@ -255,17 +278,29 @@
 
         /** Ort der Erde im Modell (Sonne im Ursprung, x zum Frühlingspunkt, z zum Nordpol der Ekliptik) */
         function earthPosition(jd) {
-            const sun = calculateSunPosition(jd);
-            const R = sun.distance / AU_KM;
-            const r = exaggerated() ? 1 + ECC_FACTOR * (R - 1) : R;
-            const L = sun.longitude + Math.PI;       // von der Sonne aus gesehen steht die Erde gegenüber
+            const h = sunGeometry(jd);
+            const r = exaggerated() ? 1 + ECC_FACTOR * (h.R - 1) : h.R;
+            const L = h.longitude + Math.PI + frameRotation(jd);   // von der Sonne aus steht die Erde gegenüber
             return [r * Math.cos(L), r * Math.sin(L), 0];
         }
 
+        /**
+         * Länge der Sonne (Äquinoktium des Datums) und Abstand [AE]; im Zeitraffer aus den mittleren Bahnelementen
+         * (longterm.js), sonst aus calculateSunPosition
+         */
+        function sunGeometry(jd) {
+            if (state.epoch) {
+                const h = earthHelio(jd);
+                return { longitude: h.lon + Math.PI, R: h.r };
+            }
+            const sun = calculateSunPosition(jd);
+            return { longitude: sun.longitude, R: sun.distance / AU_KM };
+        }
+
         /** Richtung eines Punkts der Erdoberfläche (Breite, Länge in Grad) im Modell, Erdmitte im Ursprung */
-        function surfaceDir(lat, lon, theta, eps) {
+        function surfaceDir(lat, lon, theta, eps, rot = 0) {
             const a = theta + lon * DEG2RAD, c = Math.cos(lat * DEG2RAD);
-            return V.rotX([c * Math.cos(a), c * Math.sin(a), Math.sin(lat * DEG2RAD)], -eps);
+            return V.rotZ(V.rotX([c * Math.cos(a), c * Math.sin(a), Math.sin(lat * DEG2RAD)], -eps), rot);
         }
 
         /** Bahngeschwindigkeit [km/s] im Abstand r [km] (Vis-viva-Gleichung) */
@@ -274,33 +309,52 @@
         }
 
         let yearEvents = null;      // Jahrespunkte und Apsiden des eingestellten Jahres
+        /**
+         * Jahrespunkte, Perihel und Aphel: zwischen 1000 und 3000 genau nach Meeus (Kap. 26, 37), im Zeitraffer
+         * und außerhalb dieser Jahre aus den mittleren Bahnelementen (longterm.js)
+         */
         function eventsOfYear(year) {
-            if (yearEvents && yearEvents.year === year) return yearEvents;
-            const jan1 = julianDayFromDate(new Date(Date.UTC(year, 0, 1)));
-            const seasons = [EquinoxType.Spring, EquinoxType.Summer, EquinoxType.Autumn, EquinoxType.Winter]
-                .map(t => calculateEquinoxSolstice(year, t));
-            const peri = calculateNextEarthApsis(jan1 - 10, ApsisType.Periapsis);
-            const aph = calculateNextEarthApsis(jan1 + 60, ApsisType.Apoapsis);
-            const prevAutumn = calculateEquinoxSolstice(year - 1, EquinoxType.Autumn);
-            yearEvents = { year, seasons, peri, aph, prevAutumn };
+            const longterm = state.epoch || year < 1000 || year > 3000;
+            if (yearEvents && yearEvents.year === year && yearEvents.longterm === longterm) return yearEvents;
+            let seasons, peri, aph, prevAutumn, prevWinter;
+            if (longterm) {
+                seasons = seasonsOfYear(year);
+                const prev = seasonsOfYear(year - 1);
+                prevAutumn = prev[2];
+                prevWinter = prev[3];
+                const toKm = a => ({ time: a.time, distance: a.distance * AU_KM });
+                peri = toKm(apsisOfYear(year, 'peri'));
+                aph = toKm(apsisOfYear(year, 'aph'));
+            } else {
+                const jan1 = yearStartJd(year);
+                seasons = [EquinoxType.Spring, EquinoxType.Summer, EquinoxType.Autumn, EquinoxType.Winter]
+                    .map(t => calculateEquinoxSolstice(year, t));
+                peri = calculateNextEarthApsis(jan1 - 10, ApsisType.Periapsis);
+                aph = calculateNextEarthApsis(jan1 + 60, ApsisType.Apoapsis);
+                prevAutumn = calculateEquinoxSolstice(year - 1, EquinoxType.Autumn);
+                prevWinter = calculateEquinoxSolstice(year - 1, EquinoxType.Winter);
+            }
+            yearEvents = { year, longterm, seasons, peri, aph, prevAutumn, prevWinter };
             return yearEvents;
         }
 
         function computeScene() {
             const jd = currentJd();
             const eps = calculateObliquity(jd);
-            const sun = calculateSunPosition(jd);
+            const g = sunGeometry(jd);
+            const sun = { longitude: g.longitude, latitude: 0, distance: g.R * AU_KM };
             const earth = earthPosition(jd);
             const toSun = V.norm(V.scale(earth, -1));
             const theta = calculateGreenwichSiderealTime(jd);
-            const pole = surfaceDir(90, 0, theta, eps);
+            const rot = frameRotation(jd);
+            const pole = surfaceDir(90, 0, theta, eps, rot);
             const ev = eventsOfYear(state.year);
             // Bahn über ein Jahr ab dem 1. Januar
-            const jan1 = julianDayFromDate(new Date(Date.UTC(state.year, 0, 1)));
+            const jan1 = yearStartJd(state.year);
             const orbit = [];
             for (let k = 0; k <= 366; k += 2) orbit.push(earthPosition(jan1 + k));
             const equ = calculateEquatorial(sun, eps);
-            return { jd, eps, sun, earth, toSun, theta, pole, ev, orbit, dec: equ.dec,
+            return { jd, eps, sun, earth, toSun, theta, rot, pole, ev, orbit, dec: equ.dec,
                      distance: sun.distance, speed: orbitalSpeed(sun.distance) };
         }
 
@@ -326,14 +380,15 @@
             return julianDayToDate(jd).toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' });
         }
 
-        function drawPlane() {
+        function drawPlane(S) {
             if (!visible('ecliptic')) return;
             const c = colors;
             scene.fill(circleZ(1.45), c.plane);
             scene.stroke(circleZ(1.45), { color: c['plane-line'], width: 1 });
-            // Richtung zum Frühlingspunkt
-            scene.stroke([[0, 0, 0], [1.45, 0, 0]], { color: c['plane-line'], width: 1, dash: [4, 4] });
-            scene.label([1.45, 0, 0], 'Richtung Frühlingspunkt', c['text-2'],
+            // Richtung zum Frühlingspunkt (im Zeitraffer der des eingestellten Jahres, er wandert zwischen den Sternen)
+            const vernal = V.rotZ([1.45, 0, 0], S.rot);
+            scene.stroke([[0, 0, 0], vernal], { color: c['plane-line'], width: 1, dash: [4, 4] });
+            scene.label(vernal, 'Richtung Frühlingspunkt', c['text-2'],
                         { size: 11, dy: scene.width < 560 ? 28 : 13, align: 'right', halo: c['surface-2'] });
             scene.label([-1.25, -1.0, 0], 'Ekliptik', c['text-2'], { size: 11, alpha: 0.8 });
         }
@@ -409,7 +464,7 @@
         function drawEarth(S) {
             const c = colors, ctr = S.earth, R = EARTH_R;
             const facing = p => scene.facing(p, ctr);
-            const point = (lat, lon, r = R) => V.add(ctr, V.scale(surfaceDir(lat, lon, S.theta, S.eps), r));
+            const point = (lat, lon, r = R) => V.add(ctr, V.scale(surfaceDir(lat, lon, S.theta, S.eps, S.rot), r));
             const north = V.add(ctr, V.scale(S.pole, R * 1.75)), south = V.add(ctr, V.scale(S.pole, -R * 1.75));
             const axisStyle = { color: c.axis, width: 2 };
             if (visible('axis')) scene.stroke([south, north], axisStyle);
@@ -465,6 +520,43 @@
                 scene.stroke([north, tip], { color: c.axis, width: 1.5, dash: [4, 4] });
                 scene.label(V.add(tip, V.scale(S.pole, R * 0.4)), 'zum Polarstern', c.axis, { size: 11, halo: c['surface-2'] });
             }
+            if (visible('stars') && state.epoch) drawPolePath(S, ctr, north);
+        }
+
+        // Weg des Himmelsnordpols über den Zeitraffer, als Richtungen in J2000 (einmal berechnet)
+        let polePath = null;
+        function polePathPoints() {
+            if (polePath) return polePath;
+            polePath = [];
+            for (let y = LONGTERM_YEARS.min; y <= LONGTERM_YEARS.max; y += 100) polePath.push({ y, v: poleOfDate(midYear(y)) });
+            return polePath;
+        }
+
+        /**
+         * Himmel um den Nordpol, in Richtungen vom Erdmittelpunkt aus (Abstand STAR_R): Weg des Pols mit
+         * Jahreszahlen, Sterne in seiner Nähe, verlängerte Achse bis zum Pol des eingestellten Jahres
+         */
+        function drawPolePath(S, ctr, north) {
+            const c = colors, STAR_R = EARTH_R * 4.2;
+            const at = v => V.add(ctr, V.scale(v, STAR_R));
+            const path = polePathPoints();
+            scene.stroke(path.map(p => at(p.v)), { color: c.axis, width: 1.2, dash: [2, 3], alpha: 0.8 });
+            for (const p of path) {
+                if (p.y % 4000 !== 0) continue;
+                scene.dot(at(p.v), 2, c.axis);
+                scene.label(at(p.v), formatYear(p.y), c.axis, { size: 10, dy: 11, halo: c['surface-2'] });
+            }
+            for (const star of POLE_STARS) {
+                const v = starVector(star);
+                scene.dot(at(v), 3.5, c.text, { ring: c['surface-2'] });
+                scene.label(at(v), star.name, c.text, { size: 11, dy: -11, halo: c['surface-2'] });
+            }
+            const tip = at(S.pole);
+            scene.stroke([north, tip], { color: c.axis, width: 1.8 });
+            scene.dot(tip, 4, c.axis, { ring: c.surface });
+            // Pol der Ekliptik als Mittelpunkt des Kreises
+            scene.dot(at([0, 0, 1]), 2.5, c.muted);
+            scene.label(at([0, 0, 1]), 'Pol der Ekliptik', c.muted, { size: 10, dy: -11, halo: c['surface-2'] });
         }
 
         function draw() {
@@ -472,12 +564,12 @@
             colors = canvas3d.readColors(COLOR_NAMES);
             const S = computeScene();
             if (state.follow && !scene.tween) {
-                scene.target = S.earth;
+                scene.target = V.add(S.earth, [0, 0, state.follow.lift || 0]);
                 const L = Math.atan2(S.earth[1], S.earth[0]) * RAD2DEG;
                 scene.cam.az = ((state.follow.relAz - L) % 360 + 360) % 360;
             }
             scene.begin();
-            drawPlane();
+            drawPlane(S);
             drawOrbit(S);
             // Sonne und Erde von hinten nach vorn
             const bodies = [{ z: scene.project([0, 0, 0])[2], draw: drawSun }, { z: scene.project(S.earth)[2], draw: () => drawEarth(S) }];
@@ -534,8 +626,8 @@
             const d = dateOfDay(state.year, state.day);
             const rows = [];
             const add = (k, v) => rows.push(`<tr><td>${k}</td><td>${v}</td></tr>`);
-            add('Datum', d.toLocaleDateString('de-DE', { ...zoneOption(), weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
-                + `, ${clock(state.minutes / 60)} ${zoneName()}`);
+            add('Datum', d.toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' }) + ' '
+                + formatYear(state.year) + `, ${clock(state.minutes / 60)} ${zoneName()}`);
             add('Entfernung Erde – Sonne', `${formatNumber(S.distance / 1e6, 2)} Mio. km`);
             add('Geschwindigkeit der Erde', `${formatNumber(S.speed, 2)} km/s`);
             add('Sonne von der Erde aus', `ekliptikale Länge ${formatNumber(((S.sun.longitude * RAD2DEG) % 360 + 360) % 360, 1)}°, `
@@ -544,6 +636,14 @@
             const dl = dayLength();
             add(`Tageslänge bei ${formatNumber(Math.abs(state.lat), 1)}° ${state.lat >= 0 ? 'N' : 'S'}`,
                 dl.hours >= 24 ? 'Polartag' : dl.hours <= 0 ? 'Polarnacht' : duration(dl.hours));
+            if (state.epoch) {
+                const half = halfYears(state.year), star = poleStars(S.jd)[0];
+                add('Neigung der Erdachse', `${formatNumber(S.eps * RAD2DEG, 2)}°`);
+                add('Exzentrizität der Bahn', formatNumber(earthElements(S.jd).e, 4));
+                add('Perihel', `${shortDate(S.ev.peri.time)}, ${formatNumber(S.ev.peri.time - S.ev.prevWinter, 0)} Tage nach dem Winteranfang`);
+                add('Sommer- und Winterhalbjahr', `${formatNumber(half.summer, 1)} und ${formatNumber(half.winter, 1)} Tage (Nordhalbkugel)`);
+                add('Stern am Himmelsnordpol', `${star.star.name}, ${formatNumber(star.distance * RAD2DEG, 1)}° vom Pol`);
+            }
             document.getElementById('info').innerHTML = `<table>${rows.join('')}</table>`;
             document.getElementById('dayValue').textContent = d.toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' });
             document.getElementById('timeValue').textContent = `${clock(state.minutes / 60)} ${zoneName()}`;
@@ -557,10 +657,10 @@
         function tourValues(S) {
             const ev = S.ev, dl = dayLength();
             const sector = ap => {
-                const a = calculateSunPosition(ap.time).longitude, b = calculateSunPosition(ap.time + 30).longitude;
+                const a = sunGeometry(ap.time).longitude, b = sunGeometry(ap.time + 30).longitude;
                 return formatNumber(((b - a) * RAD2DEG % 360 + 360) % 360, 1);
             };
-            const springNext = calculateEquinoxSolstice(state.year, EquinoxType.Spring);
+            const springNext = ev.seasons[0];
             const autumn = ev.seasons[2];
             return {
                 date: shortDate(S.jd),
@@ -576,6 +676,61 @@
                 summerHalf: formatNumber(autumn - springNext, 1),
                 winterHalf: formatNumber(springNext - ev.prevAutumn, 1),
                 halfDiff: formatNumber((autumn - springNext) - (springNext - ev.prevAutumn), 1),
+                ...(state.epoch ? epochValues(S) : {}),
+            };
+        }
+
+        // Nächste Annäherung jedes Sterns an den Himmelsnordpol im Zeitraffer (einmal berechnet)
+        let closest = null;
+        function closestApproaches() {
+            if (closest) return closest;
+            closest = {};
+            for (let y = LONGTERM_YEARS.min; y <= LONGTERM_YEARS.max; y += 10) {
+                for (const s of poleStars(midYear(y))) {
+                    const d = s.distance * RAD2DEG, best = closest[s.star.name];
+                    if (!best || d < best.deg) closest[s.star.name] = { deg: d, year: y };
+                }
+            }
+            return closest;
+        }
+
+        /** Werte für den Rundgang „Was sich über Jahrhunderte ändert“ */
+        function epochValues(S) {
+            const at = y => midYear(y);
+            const star = poleStars(S.jd)[0], best = closestApproaches();
+            // ungefähre Jahre auf zehn gerundet: 2100, 2880 v. Chr.
+            const about = y => y > 0 ? String(Math.round(y / 10) * 10) : `${Math.round((1 - y) / 10) * 10} v. Chr.`;
+            const near = name => ({ year: about(best[name].year), deg: formatNumber(best[name].deg, 1) });
+            const withArticle = name => name === 'Polarstern' ? 'der Polarstern' : name;
+            const half = halfYears(state.year);
+            const marchJd = S.ev.seasons[0];
+            const greg = calendarFromJulianDay(marchJd, 'gregorian'), jul = calendarFromJulianDay(marchJd, 'julian');
+            const marchNow = seasonsOfYear(2026)[0], julNow = calendarFromJulianDay(marchNow, 'julian');
+            const month = m => ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September',
+                                'Oktober', 'November', 'Dezember'][m - 1];
+            const greg12000 = calendarFromJulianDay(seasonsOfYear(12000)[0], 'gregorian');
+            const gregMin = calendarFromJulianDay(seasonsOfYear(LONGTERM_YEARS.min)[0], 'gregorian');
+            return {
+                year: formatYear(state.year),
+                star: withArticle(star.star.name), starDist: formatNumber(star.distance * RAD2DEG, 1),
+                nearPolaris: near('Polarstern'), nearThuban: near('Thuban'), nearAlderamin: near('Alderamin'),
+                nearDeneb: near('Deneb'),
+                vegaEnd: formatNumber(poleStars(at(LONGTERM_YEARS.max)).find(s => s.star.name === 'Wega').distance * RAD2DEG, 0),
+                periAfterWinter: formatNumber(S.ev.peri.time - S.ev.prevWinter, 0),
+                summer: formatNumber(half.summer, 1), winter: formatNumber(half.winter, 1),
+                eps: formatNumber(S.eps * RAD2DEG, 2),
+                epsMin: formatNumber(calculateObliquity(at(LONGTERM_YEARS.min)) * RAD2DEG, 1),
+                epsMax: formatNumber(calculateObliquity(at(LONGTERM_YEARS.max)) * RAD2DEG, 1),
+                ecc: formatNumber(earthElements(S.jd).e, 4),
+                eccMin: formatNumber(earthElements(at(LONGTERM_YEARS.min)).e, 4),
+                eccNow: formatNumber(earthElements(at(2026)).e, 4),
+                eccMax: formatNumber(earthElements(at(LONGTERM_YEARS.max)).e, 4),
+                marchGreg: `${greg.day}. ${month(greg.month)}`, marchJul: `${jul.day}. ${month(jul.month)}`,
+                marchJulNow: `${julNow.day}. ${month(julNow.month)}`,
+                marchGreg12000: `${greg12000.day}. ${month(greg12000.month)}`,
+                marchGregMin: `${gregMin.day}. ${month(gregMin.month)}`,
+                deltaT0: formatNumber(deltaT(julianDayFromCalendar(0, 7, 1)) / 3600, 1),
+                deltaT500: formatNumber(deltaT(julianDayFromCalendar(-500, 7, 1)) / 3600, 1),
             };
         }
 
@@ -670,6 +825,102 @@
             },
         ];
 
+        const EPOCH = ['ecliptic', 'marks', 'axis', 'stars'];
+        const EPOCH_TOP = ['ecliptic', 'marks', 'axis'];      // Draufsicht: ohne Sterne, sie verdecken die Erde
+        const CENTURY_STEPS = [
+            {
+                title: 'Heute',
+                layers: [...EPOCH], epoch: true, year: 2026, view: 'pole', event: EquinoxType.Summer, minutes: 12 * 60,
+                exaggerate: false,
+                text: v => `<p>Die Erdachse zeigt heute fast genau auf den Polarstern: Er steht nur ${v.starDist}° neben
+                    dem <b>Himmelsnordpol</b> (lila Punkt). Die Achse ist ${v.eps}° geneigt, und die Erde ist der Sonne
+                    Anfang Januar am nächsten.</p>
+                    <p>Für ein Menschenleben ist das alles fest. Über Jahrtausende nicht: Der Zeitraffer in diesem
+                    Rundgang reicht von 8001 v. Chr. bis ins Jahr 12 000, so weit die Formeln gelten. Bezugsrahmen sind
+                    jetzt die Sterne.</p>`,
+            },
+            {
+                title: 'Die Achse kreiselt',
+                layers: [...EPOCH], epoch: true, year: 2026, playEpoch: true, view: 'pole', exaggerate: false,
+                text: v => `<p>Sonne und Mond zerren an der abgeplatteten Erde. Die Achse weicht aus wie ein schräg
+                    stehender Kreisel und beschreibt in rund 25 800 Jahren einen Kegel um den Pol der Ekliptik: die
+                    <b>Präzession</b>. Der Himmelsnordpol wandert dabei auf einem Kreis zwischen den Sternen
+                    (gepunktet, mit Jahreszahlen).</p>
+                    <p>Jahr ${v.year}: Am nächsten am Pol steht ${v.star} (${v.starDist}°). Der Polarstern kommt ihm im
+                    Jahr ${v.nearPolaris.year} am nächsten (${v.nearPolaris.deg}°); um ${v.nearThuban.year} war es
+                    Thuban im Drachen (${v.nearThuban.deg}°), um ${v.nearAlderamin.year} wird es Alderamin im Kepheus
+                    sein (${v.nearAlderamin.deg}°), um ${v.nearDeneb.year} Deneb im Schwan (${v.nearDeneb.deg}°).</p>`,
+            },
+            {
+                title: 'Der Frühlingspunkt wandert',
+                layers: [...EPOCH_TOP], epoch: true, year: 2026, playEpoch: true, view: 'top', exaggerate: false,
+                text: v => `<p>Mit der Achse dreht sich auch die Richtung, in der die Sonne zu Frühlingsanfang steht,
+                    der <b>Frühlingspunkt</b> – rückwärts, ein Grad in 72 Jahren. Mit ihm wandern alle vier
+                    Jahrespunkte gegenüber den Sternen um die Bahn.</p>
+                    <p>Vor gut 2000 Jahren lag der Frühlingspunkt im Sternbild Widder, daher sein Zeichen ♈; heute liegt
+                    er in den Fischen. Jahr ${v.year}.</p>`,
+            },
+            {
+                title: 'Das Perihel wandert durch das Jahr',
+                layers: [...EPOCH_TOP], epoch: true, year: 1246, playEpoch: true, view: 'top', exaggerate: true,
+                text: v => `<p>Auch die Ellipse dreht sich langsam, und zusammen mit den Jahrespunkten verschiebt sich das
+                    Perihel gegenüber den Jahreszeiten: um einen Tag in rund 58 Jahren. Im Jahr 1246 fiel es auf den
+                    Winteranfang, heute liegt es 13 Tage danach.</p>
+                    <p>Jahr ${v.year}: Perihel ${v.periAfterWinter} Tage nach dem Winteranfang. Das Sommerhalbjahr der
+                    Nordhalbkugel dauert ${v.summer} Tage, das Winterhalbjahr ${v.winter}. In rund 10 000 Jahren fällt
+                    das Perihel in den Nordsommer, dann ist der Sommer die kürzere Jahreshälfte.</p>`,
+            },
+            {
+                title: 'Die Achse richtet sich auf',
+                layers: [...EPOCH], epoch: true, year: LONGTERM_YEARS.min, playEpoch: true, view: 'pole', exaggerate: false,
+                text: v => `<p>Auch die Neigung der Achse ist nicht fest. Sie pendelt in rund 41 000 Jahren zwischen etwa
+                    22,1° und 24,5°. Um 8001 v. Chr. lag sie bei ${v.epsMin}°, heute bei 23,44°, im Jahr 12 000 wird sie
+                    ${v.epsMax}° betragen. Jahr ${v.year}: ${v.eps}°.</p>
+                    <p>Mit der Neigung verschieben sich Wende- und Polarkreise, und der Unterschied zwischen Sommer und
+                    Winter wird etwas kleiner. Für die Mittagshöhe der Sonne macht das in 1000 Jahren nur ein Zehntel
+                    Grad aus.</p>`,
+            },
+            {
+                title: 'Die Ellipse wird runder',
+                layers: [...EPOCH_TOP], epoch: true, year: LONGTERM_YEARS.min, playEpoch: true, view: 'top', exaggerate: true,
+                text: v => `<p>Selbst die Form der Bahn ändert sich. Die <b>Exzentrizität</b> lag um 8001 v. Chr. bei
+                    ${v.eccMin}, heute bei ${v.eccNow}, im Jahr 12 000 wird sie ${v.eccMax} betragen; die Bahn wird also
+                    runder. Jahr ${v.year}: ${v.ecc}.</p>
+                    <p>Über Zehntausende von Jahren schwankt sie in Zyklen von rund 100 000 und 400 000 Jahren. Zusammen
+                    mit Präzession und Neigung bestimmt sie, wie sich das Sonnenlicht über Jahreszeiten und Breiten
+                    verteilt – ein Schlüssel zu den Eiszeiten (<b>Milanković-Zyklen</b>).</p>`,
+            },
+            {
+                title: 'Der Kalender hält Schritt',
+                layers: [...EPOCH_TOP], epoch: true, year: 2026, view: 'top', exaggerate: false,
+                text: v => `<p>Ein Kalenderjahr soll zu den Jahreszeiten passen, nicht zu den Sternen. Der julianische
+                    Kalender mit einem Schaltjahr alle vier Jahre war dafür etwas zu lang: Frühlingsanfang wäre in ihm
+                    heute schon am ${v.marchJulNow}.</p>
+                    <p>Die gregorianische Reform von 1582 strich zehn Tage und lässt seither drei Schalttage in 400 Jahren
+                    ausfallen. Damit bleibt der Frühlingsanfang beim 20. oder 21. März; erst über Jahrtausende wandert er
+                    ein wenig – im Jahr 12 000 am ${v.marchGreg12000}, rückwärts gerechnet 8001 v. Chr. am
+                    ${v.marchGregMin}.</p>`,
+            },
+            {
+                title: 'Die Erde dreht sich langsamer',
+                layers: [...EPOCH], epoch: true, year: 2026, view: 'pole', exaggerate: false,
+                text: v => `<p>Die Gezeiten bremsen die Erde. Ein Tag wird pro Jahrhundert um knapp zwei Millisekunden
+                    länger – wenig, aber es summiert sich: Um Christi Geburt lag die Drehung der Erde schon rund
+                    ${v.deltaT0} Stunden hinter einer gleichmäßig laufenden Uhr zurück, 500 v. Chr. rund ${v.deltaT500}
+                    Stunden.</p>
+                    <p>Diese Abweichung heißt <b>ΔT</b>. Bekannt ist sie aus alten Finsternisberichten: Ohne sie lägen
+                    die Orte, an denen damals eine Sonnenfinsternis zu sehen war, um Tausende Kilometer daneben.</p>`,
+            },
+            {
+                title: 'Selbst ausprobieren',
+                layers: null, epoch: true, view: 'oblique',
+                text: v => `<p>Damit ist der Rundgang zu Ende. Mit dem Regler „Jahrtausende“ lässt sich jedes Jahr von
+                    8001 v. Chr. bis 12 000 einstellen, ▶ spielt den Zeitraffer ab. Die Werte unter dem Bild zeigen
+                    Neigung, Exzentrizität, Perihel und den Stern am Pol.</p>
+                    <p>Mit „Fertig“ geht es zurück in die Gegenwart.</p>`,
+            },
+        ];
+
         // Rundgang rechnet für einen festen Ort und mit deutscher Uhrzeit
         const TOUR_PLACE = { lat: 50, lon: 10 };
         let savedPlace = null;
@@ -686,6 +937,7 @@
                 savedPlace = null;
                 setPlay('year', false);
                 setPlay('day', false);
+                setEpochMode(false);
             }
             for (const id of ids) document.getElementById(id).disabled = on;
             for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = on;
@@ -694,6 +946,10 @@
         function applyTourStep(step) {
             setPlay('year', !!step.playYear);
             setPlay('day', !!step.playDay);
+            setPlayEpoch(false);
+            setEpochMode(!!step.epoch);
+            if (step.year !== undefined) setEpochYear(step.year);
+            if (step.playEpoch) setPlayEpoch(true);
             if (step.event !== undefined) jumpToEvent(step.event);
             if (step.apsis) jumpToApsis(step.apsis);
             if (step.minutes !== undefined) setMinutes(step.minutes);
@@ -755,6 +1011,40 @@
             requestDraw();
         }
 
+        /** Zeitraffer über Jahrtausende ein- oder ausschalten; aus: zurück zum Jahr vorher (oder heute) */
+        let yearBeforeEpoch = null;
+        function setEpochMode(on) {
+            if (on === state.epoch) return;
+            state.epoch = on;
+            yearEvents = null;
+            document.getElementById('epochControls').hidden = !on;
+            document.getElementById('epochToggle').classList.toggle('active', on);
+            if (on) {
+                yearBeforeEpoch = state.year;
+                state.epochYear = state.year;
+                setEpochYear(state.year);
+            } else {
+                setPlayEpoch(false);
+                setYear(yearBeforeEpoch ?? new Date().getFullYear());
+            }
+            requestDraw();
+        }
+
+        function setEpochYear(year, round = true) {
+            const y = Math.min(Math.max(year, LONGTERM_YEARS.min), LONGTERM_YEARS.max);
+            if (round) state.epochYear = y;
+            const whole = Math.round(y / 10) * 10 || y;
+            document.getElementById('epochSlider').value = whole;
+            document.getElementById('epochValue').textContent = formatYear(Math.round(y));
+            if (Math.round(y) !== state.year) setYear(Math.round(y));
+        }
+
+        function setPlayEpoch(on) {
+            state.playEpoch = on;
+            document.getElementById('playEpoch').textContent = on ? '❚❚' : '▶';
+            if (on) startLoop(); else requestDraw();
+        }
+
         function setDay(day) {
             state.day = day;
             document.getElementById('daySlider').value = Math.floor(day);
@@ -770,11 +1060,11 @@
         /** Tag eines Zeitpunkts (JD) im eingestellten Jahr, in der Zeitzone der Anzeige */
         function dayOfJd(jd) {
             const p = zonedParts(julianDayToDate(jd), displayZone);
-            return Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(state.year, 0, 1)) / 86400000);
+            return Math.round(julianDayFromCalendar(p.year, p.month + 1, p.day, 0, 'gregorian') - yearStartJd(state.year));
         }
 
         function jumpToEvent(type) {
-            setDay(dayOfJd(calculateEquinoxSolstice(state.year, type)));
+            setDay(dayOfJd(eventsOfYear(state.year).seasons[type]));
         }
 
         function jumpToApsis(which) {
@@ -785,7 +1075,7 @@
         function showDate(date) {
             const p = zonedParts(date, displayZone);
             setYear(p.year);
-            setDay(Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(p.year, 0, 1)) / 86400000));
+            setDay(Math.round(julianDayFromCalendar(p.year, p.month + 1, p.day, 0, 'gregorian') - yearStartJd(p.year)));
             setMinutes(p.hours * 60 + p.minutes);
         }
 
@@ -812,9 +1102,9 @@
             if (v.relAz !== undefined) {
                 const earth = earthPosition(currentJd());
                 const L = Math.atan2(earth[1], earth[0]) * RAD2DEG;
-                target = earth;
+                target = V.add(earth, [0, 0, v.lift || 0]);
                 cam.az = ((v.relAz - L) % 360 + 360) % 360;
-                state.follow = { relAz: v.relAz };
+                state.follow = { relAz: v.relAz, lift: v.lift || 0 };
             } else {
                 state.follow = null;
             }
@@ -841,12 +1131,19 @@
                 document.getElementById('daySlider').value = Math.floor(state.day);
             }
             if (state.playDay) setMinutes(state.minutes + 180 * dt); // 3 Stunden pro Sekunde
-            if (scene.tween && state.follow) scene.tween.to.target = earthPosition(currentJd());
+            if (state.playEpoch) {
+                const span = LONGTERM_YEARS.max - LONGTERM_YEARS.min;
+                state.epochYear = LONGTERM_YEARS.min + ((state.epochYear + 600 * dt - LONGTERM_YEARS.min) % span + span) % span;
+                setEpochYear(state.epochYear, false);                  // 600 Jahre pro Sekunde
+            }
+            if (scene.tween && state.follow) {
+                scene.tween.to.target = V.add(earthPosition(currentJd()), [0, 0, state.follow.lift || 0]);
+            }
             scene.step(now);
             draw();
             if (!kmEmbed.visible) {
                 loopRunning = false;        // außerhalb des Bildes: anhalten, onVisibility setzt fort
-            } else if (state.playYear || state.playDay || scene.tween) {
+            } else if (state.playYear || state.playDay || state.playEpoch || scene.tween) {
                 requestAnimationFrame(loop);
             } else {
                 loopRunning = false;
@@ -868,8 +1165,8 @@
 
         /**
          * Startzustand aus der Adresse (embed.js): Rundgang, Zeitpunkt t, Ansicht view, Ebenen layers
-         * (ecliptic, marks, axis, polaris, grid, coast, parallel, place, sectors; exaggerate übertreibt die
-         * Ellipse) und Abspielen play (day/year)
+         * (ecliptic, marks, axis, polaris, grid, coast, parallel, place, sectors, stars; exaggerate übertreibt die
+         * Ellipse, epoch schaltet den Zeitraffer ein) und Abspielen play (day/year)
          */
         function applyEmbedState(s) {
             tour.fromEmbedState(s, kmEmbed.active);
@@ -878,6 +1175,7 @@
             if (s.layers) {
                 fixedLayers = s.layers;
                 state.show.exaggerate = s.layers.includes('exaggerate');
+                if (s.layers.includes('epoch')) setEpochMode(true);
                 for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
             }
             if (s.play) {
@@ -900,7 +1198,11 @@
                 requestDraw();
             });
             tour = new canvas3d.Tour({
-                steps: TOUR_STEPS, apply: applyTourStep, fixPlace,
+                tours: {
+                    erdbahn: { title: 'Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?', steps: TOUR_STEPS },
+                    jahrhunderte: { title: 'Was sich über Jahrhunderte ändert', steps: CENTURY_STEPS },
+                },
+                apply: applyTourStep, fixPlace,
                 placeLabel: 'Mitte Deutschlands (50° N, 10° O), deutsche Uhrzeit', onChange: requestDraw,
             });
             for (const name of Object.keys(VIEWS)) viewButtons[name] = document.getElementById('view-' + name);
@@ -921,6 +1223,9 @@
                 if (Number.isFinite(y) && y >= 1000 && y <= 3000) setYear(y);
             });
             document.getElementById('daySlider').addEventListener('input', ev => setDay(Number(ev.target.value)));
+            document.getElementById('epochSlider').min = LONGTERM_YEARS.min;
+            document.getElementById('epochSlider').max = LONGTERM_YEARS.max;
+            document.getElementById('epochSlider').addEventListener('input', ev => setEpochYear(Number(ev.target.value)));
             document.getElementById('timeSlider').addEventListener('input', ev => setMinutes(Number(ev.target.value)));
             for (const key of Object.keys(state.show)) {
                 const box = document.getElementById('show-' + key);
@@ -946,8 +1251,10 @@
     <p data-embed="hide">Die Erde läuft in einem Jahr auf einer leicht elliptischen Bahn um die Sonne. Ihre Achse steht
     dabei 23,44° schräg zur Bahnebene und zeigt immer in dieselbe Richtung, zum Polarstern. Daraus folgen die
     Jahreszeiten, die wechselnde Tageslänge und ein Teil der Zeitgleichung.</p>
-    <p class="start-tour" id="tourStart" hidden><button onclick="tour.start()">▶ Rundgang: Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?</button>
-    <span class="feedback">Führt in neun Schritten durch das Modell.</span></p>
+    <p class="start-tour" id="tourStart" hidden>
+        <button data-tour="erdbahn" onclick="tour.start('erdbahn')">▶ Rundgang: Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?</button>
+        <button data-tour="jahrhunderte" onclick="tour.start('jahrhunderte')">▶ Rundgang: Was sich über Jahrhunderte ändert</button>
+    </p>
 
     <div class="controls" data-control="basic">
         <div class="wide">
@@ -977,6 +1284,19 @@
         </div>
     </div>
 
+    <div class="controls" id="epochControls" hidden>
+        <div class="wide">
+            <label for="epochSlider">Jahrtausende</label>
+            <input type="range" id="epochSlider" min="-8000" max="12000" step="10">
+            <span class="value" id="epochValue"></span>
+        </div>
+        <div class="group">
+            <button id="playEpoch" onclick="setPlayEpoch(!state.playEpoch)" title="Zeitraffer, 600 Jahre pro Sekunde">▶</button>
+            <button onclick="setEpochMode(false)">Zurück in die Gegenwart</button>
+        </div>
+        <span class="feedback">8001 v. Chr. bis 12 000, so weit die Formeln gelten; Bezug sind die Sterne.</span>
+    </div>
+
     <div class="tour" id="tour" hidden>
         <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
         <div id="tourText"></div>
@@ -1003,6 +1323,8 @@
             <button id="view-top" onclick="setView('top')">Von oben</button>
             <button id="view-edge" onclick="setView('edge')">Von der Seite</button>
             <button id="view-earth" onclick="setView('earth')">Zur Erde</button>
+            <button id="view-pole" onclick="setView('pole')">Achse und Pol</button>
+            <button id="epochToggle" onclick="setEpochMode(!state.epoch)">Jahrtausende</button>
         </div>
         <label><input type="checkbox" id="show-exaggerate"> Ellipse übertrieben (×10)</label>
         <label><input type="checkbox" id="show-ecliptic"> Ekliptik</label>

@@ -74,25 +74,50 @@
 
     /**
      * Julianischer Tag für ein Datum des Gregorianischen bzw. (vor dem 15.10.1582) Julianischen Kalenders.
-     * Formel 7.1.
-     * @param year Jahr, astronomisch gezählt
+     * Formel 7.1; mit Abrunden statt Abschneiden auch für Daten vor −4712 (negative Julianische Tage).
+     * @param year Jahr, astronomisch gezählt (0 = 1 v. Chr.)
      * @param month Monat [1..12]
      * @param day Tag [1..31]
      * @param hours Uhrzeit [h]
+     * @param calendar 'auto' (julianisch bis 4.10.1582, danach gregorianisch), 'julian' oder 'gregorian'
      */
-    function julianDayFromCalendar(year, month, day, hours = 0) {
+    function julianDayFromCalendar(year, month, day, hours = 0, calendar = 'auto') {
         // Januar und Februar zählen als 13. und 14. Monat des Vorjahres
         if (month <= 2) {
             year -= 1;
             month += 12;
         }
-        const A = Math.trunc(year / 100);
+        const A = Math.floor(year / 100);
         // Julianischer Kalender bis 4.10.1582: B = 0
-        const julian = (year < 1582) || (year === 1582 && month < 10) || (year === 1582 && month === 10 && day <= 4);
-        const B = julian ? 0 : 2 - A + Math.trunc(A / 4);
+        const julian = calendar === 'julian' || (calendar === 'auto' &&
+            ((year < 1582) || (year === 1582 && month < 10) || (year === 1582 && month === 10 && day <= 4)));
+        const B = julian ? 0 : 2 - A + Math.floor(A / 4);
 
         // Formel 7.1
-        return Math.trunc(365.25 * (year + 4716)) + Math.trunc(30.6001 * (month + 1)) + day + B - 1524.5 + hours / 24;
+        return Math.floor(365.25 * (year + 4716)) + Math.floor(30.6001 * (month + 1)) + day + B - 1524.5 + hours / 24;
+    }
+
+    /**
+     * Kalenderdatum zu einem Julianischen Tag (Kapitel 7, Umkehrung von Formel 7.1); mit Abrunden auch für
+     * negative Julianische Tage.
+     * @param jd Julianischer Tag
+     * @param calendar 'auto' (julianisch vor dem 15.10.1582, danach gregorianisch), 'julian' oder 'gregorian'
+     * @return { year (astronomisch gezählt), month [1..12], day [1..31] } des Kalendertags, in den jd fällt
+     */
+    function calendarFromJulianDay(jd, calendar = 'auto') {
+        const Z = Math.floor(jd + 0.5);
+        let A = Z;
+        if (calendar === 'gregorian' || (calendar === 'auto' && Z >= 2299161)) {
+            const alpha = Math.floor((Z - 1867216.25) / 36524.25);
+            A = Z + 1 + alpha - Math.floor(alpha / 4);
+        }
+        const B = A + 1524;
+        const C = Math.floor((B - 122.1) / 365.25);
+        const D = Math.floor(365.25 * C);
+        const E = Math.floor((B - D) / 30.6001);
+        const day = B - D - Math.floor(30.6001 * E);
+        const month = E < 14 ? E - 1 : E - 13;
+        return { year: month > 2 ? C - 4716 : C - 4715, month, day };
     }
 
     /** Julianischer Tag zu einem Date-Objekt (entspricht JulianDay::fromUnixTime). */
@@ -320,14 +345,17 @@
     // ---------------------------------------------------------------
 
     /**
-     * Mittlere Schiefe der Ekliptik ε0, Formel 21.2.
+     * Mittlere Schiefe der Ekliptik ε0 nach Laskar, Formel 21.3. Gilt etwa ±10 000 Jahre um 2000 (Fehler wenige
+     * Bogensekunden, in den Jahrhunderten um heute unter 0,01″); Formel 21.2 weicht nach 2000 Jahren um 1″ ab.
      * @param jd Julianischer Tag
      * @return ε0 [rad]
      */
     function calculateObliquity(jd) {
-        const T = julianCenturies(jd);
-        // 23°26′21″.448 − 46″.8150 T − 0″.00059 T² + 0″.001813 T³
-        return angleFromDms(23, 26, horner(T, 21.448, -46.8150, -0.00059, 0.001813));
+        const U = julianCenturies(jd) / 100;
+        // 23°26′21″.448 − 4680″.93 U − 1″.55 U² + 1999″.25 U³ − 51″.38 U⁴ − 249″.67 U⁵ − 39″.05 U⁶ + 7″.12 U⁷
+        // + 27″.87 U⁸ + 5″.79 U⁹ + 2″.45 U¹⁰, U in 10 000 Julianischen Jahren
+        return angleFromDms(23, 26, horner(U, 21.448, -4680.93, -1.55, 1999.25, -51.38, -249.67, -39.05, 7.12,
+                                           27.87, 5.79, 2.45));
     }
 
     // Mittlere Größen der Sonne bei niedriger Genauigkeit (Kapitel 24): L0, M, C [rad], e [1]
@@ -1481,7 +1509,7 @@
         // Winkel
         normalizeAngle, normalizeAngleSigned, angleFromDms,
         // Zeit
-        julianDayFromCalendar, julianDayFromDate, julianDayToDate, julianDayMidnight,
+        julianDayFromCalendar, calendarFromJulianDay, julianDayFromDate, julianDayToDate, julianDayMidnight,
         deltaT, taiMinusUtc, dynamicalTime, julianDayFromDynamicalTime, julianCenturies, julianMillennia,
         calculateEaster,
         // Sternzeit

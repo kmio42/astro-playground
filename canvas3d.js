@@ -297,18 +297,19 @@
     // ---------------------------------------------------------------
 
     /**
-     * Rundgang: Startknopf (#tourStart), Kasten (#tour) mit #tourTitle, #tourCount, #tourText, #tourBack,
-     * #tourNext und einem Knopf zum Beenden. Die Seite liefert:
-     *   steps         Schritte mit title und text(values) → HTML
+     * Rundgänge: Startknöpfe in #tourStart (data-tour = Name), Kasten (#tour) mit #tourTitle, #tourCount,
+     * #tourText, #tourBack, #tourNext und einem Knopf zum Beenden. Die Seite liefert:
+     *   tours         { name: { title, steps } }, Schritte mit title und text(values) → HTML
      *   apply(step)   Zustand des Schritts einstellen
      *   fixPlace(on)  true: festen Ort und feste Zeitzone setzen (Ort des Lesers merken), false: zurück
      *   placeLabel    Text zum festen Ort für die Kopfzeile
-     * Eingebettet (embed.js): Startknopf nur mit tour, tour mit step startet sofort, step allein stellt nur den
-     * Zustand des Schritts ein (ohne Kasten und ohne festen Ort).
+     * Eingebettet (embed.js): Startknöpfe nur mit tour (mit Namen nur dieser), tour mit step startet sofort,
+     * step allein stellt nur den Zustand des Schritts ein (ohne Kasten und ohne festen Ort).
      */
     class Tour {
-        constructor({ steps, apply, fixPlace, placeLabel = '', onChange = () => {} }) {
-            Object.assign(this, { steps, apply, fixPlace, placeLabel, onChange });
+        constructor({ tours, apply, fixPlace, placeLabel = '', onChange = () => {} }) {
+            Object.assign(this, { tours, apply, fixPlace, placeLabel, onChange });
+            this.name = null;
             this.index = -1;           // -1: kein Rundgang
             this.withBox = false;
             this.showButton = true;
@@ -321,15 +322,18 @@
         }
 
         get active() { return this.index >= 0; }
+        get steps() { return this.name ? this.tours[this.name].steps : []; }
         get step() { return this.active ? this.steps[this.index] : null; }
 
-        /** Rundgang ab Schritt index (0 = erster); withBox = false stellt nur den Zustand ein */
-        start(index = 0, withBox = true) {
+        /** Rundgang name ab Schritt index (0 = erster); withBox = false stellt nur den Zustand ein */
+        start(name, index = 0, withBox = true) {
+            if (!this.tours[name]) return;
             if (withBox && !this.withBox) {
                 this.fixPlace(true);
                 document.body.classList.add('touring');
             }
             this.withBox = this.withBox || withBox;
+            this.name = name;
             this.index = Math.min(Math.max(index, 0), this.steps.length - 1);
             this.el.box.hidden = !this.withBox;
             this.el.start.hidden = true;
@@ -343,6 +347,7 @@
         end() {
             const hadBox = this.withBox;
             this.index = -1;
+            this.name = null;
             this.withBox = false;
             this.html = '';
             this.el.box.hidden = true;
@@ -384,9 +389,14 @@
 
         /** Startzustand aus embed.js (kmEmbed.state) */
         fromEmbedState(s, embedded) {
+            const names = Object.keys(this.tours);
+            const name = s.tourName && this.tours[s.tourName] ? s.tourName : null;
             this.showButton = !embedded || s.tour;
             this.el.start.hidden = !this.showButton;
-            if (s.step) this.start(s.step - 1, s.tour || !embedded);
+            if (name) {
+                for (const b of this.el.start.querySelectorAll('[data-tour]')) b.hidden = b.dataset.tour !== name;
+            }
+            if (s.step) this.start(name || names[0], s.step - 1, s.tour || !embedded);
         }
     }
 

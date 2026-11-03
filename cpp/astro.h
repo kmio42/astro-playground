@@ -17,6 +17,7 @@
  * Umgesetzt                                        Formeln/Tabellen          Funktion
  *  3  Interpolation                                3.3                       interpolate
  *  7  Julianischer Tag                             7.1                       JulianDay::fromCalendar
+ *     Kalenderdatum aus dem Julianischen Tag                                 calendarDateFromJulianDay
  *  8  Osterdatum                                                         calculateEaster
  *  9  Dynamische Zeit und Weltzeit (ΔT)                                     JulianDay::deltaT, JulianDay::taiMinusUtc
  * 10  Der Erdglobus (ρ sin φ′, ρ cos φ′)                                     calculateTopocentric
@@ -25,7 +26,7 @@
  * 13  Der parallaktische Winkel                    13.1                      calculateParallacticAngle
  * 14  Aufgang, Durchgang, Untergang (Sonne; h0)    14.1, 14.2, Δm            calculateSunRiseSet
  * 15  Atmosphärische Refraktion                   15.4                      calculateRefraction
- * 21  Schiefe der Ekliptik (ohne Nutation)         21.2                      calculateObliquity
+ * 21  Schiefe der Ekliptik (ohne Nutation)         21.3 (Laskar)             calculateObliquity
  * 24  Koordinaten der Sonne (niedrige Genauigk.)   24.1–24.5                 calculateSunPosition, calculateEarthEccentricity
  * 26  Äquinoktien und Solstitien                   Tab. 26.2, 26.3           calculateEquinoxSolstice
  * 27  Zeitgleichung (ohne Nutation)                27.1, 27.2                calculateEquationOfTime
@@ -200,12 +201,20 @@ private:
 
 // Julianischer Tag (Kapitel 7). Gespeichert wird die Weltzeit UT (ab 1961 UTC, wie bei time_t);
 // die Dynamische Zeit TD = UT + ΔT (Kapitel 9) wird bei Bedarf daraus berechnet.
+// Kalender für die Umrechnung Datum ↔ Julianischer Tag
+enum class Calendar {
+    Automatic,      // julianisch bis 4.10.1582, danach gregorianisch
+    Julian,
+    Gregorian,      // auch vor 1582 (proleptisch)
+};
+
 class JulianDay {
 public:
     constexpr JulianDay() = default;
     constexpr explicit JulianDay(const double days) : days_(days) {}             // JD (UT) [d]
 
-    static JulianDay fromCalendar(int year, int month, int day, double hours);   // Formel 7.1
+    static JulianDay fromCalendar(int year, int month, int day, double hours,     // Formel 7.1
+                                  Calendar calendar = Calendar::Automatic);
     static JulianDay fromTm(const struct tm& utc);
     static constexpr JulianDay fromUnixTime(const time_t t) { return JulianDay(t / 86400.0 + 2440587.5); }
     static JulianDay fromDynamicalTime(double jde);                              // Zeitpunkt in TD → UT
@@ -244,6 +253,8 @@ struct CalendarDate {
     int month;              // Monat [1..12]
     int day;                // Tag [1..31]
 };
+
+CalendarDate calendarDateFromJulianDay(JulianDay jd, Calendar calendar = Calendar::Automatic);   // Kapitel 7
 
 // Beobachtungsort auf der Erde
 struct GeoLocation {

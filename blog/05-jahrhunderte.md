@@ -23,10 +23,14 @@ Die Erdbahn aus Teil 4 sieht aus, als wäre sie für immer festgelegt. Ist sie d
 
 ## Modell
 
-- `Erdbahn3D.html`, Rundgang `jahrhunderte`: Zeitraffer über Jahrtausende mit Achse, Perihel,
-  Frühlingspunkt und Polarstern.
-- Kalender, Erdrotation und Uhrzeit (Punkte 5–7) lassen sich im Modell nur andeuten; eventuell ein
-  kleines Diagramm oder nur Text.
+- `erdbahn` (`Erdbahn3D.html`) mit `data-tour="jahrhunderte"`, 9 Schritte: 1 Heute, 2 Die Achse kreiselt
+  (Präzession, Weg des Himmelsnordpols, Polarstern 2100, Thuban um 2880 v. Chr., Alderamin um 7470, Deneb um
+  10 060), 3 Der Frühlingspunkt wandert, 4 Das Perihel wandert durch das Jahr (1246 am Winteranfang, heute
+  13 Tage danach, ein Tag in rund 58 Jahren), 5 Die Achse richtet sich auf (24,2° → 23,44° → 22,6°), 6 Die
+  Ellipse wird runder (0,0196 → 0,0167 → 0,0113), 7 Der Kalender hält Schritt (julianisch heute 7. März),
+  8 Die Erde dreht sich langsamer (ΔT um Christi Geburt 2,9 h), 9 Selbst ausprobieren.
+- Zeitraffer 8001 v. Chr. bis 12 000 (`longterm.js`, Gültigkeit der Formeln nach Meeus); Bezug sind die
+  Sterne.
 
 ## Notizen
 
