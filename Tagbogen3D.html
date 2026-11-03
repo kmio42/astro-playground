@@ -153,6 +153,7 @@
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
+    <script src="embed.js"></script>
     <script>
 
     /////////////////////////////////////////////////////////////////
@@ -1039,11 +1040,24 @@
             setDay(Math.round((local - start) / 86400000));
         }
 
+        /** Jahr, Tag und Uhrzeit eines Zeitpunkts (Ortszeit des Browsers) einstellen */
+        function showDate(date) {
+            setYear(date.getFullYear());
+            setDay(Math.round((new Date(date.getFullYear(), date.getMonth(), date.getDate()) - new Date(date.getFullYear(), 0, 1)) / 86400000));
+            setMinutes(date.getHours() * 60 + date.getMinutes());
+        }
+
         function showNow() {
-            const now = new Date();
-            setYear(now.getFullYear());
-            setDay(Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(now.getFullYear(), 0, 1)) / 86400000));
-            setMinutes(now.getHours() * 60 + now.getMinutes());
+            showDate(new Date());
+        }
+
+        /** Startzustand aus der Adresse (embed.js): Zeitpunkt t, Ansicht view (ohne Kamerafahrt) */
+        function applyEmbedState(s) {
+            if (s.t) showDate(s.t);
+            if (s.view && VIEWS[s.view]) {
+                state.cam = { ...VIEWS[s.view] };
+                requestDraw();
+            }
         }
 
         function setView(name) {
@@ -1144,9 +1158,10 @@
             canvas = document.getElementById('view');
             ctx = canvas.getContext('2d');
 
-            // Ort wie auf den anderen Seiten aus localStorage, sonst Mitte Deutschlands
-            document.getElementById('lat').value = localStorage.getItem('latitude') || '50';
-            document.getElementById('lon').value = localStorage.getItem('longitude') || '10';
+            // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst Mitte Deutschlands
+            const start = kmEmbed.state;
+            document.getElementById('lat').value = localStorage.getItem('latitude') || String(start.lat ?? 50);
+            document.getElementById('lon').value = localStorage.getItem('longitude') || String(start.lon ?? 10);
             readLocationInputs();
             document.getElementById('lat').addEventListener('input', readLocationInputs);
             document.getElementById('lon').addEventListener('input', readLocationInputs);
@@ -1169,20 +1184,22 @@
 
             setupCameraInteraction();
             showNow();
+            applyEmbedState(kmEmbed.state);
             new ResizeObserver(resize).observe(canvas);
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
+            kmEmbed.ready();
         };
     </script>
 </head>
 <body>
-    <h1>Tagbogen der Sonne</h1>
-    <p>Im Sommer steht die Sonne mittags hoch am Himmel, und es ist bis spät am Abend hell. Im Winter bleibt sie
+    <h1 data-embed="hide">Tagbogen der Sonne</h1>
+    <p data-embed="hide">Im Sommer steht die Sonne mittags hoch am Himmel, und es ist bis spät am Abend hell. Im Winter bleibt sie
     niedrig, und schon am Nachmittag wird es dunkel. Wie sieht die Bahn der Sonne am Himmel eigentlich aus – und
     was ändert sich an ihr im Lauf des Jahres? Läuft die Sonne im Winter auf einer kleineren Bahn als im Sommer, oder
     sehen wir nur ein kürzeres Stück davon?</p>
-    <p class="start-tour" id="tourStart"><button onclick="startTour()">▶ Schritt für Schritt erklären</button>
+    <p class="start-tour" id="tourStart" data-embed="hide"><button onclick="startTour()">▶ Schritt für Schritt erklären</button>
     <span class="feedback">Blendet die Teile des Modells nach und nach ein.</span></p>
-    <p>Die Scheibe ist der Horizont um einen Beobachter in der Mitte, der Kreis ist die Bahn, auf der die Sonne
+    <p data-embed="hide">Die Scheibe ist der Horizont um einen Beobachter in der Mitte, der Kreis ist die Bahn, auf der die Sonne
     an einem Tag um die Himmelsachse läuft. Der helle Teil über der Scheibe ist der sichtbare <b>Tagbogen</b>,
     der gestrichelte Teil darunter die Nacht. Mit dem Regler „Tag“ durch das Jahr schieben und zusehen, wie der
     Kreis nach oben und unten wandert, wie sich Auf- und Untergangsrichtung ändern und wie viel vom Kreis
@@ -1224,7 +1241,7 @@
         </div>
     </div>
 
-    <canvas id="view"></canvas>
+    <canvas id="view" role="img" aria-label="3D-Modell: Horizont des Beobachters mit dem Tageskreis der Sonne; die Werte stehen in der Tabelle unter dem Bild"></canvas>
     <div class="legend">
         <span class="area" style="--c: var(--day-fill)">Tagbogen über dem Horizont</span>
         <span class="dashed" style="--c: var(--night)">Teil unter dem Horizont</span>
@@ -1251,8 +1268,8 @@
 
     <div id="info"></div>
 
-    <h2>Ort</h2>
-    <div class="controls">
+    <h2 data-embed="hide">Ort</h2>
+    <div class="controls" data-embed="hide">
         <label>Breite <input type="text" id="lat"></label>
         <input type="range" id="latSlider" min="-90" max="90" step="0.5" aria-label="Breite">
         <label>Länge (Ost +) <input type="text" id="lon"></label>
@@ -1260,12 +1277,12 @@
         <button onclick="saveLocation()">Ort merken</button>
         <span class="feedback" id="locationFeedback"></span>
     </div>
-    <p class="hint">Mit dem Breiten-Regler den Ort nach Norden oder Süden schieben: Am Äquator stehen die Kreise
+    <p class="hint" data-embed="hide">Mit dem Breiten-Regler den Ort nach Norden oder Süden schieben: Am Äquator stehen die Kreise
     senkrecht und sind immer halb über dem Horizont, am Pol liegen sie waagerecht – dann gibt es Polartag und
     Polarnacht.</p>
 
-    <h2>Wie lese ich das?</h2>
-    <ul class="hint">
+    <h2 data-embed="hide">Wie lese ich das?</h2>
+    <ul class="hint" data-embed="hide">
         <li><b>Ziehen</b> dreht die Ansicht, das <b>Mausrad</b> zoomt. „Von Osten“ schaut genau entlang der Kreise:
         Sie erscheinen dann als parallele, schräge Striche – der Kreis verschiebt sich im Jahreslauf nur, er kippt nicht.</li>
         <li>Die <b>Vergleichskreise</b> zeigen den Tagkreis an den Sonnenwenden (21. Juni orange, 21. Dezember blau) und an den

@@ -992,7 +992,7 @@
         <span class="dot" style="--c: var(--moon); --fill: var(--surface)">Vollmond</span>
     </div>
     <div class="figure">
-        <canvas id="orbit"></canvas>
+        <canvas id="orbit" role="img" aria-label="Bahnen von Erde und Mond um die Sonne im eingestellten Jahr, mit Neu- und Vollmonden"></canvas>
         <div class="tooltip" id="orbitTooltip"></div>
     </div>
     <p class="hint">Mausrad: zoomen · Ziehen: verschieben · Doppelklick: Gesamtansicht · Klick auf die Bahn: Zeitpunkt wählen. Blick von Norden auf die Ekliptik, Umlauf gegen den Uhrzeigersinn.
@@ -1005,7 +1005,7 @@
         <span style="--c: var(--moon)">Mond</span>
     </div>
     <div class="figure">
-        <canvas id="distanceChart" class="chart"></canvas>
+        <canvas id="distanceChart" class="chart" role="img" aria-label="Diagramm: Abstand von Erde und Mond zur Sonne über das Jahr"></canvas>
         <div class="tooltip" id="distanceTooltip"></div>
     </div>
     <p class="hint">Die Erde ist Anfang Januar im Perihel und Anfang Juli im Aphel. Der Mond pendelt monatlich um ±0,0026 AE um diese Kurve – bei Vollmond außen, bei Neumond innen.</p>
@@ -1017,7 +1017,7 @@
         <span class="dashed" style="--c: var(--text-2)">Mond in der überhöhten Darstellung</span>
     </div>
     <div class="figure">
-        <canvas id="curvatureChart" class="chart"></canvas>
+        <canvas id="curvatureChart" class="chart" role="img" aria-label="Diagramm: Krümmung der Mondbahn um die Sonne über das Jahr"></canvas>
         <div class="tooltip" id="curvatureTooltip"></div>
     </div>
     <p class="hint">Krümmung κ = 1/Krümmungsradius in 1/AE, positiv bedeutet zur Sonne hin gekrümmt. Die Anziehung der Sonne auf den Mond ist gut doppelt so stark wie die der Erde – deshalb bleibt κ des Mondes immer positiv: Bei Neumond ist die Bahn stärker gekrümmt als die Erdbahn (Radius ≈ 0,7 AE), bei Vollmond flacher (Radius ≈ 2 AE). Auch die Erde schwankt leicht, da sie um den gemeinsamen Schwerpunkt mit dem Mond kreist.</p>

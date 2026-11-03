@@ -1,0 +1,138 @@
+/*
+ * modelle.js – bindet Modellseiten als iframe in eine andere Seite ein (z. B. in einen Blogbeitrag)
+ *
+ * In der Seite:
+ *   <div class="km-modell" id="sommer" data-modell="tagbogen" data-datum="2026-06-21 10:00" data-ansicht="east">
+ *     <a href="…/Tagbogen3D.html">Ersatz ohne JavaScript, z. B. ein Bild mit alt-Text oder ein Link</a>
+ *   </div>
+ *   <script src="…/modelle.js" defer></script>
+ *
+ * Angaben am Platzhalter:
+ *   data-modell    Name des Modells (siehe MODELS)
+ *   id             Name für Nachrichten und Links im Text
+ *   data-datum     Zeitpunkt: „2026-06-21 10:00“ (Ortszeit des Lesers) oder ISO 8601 mit Zone „2026-06-21T10:00Z“
+ *   data-ort       Breite, Länge in Grad: „50,10“ oder „50.5, 10.2“ oder „50,5; 10,2“; gilt, solange der Leser
+ *                  keinen eigenen Ort gemerkt hat
+ *   data-ansicht   Ansicht, Namen wie in VIEWS der Modellseite (z. B. „east“)
+ *   data-farben    „hell“ (Standard), „dunkel“ oder „auto“ (nach dem System des Lesers)
+ *   data-hoehe     Seitenverhältnis Breite/Höhe bis zur ersten Höhenmeldung, z. B. „3/4“
+ *
+ * Die Modellseiten liegen im selben Ordner wie diese Datei und müssen dieselbe Herkunft haben wie die Seite:
+ * Die Höhe kommt per postMessage nur von dort, und der gemerkte Ort im localStorage gilt für beide.
+ * Das Skript darf mehrfach eingebunden sein; es läuft nur einmal.
+ */
+(function () {
+    'use strict';
+    if (window.kmModelle) { window.kmModelle.scan(); return; }
+
+    const VERSION = 'dev';          // setzt das Veröffentlichungsskript auf die Git-Version
+    const BASE = new URL('.', document.currentScript ? document.currentScript.src : location.href);
+
+    // Modelle mit Einbettmodus (embed.js); ratio = Breite/Höhe des Inhalts bei etwa 660 px Breite
+    const MODELS = {
+        tagbogen: { page: 'Tagbogen3D.html', title: '3D-Modell: Tagbogen der Sonne', ratio: '660/1000' },
+    };
+
+    const THEMES = { hell: 'light', dunkel: 'dark', auto: 'auto' };
+
+    const style = document.createElement('style');
+    style.id = 'km-modelle-styles';
+    style.textContent = `
+        .km-modell { margin: 1em 0; }
+        .km-modell iframe { display: block; width: 100%; border: 0; aspect-ratio: var(--km-ratio, 3/4); }
+        .km-modell .km-modell-link { margin: 2px 0 0; text-align: right; font-size: 0.85em; }`;
+    document.head.appendChild(style);
+
+    /** „50,10“, „50.5, 10.2“ oder „50,5; 10,2“ → [Breite, Länge] als Texte, sonst null */
+    function parsePlace(text) {
+        const s = text.trim();
+        let parts;
+        if (s.includes(';')) parts = s.split(';');                  // „50,5; 10,2“
+        else if (/^[^,]*,[^,]*$/.test(s)) parts = s.split(',');     // „50,10“, „50.5, 10.2“
+        else parts = s.split(/\s+/);                                // „50,5 10,2“
+        parts = parts.map(p => p.trim().replace(',', '.'));
+        if (parts.length !== 2 || parts.some(p => p === '')) return null;
+        const [lat, lon] = parts.map(Number);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+        return [String(lat), String(lon)];
+    }
+
+    /** Parameter des Startzustands aus den Angaben am Platzhalter */
+    function stateParams(el) {
+        const p = new URLSearchParams();
+        const d = el.dataset;
+        if (d.datum) p.set('t', d.datum.trim().replace(' ', 'T'));
+        if (d.ort) {
+            const place = parsePlace(d.ort);
+            if (place) { p.set('lat', place[0]); p.set('lon', place[1]); }
+            else console.warn('modelle.js: data-ort nicht lesbar:', d.ort);
+        }
+        if (d.ansicht) p.set('view', d.ansicht.trim());
+        return p;
+    }
+
+    const frames = [];
+
+    function mount(el) {
+        if (el.dataset.kmMounted) return;
+        const model = MODELS[el.dataset.modell];
+        if (!model) {
+            console.warn('modelle.js: unbekanntes Modell', el.dataset.modell);
+            return;
+        }
+        el.dataset.kmMounted = '1';
+
+        const state = stateParams(el);
+        const pageUrl = new URL(model.page, BASE);
+
+        const embed = new URLSearchParams(state);
+        if (el.id) embed.set('id', el.id);
+        const theme = THEMES[(el.dataset.farben || '').trim()];
+        if (theme) embed.set('theme', theme);
+        embed.set('v', VERSION);
+        const frameUrl = new URL(pageUrl);
+        frameUrl.search = 'embed&' + embed.toString();
+
+        const iframe = document.createElement('iframe');
+        iframe.src = frameUrl.href;
+        const alt = el.querySelector('img[alt]');
+        iframe.title = alt && alt.alt ? alt.alt : model.title;
+        iframe.loading = 'lazy';
+        iframe.allow = 'fullscreen';
+        iframe.style.setProperty('--km-ratio', (el.dataset.hoehe || model.ratio).trim());
+
+        const own = new URL(pageUrl);
+        own.search = state.toString();
+        const link = document.createElement('p');
+        link.className = 'km-modell-link';
+        const a = document.createElement('a');
+        a.href = own.href;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = 'Eigene Seite ↗';
+        link.appendChild(a);
+
+        el.replaceChildren(iframe, link);
+        frames.push(iframe);
+    }
+
+    window.addEventListener('message', ev => {
+        if (ev.origin !== location.origin) return;
+        const data = ev.data;
+        if (!data || data.source !== 'km-model') return;
+        const iframe = frames.find(f => f.contentWindow === ev.source);
+        if (!iframe) return;
+        if (data.type === 'height' && Number.isFinite(data.height) && data.height > 0) {
+            iframe.style.aspectRatio = 'auto';
+            iframe.style.height = Math.ceil(data.height) + 'px';
+        }
+    });
+
+    function scan() {
+        document.querySelectorAll('.km-modell[data-modell]').forEach(mount);
+    }
+
+    window.kmModelle = { version: VERSION, scan };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan);
+    else scan();
+})();
