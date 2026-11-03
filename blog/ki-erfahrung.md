@@ -33,24 +33,37 @@ um die Zeitgleichung oder Sonnenauf- und -untergang darzustellen, enthielten Feh
 ChatGPT half ein bisschen bei der Einarbeitung in das neue Thema, ein ganzer Teil war aber noch
 gewöhnliche Recherche. Dabei war ich überladen von Koordinatensystemen und Fachbegriffen, und die
 Zeichnungen verstand ich oft nicht. Am Schluss landete ich bei Jean Meeus' *Astronomische Algorithmen* und begann
-eine eigene Umsetzung in JavaScript. Dabei stieß ich auf ein Git-Projekt in Go
+eine eigene Umsetzung in JavaScript. Die ersten Formeln kamen direkt aus dem Buch, per Hand
+abgeschrieben. Etwas später stieß ich auf ein Git-Projekt in Go
 ([soniakeys/meeus](https://github.com/soniakeys/meeus)), in dem alle Formeln des Buchs schon umgesetzt
-waren. Leicht war es trotzdem nicht, die Formeln richtig umzusetzen und
-lauffähig zu bekommen: Man musste die Dinge wirklich verstehen. Manchmal war es nur ein übersehenes
-Vorzeichen oder eine Umwandlung der Winkel – mein Ziel war von Anfang an, nur in Radiant zu rechnen.
+waren. Das machte es etwas einfacher, aber es blieb viel Handarbeit und Testen. Die Formeln richtig
+umzusetzen und lauffähig zu bekommen, war nicht leicht: Man musste die Dinge wirklich verstehen.
+Manchmal war es nur ein übersehenes Vorzeichen oder eine Umwandlung der Winkel – mein Ziel war von
+Anfang an, nur in Radiant zu rechnen.
+
+Dass ich mit manchen schematischen Zeichnungen Schwierigkeiten hatte, brachte mich schon früh auf die
+Idee interaktiver Hilfsmittel. Auch dabei zeigte sich, dass ich die Sachen erst richtig verstehen
+musste. Eine zweidimensionale Zeichnung von Sonne und Erde etwa kann nicht alle Aspekte von
+Sonnenauf- und -untergang im Lauf der Jahreszeiten zeigen, weil sich die Neigung der Erdachse
+gegenüber der Linie Sonne–Erde verschiebt: Im Sommer neigt sich der Nordpol zur Sonne hin, im Winter
+von ihr weg, im Frühling und Herbst zur Seite.
 
 Die KI half dabei am Rand. ChatGPT baute mir ein kleines, einfaches Beispiel für das
 JavaScript-Canvas, das ich an meine Berechnungen anpasste, und kleine Hilfsfunktionen, die die
-Eingabe des Standorts vernünftig auswerten. So entstand zuerst eine Sammlung von Funktionen für die
-Astro-Berechnungen und daraus eine kleine JavaScript-Bibliothek. Auf ihr beruht das Modell aus dem
-Beitrag „Sternzeit und Erdposition“.
+Eingabe des Standorts vernünftig auswerten. Im ersten Entwurf eines Gittermodells der Kugel waren
+die Knotenpunkte falsch verbunden. Das ließ sich leicht beheben, würde heute aber gar nicht mehr
+passieren. So entstand zuerst eine Sammlung von Funktionen für die Astro-Berechnungen und daraus eine
+kleine JavaScript-Bibliothek. Auf ihr beruht das Modell aus dem Beitrag „Sternzeit und Erdposition“.
 
 Im Frühjahr 2026 testete ich Claude Code über die API und hatte für ein paar Euro eine Entsprechung in
 C++. Später drehte sich das um: Die JavaScript-Bibliothek wurde als Portierung der C++-Fassung neu
 geschrieben, mit denselben Funktionen und Ergebnissen. Seither werden beide gemeinsam geändert und
-stimmen bis auf winzige Rundungsreste überein. Seit ein paar Wochen erlebe ich nun meinen persönlichen „KI-Schock“: Mit dem agentischen Modus
-und den neuen Modellen ist unglaublich viel möglich, und das Ergebnis ist im Verhältnis erstaunlich
-fehlerfrei. Es gehen Dinge, die vor wenigen Monaten für mich noch unvorstellbar gewesen wären.
+stimmen bis auf winzige Rundungsreste überein.
+
+Seit ein paar Wochen erlebe ich nun meinen persönlichen „KI-Schock“: Mit dem agentischen Modus und
+den neuen Modellen ist unglaublich viel möglich, und das Ergebnis ist im Verhältnis erstaunlich
+fehlerfrei. Es gehen Dinge, die vor wenigen Monaten für mich noch unvorstellbar gewesen wären. Heute
+entstehen ganze interaktive 3D-Modelle wie mit einem Fingerschnippen.
 
 <!-- Portierung JS ← C++: Commit cb87c68 vom 2026-10-26; Abweichung JS/C++ etwa 1e-11. -->
 
@@ -94,3 +107,16 @@ Aus der Arbeit an der Reihe, als Gedächtnisstütze:
 > Wochen erlebe ich meinen persönlichen "KI-Schock". Mit dem agentischen Modus und den neuen Modellen
 > ist so unglaublich viel möglich. Und das Ergebnis ist im Verhältnis so fehlerfrei. Es gehen Dinge,
 > die vor wenigen Monaten (für mich) noch unvorstellbar gewesen wären.
+>
+> Nachtrag: Das Go-Projekt kam erst etwas später – die ersten Formeln kamen wirklich direkt aus dem
+> Buch, per Hand abgeschrieben. Das Go-Projekt machte es etwas einfacher, aber es war trotzdem noch
+> viel Handarbeit und Testen.
+>
+> Nachtrag 2: Dass ich Schwierigkeiten mit manchen schematischen Zeichnungen hatte, brachte mich schon
+> früh auf die Idee von interaktiven Hilfsmitteln. Auch dabei merkte ich, dass ich Sachen erst richtig
+> verstehen musste. Zum Beispiel war eine zweidimensionale Zeichnung der Sonne und Erde nicht möglich,
+> wenn man alle Aspekte von Sonnenauf- und Untergang im Laufe der Jahreszeiten darstellen wollte – weil
+> sich die Neigung der Erde gegenüber der Achse Sonne–Erde verschiebt. Im ersten Entwurf des
+> ChatGPT-Gittermodells einer Kugel waren die Knotenpunkte falsch verbunden. Das konnte leicht behoben
+> werden, würde aber heute gar nicht mehr passieren. Heute werden mit einem Fingerschnipsen ganze
+> interaktive 3D-Modelle gebaut.
