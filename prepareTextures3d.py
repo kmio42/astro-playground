@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Texturen für ErdeMond3D.html aus den NASA-Downloads in textures/src/ erzeugen (Konzept-ErdeMond3D.md).
+Texturen für erdemond3d.html aus den NASA-Downloads in textures/src/ erzeugen (Konzept-ErdeMond3D.md).
 
 Benötigt Pillow und NumPy. Aufruf aus dem Projektordner:  python3 prepareTextures3d.py
 
@@ -40,7 +40,7 @@ def earth_day():
 
 
 def earth_day_small():
-    """Tagseite für die datensparende Version (ErdeMond3D.html?klein): 2048×1024"""
+    """Tagseite für die datensparende Version (erdemond3d.html?klein): 2048×1024"""
     im = Image.open(os.path.join(SRC, 'world.topo.bathy.200405.3x5400x2700.jpg')).convert('RGB')
     im.resize((2048, 1024), Image.LANCZOS).save(os.path.join(OUT, 'earth_day_2k.jpg'), quality=85)
 
@@ -79,7 +79,7 @@ def moon_normal():
 
 
 def moon_normal_small():
-    """Mond-Normal-Map für die datensparende Version (ErdeMond3D.html?klein): 1024×512"""
+    """Mond-Normal-Map für die datensparende Version (erdemond3d.html?klein): 1024×512"""
     make_moon_normal(1024, 88, 'moon_normal_1k.jpg')
 
 

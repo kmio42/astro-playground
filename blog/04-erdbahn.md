@@ -1,7 +1,7 @@
 # Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?
 
-<!-- Beitrag 4 der Reihe (Wegweiser: Teil 5). Modelle: Erdbahn3D.html (Rundgang „erdbahn“, 9 Schritte),
-     Tageslaenge.html (Rundgang „zeitgleichung“, 5 Schritte). Zahlen: 2026, MEZ. -->
+<!-- Beitrag 4 der Reihe (Wegweiser: Teil 5). Modelle: erdbahn3d.html (Rundgang „erdbahn“, 9 Schritte),
+     tageslaenge.html (Rundgang „zeitgleichung“, 5 Schritte). Zahlen: 2026, MEZ. -->
 
 *Teil 5 der Reihe „Sonne, Erde, Mond“. Zuletzt: „Warum steht der Polarstern immer an derselben Stelle?“*
 
@@ -33,7 +33,7 @@ rund 7 % mehr Sonnenstrahlung an – die Neigung der Achse wiegt aber viel schwe
 <li>In Sonnennähe läuft die Erde schneller (30,3 statt 29,3 km/s). Das Sommerhalbjahr der Nordhalbkugel
 dauert deshalb 186,4 Tage, das Winterhalbjahr nur 178,9.</li>
 </ul>
-<p><a href="Erdbahn3D.html">3D-Modell: Die Bahn der Erde um die Sonne (eigene Seite öffnen)</a></p>
+<p><a href="erdbahn3d.html">3D-Modell: Die Bahn der Erde um die Sonne (eigene Seite öffnen)</a></p>
 </div>
 
 ## Die Neigung macht die Jahreszeiten
@@ -65,7 +65,7 @@ voran, um die Sonnenwenden schneller. Zwei Wellen im Jahr, bis zu 10 Minuten.</l
 <li>Um Weihnachten steigen beide gleichzeitig an: Der Mittag rückt jeden Tag eine halbe Minute nach
 hinten – daher der früheste Sonnenuntergang am 12. Dezember.</li>
 </ul>
-<p><a href="Tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
+<p><a href="tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
 </div>
 
 > **Zum Nachrechnen:** Eine gängige Näherung für die Zeitgleichung, also wie weit eine Sonnenuhr vorgeht, ist

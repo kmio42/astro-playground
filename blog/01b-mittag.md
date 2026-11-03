@@ -1,6 +1,6 @@
 # Das Rätsel vom 12. Dezember
 
-<!-- Teil 1b. Modell: Tageslaenge.html, Rundgang „mittag“ (6 Schritte). Zahlen: 50° N, 10° O, 2026,
+<!-- Teil 1b. Modell: tageslaenge.html, Rundgang „mittag“ (6 Schritte). Zahlen: 50° N, 10° O, 2026,
      MEZ ohne Sommerzeit. -->
 
 *Teil 2 der Reihe „Sonne, Erde, Mond“. Teil 1: „Warum werden die Tage im Herbst so schnell kürzer?“*
@@ -34,7 +34,7 @@ wieder später unter.</li>
 <li>Im Frühjahr und im Herbst rückt der Mittag nach vorn. Deshalb gewinnen im Frühjahr vor allem die
 Morgen, im Herbst verlieren vor allem die Abende.</li>
 </ul>
-<p><a href="Tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
+<p><a href="tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
 </div>
 
 ## Mittag ist nicht gleich zwölf Uhr

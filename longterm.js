@@ -1,5 +1,5 @@
 /**
- * longterm.js — Erdbahn und Erdachse über Jahrtausende, für den Zeitraffer in Erdbahn3D.html.
+ * longterm.js — Erdbahn und Erdachse über Jahrtausende, für den Zeitraffer in erdbahn3d.html.
  * DOM-frei wie astro.js: im Browser globale Funktionen, in Node.js per require('./longterm.js').
  *
  * Mittlere Bahnelemente der Erde nach Meeus, Kapitel 31 (Tabelle 31.A, mittleres Äquinoktium des Datums), die

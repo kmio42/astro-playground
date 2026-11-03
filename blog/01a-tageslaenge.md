@@ -1,23 +1,24 @@
 # Warum werden die Tage im Herbst so schnell kürzer?
 
-<!-- Teil 1a. Modell: Tageslaenge.html, Rundgang „tageslaenge“ (7 Schritte). Zahlen: 50° N, 10° O, 2026,
+<!-- Teil 1a. Modell: tageslaenge.html, Rundgang „tageslaenge“ (7 Schritte). Zahlen: 50° N, 10° O, 2026,
      Uhrzeit mit Sommerzeit wie auf der Uhr. -->
 
 *Teil 1 der Reihe „Sonne, Erde, Mond“: vom Beobachten zum Erklären.*
 
-Im Herbst fällt mir auf, dass die Sonne innerhalb weniger Tage deutlich früher untergeht – einem
-Abendmenschen eher als der spätere Sonnenaufgang. Um die Jahreswende scheint sich dann kaum noch etwas
-zu tun, bis die Tage im Frühjahr mit einmal wieder spürbar länger werden. Täuscht das Gefühl? Und wenn
-nicht: Wie stark ändert sich die Tageslänge von Tag zu Tag, und wann im Jahr am meisten?
+Im Herbst fällt mir als Abendmensch besonders auf, dass die Sonne innerhalb weniger Tage deutlich
+früher untergeht. Um die Jahreswende scheint sich dann kaum noch etwas zu tun, und im Frühjahr kommt
+die Zeit, in der die Tage plötzlich wieder spürbar länger werden. Täuscht das Gefühl? Und wenn nicht:
+Wie stark ändert sich die Tageslänge von Tag zu Tag, und wann im Jahr am meisten?
 
 Diese Frage war vor zwei Jahren der Auslöser, sich näher mit dem Lauf der Sonne zu beschäftigen.
 Daraus entstand das Modell aus dem Beitrag „Sternzeit und Erdposition“, das erste Projekt, bei dem KI
 zaghaft beim Programmieren half – mit Resultaten, die noch nicht durchgehend überzeugten. Bei dieser
 Reihe war die KI ein wesentlich größerer Helfer; mehr dazu am Ende.
 
-Am Anfang steht nur, was man selbst beobachten kann, ganz ohne Astronomie; die Erklärungen folgen
-Schritt für Schritt in den nächsten Teilen. Gerechnet wird wie damals nach Jean Meeus' *Astronomische
-Algorithmen*, diesmal aber nicht als Tabelle, sondern als Modell, in dem man selbst herumklicken kann.
+In dieser Reihe möchte ich den Weg zu dem, was ich dabei gelernt habe, geordnet aufbereiten. Sie
+beginnt mit Erscheinungen, die man selbst beobachten kann, ganz ohne Astronomie; die Erklärungen
+folgen Schritt für Schritt in den nächsten Teilen. Gerechnet wird wieder mit den Formeln von Jean
+Meeus, diesmal stecken sie aber vor allem in interaktiven 3D-Modellen, die man selbst erkunden kann.
 
 ## Ein Jahr in zwei Diagrammen
 
@@ -39,7 +40,7 @@ Sommerzeit dann eine Stunde vom Morgen auf den Abend.</li>
 <li>Nach Sonnenuntergang folgt die Dämmerung: bürgerlich (bis 6° unter dem Horizont), nautisch (bis
 12°), astronomisch (bis 18°). Im Juni wird es hier die ganze Nacht nicht richtig dunkel.</li>
 </ul>
-<p><a href="Tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
+<p><a href="tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
 </div>
 
 ## Das Gefühl täuscht nicht

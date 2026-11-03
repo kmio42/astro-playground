@@ -1,5 +1,5 @@
 // moonRender.js
-// Gemeinsame Monddarstellungs-Funktionen für Browser (Mond.html) und Node.js (renderMoon.js).
+// Gemeinsame Monddarstellungs-Funktionen für Browser (mond.html) und Node.js (renderMoon.js).
 //
 // Abhängigkeiten – in Browser global aus astro.js/render.js; in Node.js vor require() setzen:
 //   Object.assign(global, require('./astro.js'), require('./render.js'))
@@ -160,7 +160,7 @@ function drawMoonPhaseTexture(ctx, sunRaDec, moonRaDec, moonAxisAngle, libration
 
 /**
  * Rendert Mondphase mit mond2.png-Textur und pixelweiser Schattenberechnung.
- * Entspricht dem Rendering-Teil von drawMoonPhase aus Mond.html.
+ * Entspricht dem Rendering-Teil von drawMoonPhase aus mond.html.
  *
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} sunRaDec

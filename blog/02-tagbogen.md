@@ -1,6 +1,6 @@
 # Läuft die Sonne im Winter auf einer kleineren Bahn?
 
-<!-- Beitrag 2 der Reihe (Wegweiser: Teil 3). Modell: Tagbogen3D.html, Rundgang (10 Schritte). Zahlen: 50° N,
+<!-- Beitrag 2 der Reihe (Wegweiser: Teil 3). Modell: tagbogen3d.html, Rundgang (10 Schritte). Zahlen: 50° N,
      10° O, 2026, MEZ (ohne Sommerzeit). -->
 
 *Teil 3 der Reihe „Sonne, Erde, Mond“. Bisher: „Warum werden die Tage im Herbst so schnell kürzer?“ und
@@ -38,7 +38,7 @@ schnellsten.</li>
 <li>Der Schatten eines senkrechten Stabs zeigt immer von der Sonne weg; die Spur seiner Spitze über den
 Tag ist das Prinzip der Sonnenuhr.</li>
 </ul>
-<p><a href="Tagbogen3D.html">3D-Modell: Tagbogen der Sonne (eigene Seite öffnen)</a></p>
+<p><a href="tagbogen3d.html">3D-Modell: Tagbogen der Sonne (eigene Seite öffnen)</a></p>
 </div>
 
 ## Ein Kreis, der wandert

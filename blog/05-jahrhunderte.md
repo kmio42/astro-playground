@@ -1,6 +1,6 @@
 # Zeigt die Erdachse immer zum Polarstern?
 
-<!-- Beitrag 5 der Reihe (Wegweiser: Teil 6). Modell: Erdbahn3D.html, Rundgang „jahrhunderte“ (9 Schritte),
+<!-- Beitrag 5 der Reihe (Wegweiser: Teil 6). Modell: erdbahn3d.html, Rundgang „jahrhunderte“ (9 Schritte),
      Zeitraffer 8001 v. Chr. bis 12 000 (longterm.js, Gültigkeit der Formeln nach Meeus). -->
 
 *Teil 6 der Reihe „Sonne, Erde, Mond“. Zuletzt: „Warum ist es im Winter kalt, obwohl die Erde der Sonne
@@ -33,7 +33,7 @@ heute schon am 7. März.</li>
 <li>Die Gezeiten bremsen die Erde: Um Christi Geburt lag ihre Drehung schon rund drei Stunden hinter einer
 gleichmäßig laufenden Uhr zurück.</li>
 </ul>
-<p><a href="Erdbahn3D.html">3D-Modell: Die Bahn der Erde um die Sonne (eigene Seite öffnen)</a></p>
+<p><a href="erdbahn3d.html">3D-Modell: Die Bahn der Erde um die Sonne (eigene Seite öffnen)</a></p>
 </div>
 
 ## Was davon spürbar ist

@@ -30,23 +30,22 @@ um die Zeitgleichung oder Sonnenauf- und -untergang darzustellen, enthielten Feh
      (begrenzt); „ChatGPT Search“ mit Quellenlinks ab 31.10.2024 für Plus/Team, ab 16.12.2024 für alle
      Angemeldeten. Ob gesucht wurde, entschied meist das Modell. -->
 
-ChatGPT half ein bisschen bei der Einarbeitung in das neue Thema, ein ganzer Teil war aber noch
-gewöhnliche Recherche. Dabei war ich überladen von Koordinatensystemen und Fachbegriffen, und die
-Zeichnungen verstand ich oft nicht. Am Schluss landete ich bei Jean Meeus' *Astronomische Algorithmen* und begann
-eine eigene Umsetzung in JavaScript. Die ersten Formeln kamen direkt aus dem Buch, per Hand
-abgeschrieben. Etwas später stieß ich auf ein Git-Projekt in Go
-([soniakeys/meeus](https://github.com/soniakeys/meeus)), in dem alle Formeln des Buchs schon umgesetzt
-waren. Das machte es etwas einfacher, aber es blieb viel Handarbeit und Testen. Die Formeln richtig
-umzusetzen und lauffähig zu bekommen, war nicht leicht: Man musste die Dinge wirklich verstehen.
-Manchmal war es nur ein übersehenes Vorzeichen oder eine Umwandlung der Winkel – mein Ziel war von
-Anfang an, nur in Radiant zu rechnen.
+ChatGPT half bei der Einarbeitung in das neue Thema, ein ganzer Teil war aber noch gewöhnliche
+Recherche. Dabei war ich überladen von Koordinatensystemen und Fachbegriffen und hatte Mühe, Skizzen
+und Zeichnungen zu verstehen. Am Schluss landete ich bei Jean Meeus' *Astronomische Algorithmen* und
+begann eine eigene Umsetzung in JavaScript – vor allem, um die Zusammenhänge sichtbar zu machen und
+so besser zu begreifen. Die ersten Formeln kamen direkt aus dem Buch, per Hand abgeschrieben. Sie
+richtig umzusetzen und lauffähig zu bekommen, war nicht leicht. Manchmal war es nur ein übersehenes
+Vorzeichen oder eine fehlerhafte Umwandlung der Winkel, denn viele Angaben stehen traditionell in
+Grad oder Stunden. Manchmal lag es auch am Verständnis: Eine zweidimensionale Zeichnung von Sonne und
+Erde etwa kann nicht alle Aspekte von Sonnenauf- und -untergang im Lauf der Jahreszeiten zeigen, weil
+sich die Neigung der Erdachse gegenüber der Linie Sonne–Erde verschiebt: Im Sommer neigt sich der
+Nordpol zur Sonne hin, im Winter von ihr weg, im Frühling und Herbst zur Seite.
 
-Dass ich mit manchen schematischen Zeichnungen Schwierigkeiten hatte, brachte mich schon früh auf die
-Idee interaktiver Hilfsmittel. Auch dabei zeigte sich, dass ich die Sachen erst richtig verstehen
-musste. Eine zweidimensionale Zeichnung von Sonne und Erde etwa kann nicht alle Aspekte von
-Sonnenauf- und -untergang im Lauf der Jahreszeiten zeigen, weil sich die Neigung der Erdachse
-gegenüber der Linie Sonne–Erde verschiebt: Im Sommer neigt sich der Nordpol zur Sonne hin, im Winter
-von ihr weg, im Frühling und Herbst zur Seite.
+Zwischendurch stieß ich auf ein Git-Projekt in Go
+([soniakeys/meeus](https://github.com/soniakeys/meeus)), in dem alle Formeln des Buchs schon umgesetzt
+waren. Das machte die Arbeit etwas einfacher und weniger fehleranfällig, aber es blieb viel
+Handarbeit und Testen.
 
 Die KI half dabei am Rand. ChatGPT baute mir ein kleines, einfaches Beispiel für das
 JavaScript-Canvas, das ich an meine Berechnungen anpasste, und kleine Hilfsfunktionen, die die
@@ -120,3 +119,6 @@ Aus der Arbeit an der Reihe, als Gedächtnisstütze:
 > ChatGPT-Gittermodells einer Kugel waren die Knotenpunkte falsch verbunden. Das konnte leicht behoben
 > werden, würde aber heute gar nicht mehr passieren. Heute werden mit einem Fingerschnipsen ganze
 > interaktive 3D-Modelle gebaut.
+>
+> Nachtrag 3: Die Umsetzung in JavaScript war hauptsächlich zur Visualisierung, dass ich die
+> Zusammenhänge besser begreife.

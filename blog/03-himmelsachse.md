@@ -1,6 +1,6 @@
 # Warum steht der Polarstern immer an derselben Stelle?
 
-<!-- Beitrag 3 der Reihe (Wegweiser: Teil 4). Modell: Himmelsachse3D.html, Rundgang (11 Schritte). Zahlen: 50° N,
+<!-- Beitrag 3 der Reihe (Wegweiser: Teil 4). Modell: himmelsachse3d.html, Rundgang (11 Schritte). Zahlen: 50° N,
      10° O, 2026. -->
 
 *Teil 4 der Reihe „Sonne, Erde, Mond“. Zuletzt: „Läuft die Sonne im Winter auf einer kleineren Bahn?“*
@@ -31,7 +31,7 @@ alle Orte gleich und ändert sich an einem Tag kaum, darum läuft die Sonne auf 
 <li>Mittagshöhe der Sonne = 90° − geografische Breite + Deklination: 63° im Juni, 40° zu den
 Tagundnachtgleichen, 17° im Dezember (bei 50° N).</li>
 </ul>
-<p><a href="Himmelsachse3D.html">3D-Modell: Erdachse und Himmelsachse (eigene Seite öffnen)</a></p>
+<p><a href="himmelsachse3d.html">3D-Modell: Erdachse und Himmelsachse (eigene Seite öffnen)</a></p>
 </div>
 
 ## Zwei Arten, den Himmel zu beschreiben

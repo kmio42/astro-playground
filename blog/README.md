@@ -24,7 +24,7 @@ danach der Mond.
 | 1b | [Mittag](01b-mittag.md) | Warum geht die Sonne am 12. Dezember am frühesten unter? | `tageslaenge`, Rundgang `mittag` | Entwurf |
 | 2 | [Tagbogen](02-tagbogen.md) | Läuft die Sonne im Winter auf einer kleineren Bahn? | `tagbogen`, Rundgang (10 Schritte) | Entwurf |
 | 3 | [Himmelsachse](03-himmelsachse.md) | Warum steht der Polarstern immer an derselben Stelle? | `himmelsachse`, Rundgang (11 Schritte) | Entwurf |
-| 4 | [Erdbahn](04-erdbahn.md) | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `erdbahn` (Erdbahn3D.html), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | Entwurf |
+| 4 | [Erdbahn](04-erdbahn.md) | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `erdbahn` (erdbahn3d.html), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | Entwurf |
 | 5 | [Jahrhunderte](05-jahrhunderte.md) | Zeigt die Erdachse immer zum Polarstern? | `erdbahn`, Rundgang `jahrhunderte` | Entwurf |
 | 6 ff. | [Mond](06-mond.md) | (später festlegen) | `erdemond`, `mond`, `mondbahn` | Ideen |
 | – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Vorgeschichte im Entwurf, sonst Stoff |
@@ -32,7 +32,7 @@ danach der Mond.
 - Teil 1 bleibt bei Alltagsbeobachtungen. 1b löst das Rätsel vom 12. Dezember mit dem wandernden
   Mittag; die Ursachen der Zeitgleichung kommen in Teil 4.
 - Teil 2 nimmt aus der früheren Langfassung auch Winkel und Dauer des Untergangs auf. Die
-  Lichtbrechung entfällt. `Sichtbarkeit.html` gehört nicht zur Reihe.
+  Lichtbrechung entfällt. `sichtbarkeit.html` gehört nicht zur Reihe.
 - Die frühere Langfassung `Erklaerung-Sonnenbahn.md` ist in diesen Entwürfen aufgegangen (Text und jeweils
   ein Abschnitt „Material aus der früheren Langfassung“) und gelöscht; ihre Übersicht „welche Seite zeigt
   was“ steht auf `index.html`.
@@ -83,7 +83,7 @@ geschrieben, dazu der Link zur eigenen Seite.
 ```html
 <div class="km-modell" id="…" data-modell="tageslaenge" data-tour="tageslaenge">
 <ul><li>…</li></ul>
-<p><a href="Tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
+<p><a href="tageslaenge.html">Diagramm: Tageslänge im Jahr (eigene Seite öffnen)</a></p>
 </div>
 ```
 
@@ -104,13 +104,13 @@ Sobald der Erfahrungsbericht erschienen ist, wird „ein eigener Beitrag“ zum 
 
 ## Arbeitsplan
 
-1. Stilprobe: die Rundgänge `tageslaenge` und `mittag` in `Tageslaenge.html` mit Startknopf, dazu
+1. Stilprobe: die Rundgänge `tageslaenge` und `mittag` in `tageslaenge.html` mit Startknopf, dazu
    die Entwürfe 1a und 1b.
 2. Prüfen des Stils (erledigt, Stil freigegeben).
 3. Die vorhandenen Rundgänge (Tagbogen, Himmelsachse, Erde-Mond) im neuen Stil, mit Startknopf (erledigt; Texte von Erde-Mond folgen mit den Mond-Beiträgen).
 4. Diagramm der Zeitgleichung mit den Anteilen Ellipse und Neigung (Formel nach Smart, Meeus 27.3)
-   in `Tageslaenge.html`, dazu der Rundgang `zeitgleichung` (erledigt).
-5. `Erdbahn3D.html`:
+   in `tageslaenge.html`, dazu der Rundgang `zeitgleichung` (erledigt).
+5. `erdbahn3d.html`:
    - Canvas 2D, schematisch, gemeinsamer Code in `canvas3d.js`;
    - Küstenlinien von Natural Earth 1:110 Mio. (gemeinfrei);
    - Rundgang `erdbahn` (erledigt, 9 Schritte; `canvas3d.js` und `coastlines.js` sind angelegt).
@@ -119,5 +119,5 @@ Sobald der Erfahrungsbericht erschienen ist, wird „ein eigener Beitrag“ zum 
      Laskar 22.3 und der Kalender vor 1582.
    - In einem eigenen JS-Modul: was nur der Zeitraffer braucht (Kap. 21, 31).
    - Zeitraffer von −8000 bis +12 000.
-   (erledigt: `longterm.js`, Rundgang `jahrhunderte` in `Erdbahn3D.html`)
+   (erledigt: `longterm.js`, Rundgang `jahrhunderte` in `erdbahn3d.html`)
 7. Den Inhalt von `Erklaerung-Sonnenbahn.md` vollständig übernehmen, dann die Datei löschen (erledigt).

@@ -1,5 +1,5 @@
 /*
- * orbit3d.js – Geometrie von Erde, Mond und Sonne für das 3D-Modell (ErdeMond3D.html)
+ * orbit3d.js – Geometrie von Erde, Mond und Sonne für das 3D-Modell (erdemond3d.html)
  *
  * Konzept: Konzept-ErdeMond3D.md. DOM-frei wie astro.js: im Browser sind alle öffentlichen Namen global,
  * in Node.js kommen sie aus require('./orbit3d.js'). Benötigt astro.js (im Browser vorher laden).
@@ -362,7 +362,7 @@
 
     /**
      * Sichtbarer Anteil der Sonnenscheibe, wenn ein Körper davor steht (Überdeckung zweier Kreisscheiben).
-     * Gleiche Rechnung wie im Shader von ErdeMond3D.html.
+     * Gleiche Rechnung wie im Shader von erdemond3d.html.
      * @param rs Winkelradius der Sonne, ro Winkelradius des verdeckenden Körpers, d Winkelabstand der Mitten
      * @return 1 = ganz sichtbar, 0 = ganz verdeckt
      */

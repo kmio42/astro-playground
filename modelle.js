@@ -3,7 +3,7 @@
  *
  * In der Seite:
  *   <div class="km-modell" id="sommer" data-modell="tagbogen" data-datum="2026-06-21 10:00" data-ansicht="east">
- *     <a href="…/Tagbogen3D.html">Ersatz ohne JavaScript, z. B. ein Bild mit alt-Text oder ein Link</a>
+ *     <a href="…/tagbogen3d.html">Ersatz ohne JavaScript, z. B. ein Bild mit alt-Text oder ein Link</a>
  *   </div>
  *   <script src="…/modelle.js" defer></script>
  *
@@ -42,16 +42,16 @@
 
     // Modelle mit Einbettmodus (embed.js); ratio = Breite/Höhe des Inhalts bei etwa 660 px Breite
     const MODELS = {
-        tagbogen: { page: 'Tagbogen3D.html', title: '3D-Modell: Tagbogen der Sonne', ratio: '660/1000' },
-        himmelsachse: { page: 'Himmelsachse3D.html', title: '3D-Modell: Erdachse und Himmelsachse', ratio: '660/1100' },
-        erdposition: { page: 'Erdposition.html', title: 'Modell: Erdposition und Sternzeit', ratio: '660/2800' },
-        mond: { page: 'Mond.html', title: 'Modell: Mondbahn, Mondphase und Mondlauf am Himmel', ratio: '660/3800' },
-        tageslaenge: { page: 'Tageslaenge.html', title: 'Diagramm: Tageslänge im Jahr', ratio: '660/2100' },
-        erdbahn: { page: 'Erdbahn3D.html', title: '3D-Modell: Die Bahn der Erde um die Sonne', ratio: '660/1250' },
-        mondbahn: { page: 'Mondbahn.html', title: 'Diagramm: Bahnen von Erde und Mond um die Sonne', ratio: '660/3200' },
+        tagbogen: { page: 'tagbogen3d.html', title: '3D-Modell: Tagbogen der Sonne', ratio: '660/1000' },
+        himmelsachse: { page: 'himmelsachse3d.html', title: '3D-Modell: Erdachse und Himmelsachse', ratio: '660/1100' },
+        erdposition: { page: 'erdposition.html', title: 'Modell: Erdposition und Sternzeit', ratio: '660/2800' },
+        mond: { page: 'mond.html', title: 'Modell: Mondbahn, Mondphase und Mondlauf am Himmel', ratio: '660/3800' },
+        tageslaenge: { page: 'tageslaenge.html', title: 'Diagramm: Tageslänge im Jahr', ratio: '660/2100' },
+        erdbahn: { page: 'erdbahn3d.html', title: '3D-Modell: Die Bahn der Erde um die Sonne', ratio: '660/1250' },
+        mondbahn: { page: 'mondbahn.html', title: 'Diagramm: Bahnen von Erde und Mond um die Sonne', ratio: '660/3200' },
         // WebGL mit 3,6 MB Texturen: erst nach Klick laden, auf schmalen Bildschirmen und mit „Daten sparen“ die
         // kleinen Texturen (Parameter klein, 1,7 MB)
-        erdemond: { page: 'ErdeMond3D.html', title: '3D-Modell: Erde und Mond', ratio: '660/2300',
+        erdemond: { page: 'erdemond3d.html', title: '3D-Modell: Erde und Mond', ratio: '660/2300',
                     poster: 'posters/erdemond.jpg', posterRatio: '4/3', size: '3,6 MB', small: { param: 'klein', size: '1,7 MB' } },
     };
 

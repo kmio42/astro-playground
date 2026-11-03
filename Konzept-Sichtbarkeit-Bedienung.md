@@ -1,4 +1,4 @@
-# Konzept: Bedienung von `Sichtbarkeit.html` neu ordnen
+# Konzept: Bedienung von `sichtbarkeit.html` neu ordnen
 
 Ergänzt [Konzept-Sichtbarkeit.md](Konzept-Sichtbarkeit.md). Rechnung und Datenmodell bleiben gleich, es geht
 nur um Reihenfolge, Führung und Ausblenden. Alle Funktionen bleiben erhalten (Inventar am Ende).

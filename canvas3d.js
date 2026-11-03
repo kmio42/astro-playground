@@ -3,7 +3,7 @@
  * Vektoren, Kamera mit fast paralleler Projektion, Zeichenfunktionen, Ziehen/Zoomen, weiche Kamerafahrten
  * und ein Rundgang mit Startknopf, festem Ort und deutscher Uhrzeit.
  *
- * Im Browser: globales Objekt canvas3d. Verwendet von Erdbahn3D.html; Tagbogen3D.html und Himmelsachse3D.html
+ * Im Browser: globales Objekt canvas3d. Verwendet von erdbahn3d.html; tagbogen3d.html und himmelsachse3d.html
  * haben noch eigene Fassungen derselben Teile.
  *
  * Koordinaten: rechtshändig, z nach oben. Die Kamera schaut aus Richtung (Azimut az, Höhe el) auf den Zielpunkt;

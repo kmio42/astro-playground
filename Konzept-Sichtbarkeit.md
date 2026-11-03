@@ -1,6 +1,6 @@
 # Konzept: Wann sind Sonne und Mond von Wohnung/Balkon aus sichtbar?
 
-Stand: 27.10.2026, Konzept abgestimmt, Stufen 1 bis 3 umgesetzt (`Sichtbarkeit.html`, `visibility.js`,
+Stand: 27.10.2026, Konzept abgestimmt, Stufen 1 bis 3 umgesetzt (`sichtbarkeit.html`, `visibility.js`,
 `testVisibility.js`).
 
 ## Ziel
@@ -135,7 +135,7 @@ werden.
 
 ### Oberfläche
 
-Neue Seite `Sichtbarkeit.html` aus `astro-template`, lädt `astro.js`, `ui.js` und `visibility.js`
+Neue Seite `sichtbarkeit.html` aus `astro-template`, lädt `astro.js`, `ui.js` und `visibility.js`
 (Geometrie, Maske, Zeitsuche, ohne DOM, damit in Node.js testbar wie `moonRender.js`).
 
 **Horizontdiagramm (zentrale Ansicht):** rechteckig, Azimut waagrecht 0°–360° mit Süden in der Mitte, Höhe
@@ -412,7 +412,7 @@ aus.
 ## Umsetzung in Stufen
 
 1. **Stufe 1 (umgesetzt):** `calculateRefraction()` (JS + C++), `visibility.js` mit Standpunkten,
-   Rechtecken, Horizontlinie, Beobachtungen und Zeitsuche; `Sichtbarkeit.html` mit Horizontdiagramm,
+   Rechtecken, Horizontlinie, Beobachtungen und Zeitsuche; `sichtbarkeit.html` mit Horizontdiagramm,
    Jahres-Heatmap, Mondliste, Tagesdetail und Karte; `testVisibility.js`.
 2. **Stufe 2 (umgesetzt):** OSM-Gebäude (auch Relationen), Gelände (Nah- und Fernbereich), Zwischenspeichern,
    Fassade per Klick, Höhen bearbeiten, Schattenwurf; Stockwerk/Geschosshöhe/Augenhöhe je Standpunkt.
@@ -428,7 +428,7 @@ Später und optional:
   (360 Werte pro Standpunkt), nicht über das Raster.
 
 Nicht vorgesehen: Bäume als eigene Objekte, Sommer/Winter-Unterscheidung beim Laub, Einbindung in
-`Erdposition.html`/`Mond.html`. Die gespeicherte Maske ist aber so angelegt, dass andere Seiten sie
+`erdposition.html`/`mond.html`. Die gespeicherte Maske ist aber so angelegt, dass andere Seiten sie
 später lesen können.
 
 ## Schnittstelle `visibility.js`

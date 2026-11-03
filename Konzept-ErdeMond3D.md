@@ -1,6 +1,6 @@
 # Konzept: Interaktives 3D-Modell von Erde und Mond
 
-Stand: 28.10.2026, Konzept abgestimmt, Stufe 1 bis 3 umgesetzt (`ErdeMond3D.html`, `orbit3d.js`, `gl3d.js`,
+Stand: 28.10.2026, Konzept abgestimmt, Stufe 1 bis 3 umgesetzt (`erdemond3d.html`, `orbit3d.js`, `gl3d.js`,
 `testOrbit3d.js`, `prepareTextures3d.py`, `textures/`). Abweichungen in Stufe 2: Die Mond-Normal-Map ist ein JPG
 (1,2 MB statt 3,8 MB als PNG), der Atmosphärensaum ist immer an (abschaltbar) und 9-fach überhöht, der Erdschein
 etwa 300-fach verstärkt und nach der Phasenkurve einer Lambert-Kugel gewichtet. Zusätzlich: Sprünge zu den
@@ -17,13 +17,13 @@ Monatsgang, große/kleine Mondwende, 18,6 Jahre, Vollmond im Winter/Sommer), „
 (Drachenmonat, Rückwanderung, Finsternis-Saisons, Saros) und „Apsiden“ (anomalistischer Monat, Vorwanderung in
 8,85 Jahren, Supermond/Minimond, totale/ringförmige Finsternis). Jeder Schritt setzt Zeitpunkt, Anzeigen, Maßstab,
 Kamera und Zeitraffer; am Ende kommen Anzeigen und Maßstab wieder wie vorher.
-Datensparende Version `ErdeMond3D.html?klein`: Erde 2048 statt 4096 Pixel (`earth_day_2k.jpg`, 0,34 MB), Mondrelief
+Datensparende Version `erdemond3d.html?klein`: Erde 2048 statt 4096 Pixel (`earth_day_2k.jpg`, 0,34 MB), Mondrelief
 1024 statt 2048 (`moon_normal_1k.jpg`, 0,25 MB); zusammen 1,7 statt 3,6 MB je Aufruf. Link oben auf der Seite.
 
 ## Ziel
 
-Eine Seite `ErdeMond3D.html`, die Erde und Mond als drehbares 3D-Modell zeigt und dabei die Geometrie
-sichtbar macht, die in `Mond.html`, `Mondbahn.html` und `Erdposition.html` nur in 2D-Projektionen vorkommt:
+Eine Seite `erdemond3d.html`, die Erde und Mond als drehbares 3D-Modell zeigt und dabei die Geometrie
+sichtbar macht, die in `mond.html`, `mondbahn.html` und `erdposition.html` nur in 2D-Projektionen vorkommt:
 
 - **Ekliptikebene** und **Mondbahnebene** mit ihrer Neigung von etwa 5,1°
 - **Knotenlinie** mit aufsteigendem ☊ und absteigendem ☋ Knoten, und wie sie in 18,6 Jahren rückwärts wandert
@@ -37,7 +37,7 @@ also keine Animation nach Schema, sondern zeigt den echten Himmel des gewählten
 **Ohne Internet:** Die Seite lädt nichts aus dem Internet. Bibliothek und Texturen liegen im Projekt und
 werden von einem lokalen Webserver ausgeliefert, siehe [Offline-Betrieb](#offline-betrieb).
 
-**Kein Ziel:** heliozentrische Gesamtansicht (das zeigen `Erdposition.html` und `Mondbahn.html`),
+**Kein Ziel:** heliozentrische Gesamtansicht (das zeigen `erdposition.html` und `mondbahn.html`),
 Sternhintergrund, Planeten.
 
 ## Szene
@@ -89,7 +89,7 @@ dünne Hilfslinie.
 ### Maßstab
 
 Maßstäblich ist der Mond 0,27 Erdradien groß und 60 Erdradien entfernt. In der Gesamtansicht wäre die Erde
-nur etwa 17 px, der Mond 4–5 px groß. Deshalb zwei Regler wie in `Mondbahn.html`:
+nur etwa 17 px, der Mond 4–5 px groß. Deshalb zwei Regler wie in `mondbahn.html`:
 
 - **Körper vergrößern** ×1 … ×8 (Standard ×4): Erde und Mond gleich stark, das Größenverhältnis bleibt.
 - **Abstand stauchen** ×1 … ×0,25 (Standard ×1).
@@ -113,7 +113,7 @@ Präzession der Achse innerhalb des Datums werden vernachlässigt (Fehler < 0,01
 ### Mond
 
 Die Orientierung folgt vollständig aus `calculateMoonOrientation()`. So stimmt das 3D-Modell genau mit der
-Darstellung in `Mond.html` überein, einschließlich der physischen Libration:
+Darstellung in `mond.html` überein, einschließlich der physischen Libration:
 
 - **e** = Einheitsvektor Mond → Erde (äquatorial)
 - **n̂**, **ô** = Nord- und Ostrichtung am Himmel am Ort des Mondes (senkrecht zur Sichtlinie)
@@ -223,14 +223,14 @@ die Texturen für die Seite:
 Die großen Originaldownloads kommen nach `textures/src/` und in `.gitignore`. Ins Repository kommen das
 Skript und die fertigen Texturen in `textures/`.
 
-**Quellenangabe** auf der Seite (wie in `Mond.html`): NASA SVS CGI Moon Kit (LROC, LOLA), NASA Earth
+**Quellenangabe** auf der Seite (wie in `mond.html`): NASA SVS CGI Moon Kit (LROC, LOLA), NASA Earth
 Observatory Blue Marble (R. Stöckli), Black Marble (NASA Earth Observatory / Suomi NPP).
 
 ## Offline-Betrieb
 
-Die Seite läuft wie `Sichtbarkeit.html` über einen lokalen Webserver (`python3 -m http.server 8000`, dann
-`http://localhost:8000/ErdeMond3D.html`). Unter `file://` ginge es nicht, weil WebGL dort keine Bilddateien
-als Textur verwenden darf (gleiche Sperre wie `getImageData` in `Mond.html`).
+Die Seite läuft wie `sichtbarkeit.html` über einen lokalen Webserver (`python3 -m http.server 8000`, dann
+`http://localhost:8000/erdemond3d.html`). Unter `file://` ginge es nicht, weil WebGL dort keine Bilddateien
+als Textur verwenden darf (gleiche Sperre wie `getImageData` in `mond.html`).
 
 - **Texturen** sind normale JPG/PNG-Dateien in `textures/`.
 - **Keine Fremdbibliothek.** Alle Skripte sind eigene, klassisch eingebunden (`<script src>`) wie `astro.js`.
@@ -315,7 +315,7 @@ Eigene Bahnkamera: Ziel, Abstand, Azimut, Höhe, „Oben“ immer z (Ekliptik-No
   - *Ekliptik von oben*: Bahnform, Apsiden, Phasen als Draufsicht
   - *Kante-auf*: in der Ekliptik, senkrecht zur Knotenlinie, zeigt die 5°-Neigung am deutlichsten
   - *Von der Sonne*: beide Körper voll beleuchtet, Mond vor oder neben der Erde
-  - *Von der Erde zum Mond*: enges Blickfeld, zeigt Phase und Libration wie `Mond.html`
+  - *Von der Erde zum Mond*: enges Blickfeld, zeigt Phase und Libration wie `mond.html`
   - *Vom Mond zur Erde*: Erdphase und Erdschein
 - Option „mitführen“: Die Kamera bewegt sich im Zeitraffer mit dem Ziel.
 
@@ -341,7 +341,7 @@ Libration, Erdschein, Drachenmonat, anomalistischer Monat, Finsternis-Saison).
 
 | Datei | Inhalt |
 |---|---|
-| `ErdeMond3D.html` | Seite: Szene, Shader (`<script type="x-shader/...">`), Bedienung, Infotabelle |
+| `erdemond3d.html` | Seite: Szene, Shader (`<script type="x-shader/...">`), Bedienung, Infotabelle |
 | `gl3d.js` | eigener WebGL2-Baustein: Matrizen, Kamera, Geometrie, Linien, Texturen, Shader-Hilfen |
 | `orbit3d.js` | DOM-freie Rechnung wie `visibility.js` (Browser: global, Node: `require`), Ekliptik-Koordinaten, Matrizen als einfache Arrays |
 | `testOrbit3d.js` | Tests mit Node für `orbit3d.js` und den Rechenteil von `gl3d.js` |
@@ -427,7 +427,7 @@ Die Darstellung selbst wird im Headless-Browser geprüft (Chromium mit Software-
 
 - **Texturen:** Erde 4k (Tag) und 2k (Nacht, Wasser), Mond 2k, zusammen etwa 2 MB.
 - **Blue Marble mit eingebranntem Relief** (`world.topo.bathy.200405`).
-- **Name der Seite:** `ErdeMond3D.html`.
+- **Name der Seite:** `erdemond3d.html`.
 - **Wassermaske:** Die GEBCO-Meerestiefen sind im flachen Schelf gesättigt (Nordsee = Land), die Landhöhen
   im Meer und im Tiefland beide 0. Wasser ist deshalb „Landhöhe 0 und in Blue Marble deutlich blauer als rot“,
   dazu dunkle, blaue Seen über dem Meeresspiegel.
