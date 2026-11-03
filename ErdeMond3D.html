@@ -178,7 +178,8 @@
         }
         summary { cursor: pointer; }
         /* Formulare aus ui.js (Farbe kommt dort aus --surface-2) */
-        #locationControls > div, #timeControls > div { border-radius: 6px; overflow-x: auto; }
+        #locationControls > div, #timeControls > div { overflow-x: auto; }
+        #timeControls .ui-now { display: none; }      /* „Jetzt“ gibt es schon in der Abspielleiste */
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>

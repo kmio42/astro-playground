@@ -73,13 +73,8 @@
         }
         a { color: var(--link); }
 
-        /* Formulare aus ui.js (Farbe kommt dort aus --surface-2) */
-        #locationControls > div, #timeControls > div {
-            border-radius: 6px;
-            padding: 8px 10px;
-            margin-bottom: 10px;
-            overflow-x: auto;
-        }
+        /* Formulare aus ui.js (Gestaltung und Farben kommen von dort) */
+        #locationControls > div, #timeControls > div { margin-bottom: 10px; }
 
         /* Bilder links, Zeitknöpfe rechts daneben mitlaufend */
         .workspace {
@@ -100,11 +95,11 @@
         #solarSystem { aspect-ratio: 620 / 620; }
         #earth { aspect-ratio: 550 / 410; }
         .time-panel { position: sticky; top: 12px; }
+        #timeButtons { grid-template-columns: 1fr; }   /* Zeitknöpfe (ui.js) untereinander neben den Bildern */
         @media (max-width: 720px) {
             .workspace { grid-template-columns: minmax(0, 1fr); }
             .time-panel { grid-row: 1; top: 0; z-index: 1; background: var(--surface); padding: 6px 0; }
-            #timeButtons { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-            #timeButtons button { width: auto; padding: 4px 2px; font-size: 0.85em; }
+            #timeButtons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         #outputTable { margin-top: 20px; }

@@ -149,11 +149,11 @@
                 const d = date.getDate().toString().padStart(2,'0');
                 document.getElementById('date').value = `${y}-${mo}-${d}`;
                 document.getElementById('time').value = date.getHours().toString().padStart(2,'0')+':'+date.getMinutes().toString().padStart(2,'0');
-                document.getElementById('seconds').value = date.getSeconds() + '.' + date.getMilliseconds();
+                document.getElementById('seconds').value = (date.getSeconds() + date.getMilliseconds() / 1000).toFixed(3);
             } else {
                 document.getElementById('date').value = date.toISOString().substring(0, 10);
                 document.getElementById('time').value = date.getUTCHours().toString().padStart(2, '0')+':'+date.getUTCMinutes().toString().padStart(2, '0');
-                document.getElementById('seconds').value = date.getUTCSeconds() + '.' + date.getUTCMilliseconds();
+                document.getElementById('seconds').value = (date.getUTCSeconds() + date.getUTCMilliseconds() / 1000).toFixed(3);
             }
         }
 
@@ -173,8 +173,8 @@
             const minutesLocal = timeLocal * 60;
             const secondsLocal = (minutesLocal - Math.floor(minutesLocal)) * 60;
 
-            document.getElementById('siderealTimeLocal').innerHTML = hoursToString(timeLocal);
-            document.getElementById('siderealSecondsLocal').innerHTML = secondsLocal.toFixed(3);
+            document.getElementById('siderealTimeLocal').textContent = hoursToString(timeLocal);
+            document.getElementById('siderealSecondsLocal').textContent = secondsLocal.toFixed(3).padStart(6, '0');
         }
 
     /////////////////////////////////////////////////////////////////
@@ -195,6 +195,7 @@
         }
 
         function validateCoordinate(input, type) {
+            input = input.replace(',', '.');      // Dezimalkomma wie in deutschen Angaben üblich
             const decimalRegex = /^-?\d+(\.\d+)?$/;
             const dmsRegex = /^(\d{1,3})°\s*(\d{1,2})'\s*(\d{1,2}(\.\d+)?)"?\s*([NSWE])$/;
             const feedbackElement = document.getElementById(`${type}-feedback`);
@@ -202,17 +203,14 @@
             let value = NaN;
 
             if (decimalRegex.test(input)) {
-                feedbackElement.className = 'feedback valid';
-                inputElement.style.borderColor = '';
                 value = parseFloat(input);
             } else if (dmsRegex.test(input)) {
-                feedbackElement.className = 'feedback valid';
-                inputElement.style.borderColor = '';
                 value = dmsToDecimal(input);
-            } else {
-                inputElement.style.borderColor = 'red';
-                feedbackElement.className = 'feedback invalid';
             }
+            const valid = !isNaN(value);
+            feedbackElement.className = valid ? 'feedback valid' : 'feedback invalid';
+            inputElement.style.borderColor = valid ? '' : 'red';
+            inputElement.setAttribute('aria-invalid', String(!valid));
 
             if (type === 'longitude' && !isNaN(value)) {
                 longitude = value;
@@ -293,6 +291,12 @@
             intervalId = undefined;
         }
 
+        /** Auf die aktuelle Uhrzeit springen (Knopf „Jetzt“) */
+        function setTimeNow() {
+            datetime = new Date();
+            changeTime(0);
+        }
+
         /**
          * Zeitknopf: ein Klick (auch per Tastatur) verschiebt einmal, gedrückt halten wiederholt alle 200 ms.
          * Pointer-Events gelten für Maus, Finger und Stift; Wegziehen zum Scrollen bricht ab (pointercancel).
@@ -312,23 +316,33 @@
         }
 
         /**
-         * Erzeugt Button-Paare (minus/plus) für die Zeitsteuerung im angegebenen Container.
+         * Erzeugt für jeden Schritt eine Gruppe „− Beschriftung +“ für die Zeitsteuerung im angegebenen Container.
          * buttons: Array von { label, step }
-         *   label:       Beschriftung (wird zu "-{label}" und "+{label}")
-         *   step: Zeitversatz in Millisekunden (positiv)
+         *   label: Beschriftung, z. B. "1 Minute" (Knöpfe heißen für Screenreader "−1 Minute" und "+1 Minute")
+         *   step:  Zeitversatz in Millisekunden (positiv)
          */
         function createTimeButtons(containerId, buttons) {
             injectUiStyles();
             const container = document.getElementById(containerId);
             container.classList.add('ui-time-buttons');
             buttons.forEach(({ label, step }) => {
-                for (const [sign, offset] of [['-', -step], ['+', step]]) {
+                const group = document.createElement('div');
+                group.className = 'ui-step';
+                group.setAttribute('role', 'group');
+                group.setAttribute('aria-label', label);
+                const text = document.createElement('span');
+                text.textContent = label;
+                const make = (sign, offset) => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
-                    btn.textContent = sign + label;
+                    btn.textContent = sign === '-' ? '−' : '+';
+                    btn.title = (sign === '-' ? '−' : '+') + label;
+                    btn.setAttribute('aria-label', btn.title);
                     addEvents(btn, offset);
-                    container.appendChild(btn);
-                }
+                    return btn;
+                };
+                group.append(make('-', -step), text, make('+', step));
+                container.appendChild(group);
             });
         }
 
@@ -339,89 +353,147 @@
         /**
          * Grundgestaltung der Bedienelemente, einmal pro Seite in den <head> eingefügt. Es steht vor den Stilen der
          * Seite, deshalb gewinnen deren Regeln bei gleicher Spezifität. Farben kommen aus den CSS-Variablen der Seite
-         * (--surface-2, --text-2); ohne Variablen bleibt es beim hellen Grau.
+         * (--surface, --surface-2, --text-2, --border, --accent); ohne Variablen gelten helle Standardfarben.
+         * Die Felder ordnen sich nach der Breite des Panels (Container-Query), nicht nach der Fensterbreite.
          */
         function injectUiStyles() {
             if (document.getElementById('ui-js-styles')) return;
             const style = document.createElement('style');
             style.id = 'ui-js-styles';
             style.textContent = `
-        .ui-panel { background-color: var(--surface-2, #eeeeee); color: inherit; padding: 5px; }
-        .ui-panel table, .ui-panel .ui-indent { margin-left: 1em; }
-        .ui-panel button { width: auto; margin-left: 1em; }
-        .ui-panel .ui-wide { width: 100%; box-sizing: border-box; }
-        .ui-panel .ui-hint { color: var(--text-2, inherit); }
-        .ui-time-buttons { display: grid; grid-template-columns: repeat(2, max-content); gap: 4px; }
-        .ui-time-buttons > button {
-            width: 8em;
-            margin: 0;
+        .ui-panel {
+            background-color: var(--surface-2, #eeeeee); color: inherit;
+            padding: 8px 12px; border-radius: 8px; container-type: inline-size;
+        }
+        .ui-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; }
+        .ui-title { font-weight: bold; margin-right: auto; }
+        .ui-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
+        .ui-field { display: flex; flex-direction: column; gap: 2px; font-size: 0.85em; color: var(--text-2, inherit); }
+        .ui-field input { font-size: calc(1em / 0.85); width: 11em; color: var(--text, inherit); }
+        .ui-field .ui-input { display: flex; align-items: center; gap: 4px; }
+        .ui-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+        .ui-hint { color: var(--text-2, #555555); font-size: 0.85em; margin-top: 6px; }
+        .ui-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; align-items: center; }
+        .ui-label, .ui-unit { color: var(--text-2, inherit); }
+        .ui-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+        .ui-readout { font-variant-numeric: tabular-nums; }
+        .ui-panel .ui-seconds { width: 5.5em; }
+        .ui-panel .ui-jd { width: 13em; max-width: 100%; }
+        @container (max-width: 430px) {
+            .ui-grid { grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
+            .ui-grid .ui-label { font-size: 0.85em; margin-top: 6px; }
+        }
+
+        .ui-panel input:is([type="text"], [type="date"], [type="time"], :not([type])) {
+            font: inherit; color: inherit; background: var(--surface, #ffffff);
+            border: 1px solid var(--border, #b9b8b2); border-radius: 6px;
+            padding: 3px 6px; min-height: 2em; box-sizing: border-box;
+        }
+        .ui-panel button, .ui-step {
+            font: inherit; color: inherit; background: var(--surface, #ffffff);
+            border: 1px solid var(--border, #b9b8b2); border-radius: 6px;
+        }
+        .ui-panel button { width: auto; margin: 0; padding: 3px 12px; min-height: 2em; cursor: pointer; }
+        .ui-panel button:hover, .ui-step > button:hover {
+            background: color-mix(in srgb, currentColor 8%, var(--surface, #ffffff));
+        }
+        .ui-panel :is(input, button):focus-visible, .ui-step > button:focus-visible {
+            outline: 2px solid var(--accent, #2a78d6); outline-offset: 1px;
+        }
+
+        /* UTC | Lokalzeit: eine Checkbox (#localTime) als zweiteiliger Schalter */
+        .ui-segmented { display: inline-flex; border: 1px solid var(--border, #b9b8b2); border-radius: 6px;
+                        overflow: hidden; cursor: pointer; user-select: none; background: var(--surface, #ffffff); }
+        .ui-segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+        .ui-segmented span { padding: 3px 10px; }
+        .ui-segmented input:not(:checked) + span,
+        .ui-segmented input:checked + span + span { background: var(--accent, #2a78d6); color: #ffffff; }
+        .ui-segmented:has(input:focus-visible) { outline: 2px solid var(--accent, #2a78d6); outline-offset: 1px; }
+
+        /* Zeitknöpfe: Gruppen „− Minute +“ */
+        .ui-time-buttons { display: grid; grid-template-columns: repeat(auto-fill, minmax(13em, 1fr)); gap: 6px; }
+        .ui-step { display: inline-flex; align-items: stretch; overflow: hidden; }
+        .ui-step > button {
+            width: 2.4em; min-height: 2.2em; margin: 0; padding: 0; border: 0; border-radius: 0;
+            background: transparent; color: inherit; font: inherit; font-size: 1.15em; line-height: 1; cursor: pointer;
             touch-action: manipulation;      /* kein Doppeltipp-Zoom, Halten bleibt ein Halten */
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+        }
+        .ui-step > span {
+            flex: 1; min-width: 7em; display: flex; align-items: center; justify-content: center; text-align: center;
+            padding: 2px 6px; font-size: 0.9em; user-select: none;
+            border-inline: 1px solid var(--border, #b9b8b2);
         }`;
             document.head.prepend(style);
         }
 
         function createLocationControls(containerId) {
             injectUiStyles();
-            document.getElementById(containerId).innerHTML = `
-    <div class="ui-panel">Beobachtungsort auf Erde
-    <table>
-        <tr>
-            <td><label for="latitude">Breitengrad</label></td>
-            <td><input type="text" id="latitude" placeholder="" value="0"> <span class="ui-hint">(z.B. 48.8566 oder 48°51'22"N)</span></td>
-            <td><span id="latitude-feedback" class="feedback"></span></td>
-        </tr>
-        <tr>
-            <td><label for="longitude">Längengrad</label></td>
-            <td><input type="text" id="longitude" placeholder="" value="0"> <span class="ui-hint">(z.B. 2.3522 oder 2°20'15"E)</span></td>
-            <td><span id="longitude-feedback" class="feedback"></span></td>
-        </tr>
-    </table>
-    <button type="button" onclick="saveData()">Ort für nächsten Seitenaufruf lokal merken</button>
-    <button type="button" onclick="useGpsLocation()">Aktuelle GPS-Position verwenden</button>
-    <span id="gps-feedback" class="feedback"></span>
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+    <div class="ui-panel ui-location">
+        <div class="ui-head"><span class="ui-title">Beobachtungsort auf Erde</span></div>
+        <div class="ui-fields">
+            <label class="ui-field">Breitengrad
+                <span class="ui-input"><input type="text" id="latitude" value="0" autocomplete="off" spellcheck="false"
+                    aria-describedby="ui-coord-hint"><span id="latitude-feedback" class="feedback"></span></span>
+            </label>
+            <label class="ui-field">Längengrad (Ost positiv)
+                <span class="ui-input"><input type="text" id="longitude" value="0" autocomplete="off" spellcheck="false"
+                    aria-describedby="ui-coord-hint"><span id="longitude-feedback" class="feedback"></span></span>
+            </label>
+            <div class="ui-actions">
+                <button type="button" onclick="useGpsLocation()" title="Aktuelle GPS-Position verwenden">📍 GPS-Position</button>
+                <button type="button" onclick="saveData()" title="Ort für nächsten Seitenaufruf lokal merken">Ort merken</button>
+            </div>
+        </div>
+        <div class="ui-hint" id="ui-coord-hint">z. B. 48.8566 oder 48°51'22"N, Länge 2.3522 oder 2°20'15"E</div>
+        <div id="gps-feedback" class="feedback ui-hint" aria-live="polite"></div>
     </div>`;
+            container.querySelector('button[onclick="saveData()"]').addEventListener('click', () => {
+                const feedback = document.getElementById('gps-feedback');
+                feedback.className = 'feedback ui-hint valid';
+                feedback.textContent = 'Ort gemerkt – wird beim nächsten Aufruf wieder eingesetzt';
+            });
         }
 
         function createTimeControls(containerId) {
             injectUiStyles();
             const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            document.getElementById(containerId).innerHTML = `
-    <div class="ui-panel">Zeit
-    <label class="ui-indent"><input type="checkbox" id="localTime"> Lokalzeit (${tzName})</label>
-    <table>
-        <tr>
-            <td></td>
-            <td>Tag.Monat.Jahr</td>
-            <td>HH:MM</td>
-            <td>Sekunde.Millisekunde</td>
-        </tr>
-        <tr>
-            <td>Datum und Uhrzeit</td>
-            <td><input type="date" id="date" /></td>
-            <td><input type="time" id="time" /></td>
-            <td><input id="seconds" class="ui-wide" /></td>
-        </tr>
-        <tr>
-            <td>Sternzeit (Greenwich)</td>
-            <td></td>
-            <td><input id="siderealTime" type="time" /></td>
-            <td><input id="siderealSeconds" class="ui-wide" /></td>
-        </tr>
-        <tr>
-            <td>Sternzeit Lokal</td>
-            <td></td>
-            <td><span id="siderealTimeLocal"></span></td>
-            <td><span id="siderealSecondsLocal"></span></td>
-        </tr>
-        <tr>
-            <td><label for="julianDate">Julianisches Datum</label></td>
-            <td colspan="3"><input id="julianDate" class="ui-wide" /></td>
-        </tr>
-    </table>
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+    <div class="ui-panel ui-time">
+        <div class="ui-head">
+            <span class="ui-title">Zeit</span>
+            <label class="ui-segmented" title="Zeitzone für Datum, Uhrzeit und Tageswerte (Lokalzeit: Zeitzone des Browsers, mit Sommerzeit)">
+                <input type="checkbox" id="localTime"><span data-local="0">UTC</span><span data-local="1">Lokalzeit (${tzName})</span>
+            </label>
+            <button type="button" class="ui-now" onclick="setTimeNow()">Jetzt</button>
+        </div>
+        <div class="ui-grid">
+            <span class="ui-label">Datum und Uhrzeit</span>
+            <span class="ui-inputs">
+                <input type="date" id="date" aria-label="Datum">
+                <input type="time" id="time" aria-label="Uhrzeit (Stunde:Minute)">
+                <input id="seconds" class="ui-seconds" inputmode="decimal" autocomplete="off" aria-label="Sekunden"><span class="ui-unit">s</span>
+            </span>
+            <span class="ui-label">Sternzeit (Greenwich)</span>
+            <span class="ui-inputs">
+                <input id="siderealTime" type="time" aria-label="Sternzeit Greenwich (Stunde:Minute)">
+                <input id="siderealSeconds" class="ui-seconds" inputmode="decimal" autocomplete="off" aria-label="Sekunden der Sternzeit"><span class="ui-unit">s</span>
+            </span>
+            <span class="ui-label">Sternzeit lokal</span>
+            <span class="ui-inputs ui-readout"><span id="siderealTimeLocal"></span> <span id="siderealSecondsLocal"></span><span class="ui-unit">s</span></span>
+            <label class="ui-label" for="julianDate">Julianisches Datum</label>
+            <span class="ui-inputs"><input id="julianDate" class="ui-jd" inputmode="decimal" autocomplete="off"></span>
+        </div>
     </div>`;
+            // Klick auf den schon gewählten Teil des Schalters ändert nichts (eine Checkbox würde sonst umschalten)
+            const toggle = container.querySelector('.ui-segmented');
+            toggle.addEventListener('click', (ev) => {
+                const part = ev.target.closest('[data-local]');
+                if (part && (part.dataset.local === '1') === document.getElementById('localTime').checked) ev.preventDefault();
+            });
         }
 
     /////////////////////////////////////////////////////////////////
