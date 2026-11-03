@@ -17,7 +17,12 @@
             --length: #2a78d6;
             --rise: #eb6834;
             --set: #1baf7a;
-            --day: rgba(237, 161, 0, 0.13);
+            --day: #faefd6;
+            --civil: #eef1f6;
+            --nautical: #e1e7f0;
+            --astro: #d3dbe8;
+            --night: #c6cfdf;
+            --mark: rgba(42, 120, 214, 0.13);
         }
         @media (prefers-color-scheme: dark) {
             :root:not([data-theme="light"]) {
@@ -32,7 +37,12 @@
                 --length: #3987e5;
                 --rise: #d95926;
                 --set: #199e70;
-                --day: rgba(201, 133, 0, 0.16);
+                --day: #3a2e14;
+                --civil: #272d39;
+                --nautical: #20252f;
+                --astro: #1a1d25;
+                --night: #131519;
+                --mark: rgba(57, 135, 229, 0.2);
             }
         }
         :root[data-theme="dark"] {
@@ -47,7 +57,12 @@
             --length: #3987e5;
             --rise: #d95926;
             --set: #199e70;
-            --day: rgba(201, 133, 0, 0.16);
+            --day: #3a2e14;
+            --civil: #272d39;
+            --nautical: #20252f;
+            --astro: #1a1d25;
+            --night: #131519;
+            --mark: rgba(57, 135, 229, 0.2);
         }
         body {
             max-width: 1000px;
@@ -108,7 +123,10 @@
         .legend .area::before {
             height: 10px;
             border-radius: 2px;
+            box-shadow: inset 0 0 0 1px var(--axis);
         }
+        .legend .group { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+        .legend .group::before { display: none; }
         .tooltip {
             position: absolute;
             pointer-events: none;
@@ -124,6 +142,7 @@
             z-index: 2;
         }
         .tooltip b { font-weight: 600; }
+        .tooltip .sw.band { height: 10px; box-shadow: inset 0 0 0 1px var(--axis); }
         .tooltip .sw {
             display: inline-block;
             width: 10px;
@@ -136,6 +155,24 @@
         #outputTable table { border-collapse: collapse; }
         #outputTable td { padding: 1px 8px 1px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
         h2 { margin-top: 28px; }
+        .tour-start { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+        .tour-start[hidden], .tour-start button[hidden] { display: none; }
+        .tour-start button { padding: 6px 14px; font-size: 1em; text-align: left; }
+        .tour {
+            border-left: 4px solid var(--rise);
+            background: var(--surface-2);
+            border-radius: 6px;
+            padding: 10px 14px 12px;
+            margin: 4px 0 10px;
+        }
+        .tour-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
+        .tour-head b { font-size: 1.1em; }
+        .tour-head span { color: var(--text-2); font-size: 0.9em; }
+        #tourText { min-height: 9em; }
+        #tourText p { margin: 8px 0; }
+        .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tour-nav .end { margin-left: auto; }
+        body.touring #kmPlace { display: none; }
         button { padding: 3px 10px; }
     </style>
     <script src="astro.js"></script>
@@ -159,6 +196,17 @@
          */
         function utcOffsetForDay(year, month, day) {
             if (timeMode === 'utc') return 0;
+            if (timeMode === 'cet') return 1;
+            if (timeMode === 'de') {
+                // Sommerzeit in der EU: letzter Sonntag im März bis letzter Sonntag im Oktober, Umstellung 1 Uhr UT
+                const noon = new Date(Date.UTC(year, month, day, 12));
+                const y = noon.getUTCFullYear();
+                const lastSunday = m => {
+                    const last = new Date(Date.UTC(y, m + 1, 0));
+                    return Date.UTC(y, m, last.getUTCDate() - last.getUTCDay(), 1);
+                };
+                return (noon.getTime() >= lastSunday(2) && noon.getTime() < lastSunday(9)) ? 2 : 1;
+            }
             if (timeMode === 'standard') {
                 // Zonenzeit ohne Sommerzeit: der kleinere Abstand von Januar und Juli
                 const jan = new Date(year, 0, 1).getTimezoneOffset();
@@ -168,15 +216,62 @@
             return -new Date(year, month, day, 12).getTimezoneOffset() / 60;
         }
 
+        /** Dämmerungsstufen: Höhe des Sonnenmittelpunkts an ihrem Beginn (morgens) bzw. Ende (abends) */
+        const TWILIGHT = [
+            { key: 'civil', altitude: -6, name: 'Bürgerliche Dämmerung', gen: 'bürgerlichen', dat: 'bürgerlicher' },
+            { key: 'nautical', altitude: -12, name: 'Nautische Dämmerung', gen: 'nautischen', dat: 'nautischer' },
+            { key: 'astro', altitude: -18, name: 'Astronomische Dämmerung', gen: 'astronomischen', dat: 'astronomischer' },
+        ];
+
+        /** Bezeichnungen für die gewählte Höhe: Sonnenauf-/untergang oder Beginn/Ende einer Dämmerung */
+        function terms() {
+            const t = TWILIGHT.find(t => t.altitude === horizonAltitude);
+            if (!t) return {
+                rise: 'Sonnenaufgang', set: 'Sonnenuntergang', length: 'Tageslänge',
+                riseShort: 'Sonnenaufgang', setShort: 'Sonnenuntergang', lengthShort: 'Tageslänge',
+                earliestRise: 'Frühester Sonnenaufgang', latestRise: 'Spätester Sonnenaufgang',
+                earliestSet: 'Frühester Sonnenuntergang', latestSet: 'Spätester Sonnenuntergang',
+                shortest: 'Kürzester Tag', longest: 'Längster Tag',
+                morning: 'Aufgang früher', evening: 'Untergang später', gainLength: 'Zunahme Tageslänge',
+                legendMorning: 'Sonnenaufgang früher', legendEvening: 'Sonnenuntergang später',
+            };
+            return {
+                rise: `Beginn der ${t.gen} Dämmerung`, set: `Ende der ${t.gen} Dämmerung`,
+                length: `Tag mit ${t.dat} Dämmerung`,
+                riseShort: 'Beginn', setShort: 'Ende', lengthShort: 'Dauer',
+                earliestRise: `Frühester Beginn der ${t.gen} Dämmerung`, latestRise: `Spätester Beginn der ${t.gen} Dämmerung`,
+                earliestSet: `Frühestes Ende der ${t.gen} Dämmerung`, latestSet: `Spätestes Ende der ${t.gen} Dämmerung`,
+                shortest: `Kürzester Tag mit ${t.dat} Dämmerung`, longest: `Längster Tag mit ${t.dat} Dämmerung`,
+                morning: 'Beginn früher', evening: 'Ende später', gainLength: 'Zunahme der Dauer',
+                legendMorning: 'Dämmerung beginnt früher', legendEvening: 'Dämmerung endet später',
+            };
+        }
+
         /**
-         * Auf-/Untergang für alle Tage eines Jahres und die Zunahme gegenüber dem Vortag.
-         * Wie in NOAA_Solar_Calculations_year.ods (Spalten AM–AO):
+         * Jahr für die gewählte Höhe, dazu Sonnenauf-/untergang (sun) und die drei Dämmerungsstufen (twilight)
+         * für die Farbbänder im Diagramm der Uhrzeiten
+         */
+        function computeYear(year, location) {
+            const sunAltitude = horizonAltitude >= -1 ? horizonAltitude : -0.8333;
+            const levels = {};
+            for (const h of [sunAltitude, ...TWILIGHT.map(t => t.altitude)]) {
+                levels[h] = computeLevel(year, location, h);
+            }
+            const d = levels[horizonAltitude];
+            d.sun = levels[sunAltitude];
+            d.twilight = TWILIGHT.map(t => levels[t.altitude]);
+            return d;
+        }
+
+        /**
+         * Auf-/Untergang (Sonnenmittelpunkt in der Höhe h [°]) für alle Tage eines Jahres und die Zunahme
+         * gegenüber dem Vortag. Wie in NOAA_Solar_Calculations_year.ods (Spalten AM–AO):
          *   Zunahme Sonnenaufgang  = um so viel früher geht die Sonne auf als am Vortag
          *   Zunahme Sonnenuntergang = um so viel später geht die Sonne unter
          *   Zunahme Tageslänge = Summe aus beiden
          * Die Zunahme wird aus den Zeitpunkten in UT berechnet und ist deshalb unabhängig von der Sommerzeit.
          */
-        function computeYear(year, location) {
+        function computeLevel(year, location, h) {
             const n = (new Date(Date.UTC(year, 1, 29)).getUTCMonth() === 1) ? 366 : 365;
             const days = [];
             // Index 0 ist der 31.12. des Vorjahres, nur für die Zunahme am 1.1.
@@ -184,14 +279,14 @@
                 const offset = utcOffsetForDay(year, 0, 1 + i);
                 const midnightUT = Date.UTC(year, 0, 1 + i) / 86400000 + 2440587.5;
                 const start = midnightUT - offset / 24;              // 0 Uhr Anzeigezeit als JD
-                const r = calculateSunRiseSet(start + 0.5, location, offset, horizonAltitude * DEG2RAD);
+                const r = calculateSunRiseSet(start + 0.5, location, offset, h * DEG2RAD);
                 const rise = r.hasRise ? r.rise : NaN;
                 const set = r.hasSet ? r.set : NaN;
                 let length;
                 if (r.hasRise && r.hasSet) length = ((set - rise) % 24 + 24) % 24;
                 else if (r.hasRise) length = 24 - rise;
                 else if (r.hasSet) length = set;
-                else length = (r.maxAltitude > 0) ? 24 : 0;          // Polartag oder Polarnacht
+                else length = (r.maxAltitude > 0) ? 24 : 0;          // immer über bzw. unter h (Polartag, Polarnacht)
                 days.push({
                     start, offset, rise, set, length,
                     transit: r.hasTransit ? r.transit : NaN,
@@ -219,6 +314,7 @@
                 d.gainLength.push(gainRise + gainSet);
             }
             d.end = days[n].start + 1;
+            d.altitude = h;
             return d;
         }
 
@@ -272,6 +368,19 @@
             return sign + (min > 0 ? min + ' min ' : '') + (s % 60) + ' s';
         }
 
+        /**
+         * Beginn und Ende für eine Höhe am Tag i, z. B. "Beginn 04:31, Ende 21:44"; ohne beide steht die Sonne
+         * den ganzen Tag über bzw. unter dieser Höhe
+         */
+        function twilightText(level, i, riseWord = 'Beginn', setWord = 'Ende') {
+            const r = level.rise[i], s = level.set[i];
+            if (!Number.isFinite(r) && !Number.isFinite(s)) {
+                const alt = level.altitude < -1 ? level.altitude.toString().replace('-', '−') + '°' : 'den Horizont';
+                return level.length[i] >= 24 ? `Sonne sinkt nicht unter ${alt}` : `Sonne steigt nicht über ${alt}`;
+            }
+            return `${riseWord} ${clockString(r)}, ${setWord} ${clockString(s)}`;
+        }
+
         function offsetString(offset) {
             if (offset === 0) return 'UTC';
             return 'UTC' + (offset > 0 ? '+' : '−') + Math.abs(offset);
@@ -279,6 +388,8 @@
 
         function zoneDescription() {
             if (timeMode === 'utc') return 'UTC';
+            if (timeMode === 'de') return 'MEZ / MESZ';
+            if (timeMode === 'cet') return 'MEZ (ohne Sommerzeit)';
             if (timeMode === 'standard') return offsetString(yearData.offset[0]) + ' (ohne Sommerzeit)';
             const list = [...new Set(yearData.offset)].map(offsetString);
             return 'Lokalzeit ' + list.join(' / ');
@@ -297,7 +408,8 @@
                 surface: cssColor('--surface'), text: cssColor('--text'), text2: cssColor('--text-2'),
                 muted: cssColor('--muted'), grid: cssColor('--grid'), axis: cssColor('--axis'),
                 length: cssColor('--length'), rise: cssColor('--rise'), set: cssColor('--set'),
-                day: cssColor('--day'),
+                day: cssColor('--day'), civil: cssColor('--civil'), nautical: cssColor('--nautical'),
+                astro: cssColor('--astro'), night: cssColor('--night'),
             };
         }
 
@@ -340,11 +452,14 @@
             gain: {
                 canvasId: 'gainChart',
                 tooltipId: 'gainTooltip',
-                series: () => [
-                    { name: 'Tageslänge', values: yearData.gainLength, color: 'length', width: 2.5 },
-                    { name: 'Sonnenaufgang', values: yearData.gainRise, color: 'rise', width: 2 },
-                    { name: 'Sonnenuntergang', values: yearData.gainSet, color: 'set', width: 2 },
-                ],
+                series: () => {
+                    const T = terms();
+                    return [
+                        { name: T.length, label: T.lengthShort, values: yearData.gainLength, color: 'length', width: 2.5 },
+                        { name: T.rise, label: T.riseShort, values: yearData.gainRise, color: 'rise', width: 2 },
+                        { name: T.set, label: T.setShort, values: yearData.gainSet, color: 'set', width: 2 },
+                    ];
+                },
                 range: () => {
                     const [lo, hi] = rangeOf([yearData.gainLength, yearData.gainRise, yearData.gainSet]);
                     const pad = (hi - lo) * 0.06;
@@ -360,20 +475,36 @@
             times: {
                 canvasId: 'timesChart',
                 tooltipId: 'timesTooltip',
-                series: () => [
-                    { name: 'Sonnenaufgang', values: yearData.rise, color: 'rise', width: 2 },
-                    { name: 'Sonnenuntergang', values: yearData.set, color: 'set', width: 2 },
-                    { name: 'Höchststand (Mittag)', values: yearData.transit, color: 'muted', width: 1.5, dash: [5, 4], label: 'Mittag' },
-                ],
-                range: () => {
-                    const [lo, hi] = rangeOf([yearData.rise, yearData.set, yearData.transit]);
-                    return [Math.max(0, Math.floor(lo) - 0.5), Math.min(24, Math.ceil(hi) + 0.5)];
+                series: () => {
+                    const T = terms();
+                    return [
+                        { name: T.rise, label: T.riseShort, values: yearData.rise, color: 'rise', width: 2 },
+                        { name: T.set, label: T.setShort, values: yearData.set, color: 'set', width: 2 },
+                        { name: 'Höchststand (Mittag)', values: yearData.transit, label: 'Mittag', dash: [5, 4],
+                          ...(tour && tourStepDef().strongNoon ? { color: 'text2', width: 2.5 } : { color: 'muted', width: 1.5 }) },
+                    ];
                 },
-                ticks: (lo, hi) => niceTicks(lo, hi, 8, [1, 2, 3, 6, 12]),
+                // ganzer Tag, damit Dämmerung und Nacht zu sehen sind; ein Rundgangsschritt kann einen Ausschnitt wählen
+                range: () => (tour && tourStepDef().range) || [0, 24],
+                ticks: (lo, hi) => {
+                    if (hi - lo > 3) return niceTicks(lo, hi, 8, [1, 2, 3, 6, 12]);
+                    const m = niceTicks(lo * 60, hi * 60, 8, [1, 2, 5, 10, 15, 30]);   // kurzer Ausschnitt: Minuten
+                    return { ticks: m.ticks.map(t => t / 60), step: m.step / 60 };
+                },
                 tickFormat: t => clockString(t),
                 unit: '',
                 format: clockString,
-                extraTooltip: i => `<br>Tageslänge: ${durationString(yearData.length[i])}`,
+                extraTooltip: i => {
+                    const c = colors();
+                    let html = `<br>${terms().length}: ${durationString(yearData.length[i])}`;
+                    if (horizonAltitude < -1) {
+                        html += `<br><span class="sw band" style="background:${c.day}"></span>Sonne: ${twilightText(yearData.sun, i, 'Aufgang', 'Untergang')}`;
+                    }
+                    TWILIGHT.forEach((t, k) => {
+                        html += `<br><span class="sw band" style="background:${c[t.key]}"></span>${t.name}: ${twilightText(yearData.twilight[k], i)}`;
+                    });
+                    return html;
+                },
                 dayBand: true,
                 nowClock: true,
                 directLabels: true,
@@ -383,7 +514,7 @@
 
         function chartLayout(chart, w, h) {
             // Gleicher rechter Rand in beiden Diagrammen, damit die Tage übereinander stehen
-            const right = (w > 560) ? 110 : 12;
+            const right = (w > 560) ? 120 : 12;
             const left = 56, top = 18, bottom = 24;
             const n = yearData.n;
             return { left, right, top, bottom, w, h,
@@ -393,6 +524,7 @@
 
         function drawChart(chart) {
             const canvas = document.getElementById(chart.canvasId);
+            if (!canvas.clientWidth) return;   // im Rundgang ausgeblendet
             const { ctx, w, h } = prepareCanvas(canvas);
             const c = colors();
             const d = yearData;
@@ -404,23 +536,30 @@
 
             ctx.font = '11px Arial, sans-serif';
 
-            // Tageslicht zwischen Auf- und Untergang; Rechtecke mit ganzzahligen Pixelkanten, damit keine Streifen entstehen
+            // Nacht, darüber die Zeiten, in denen die Sonne höher als −18°, −12°, −6° und über dem Horizont steht;
+            // Rechtecke mit ganzzahligen Pixelkanten, damit keine Streifen entstehen
             if (chart.dayBand) {
-                ctx.fillStyle = c.day;
                 const fill = (i, a, b) => {
                     const x0 = Math.round(L.x(i)), x1 = Math.round(L.x(i + 1));
-                    const top = y(Math.min(b, hi)), bot = y(Math.max(a, lo));
+                    const top = Math.round(y(Math.min(b, hi))), bot = Math.round(y(Math.max(a, lo)));
                     if (bot > top) ctx.fillRect(x0, top, x1 - x0, bot - top);
                 };
-                for (let i = 0; i < d.n; i++) {
-                    const r = d.rise[i], s = d.set[i];
-                    const hasR = Number.isFinite(r), hasS = Number.isFinite(s);
-                    if (hasR && hasS && s > r) fill(i, r, s);
-                    else if (hasR && hasS) { fill(i, 0, s); fill(i, r, 24); }   // Untergang nach Mitternacht
-                    else if (hasR) fill(i, r, 24);
-                    else if (hasS) fill(i, 0, s);
-                    else if (d.length[i] >= 24) fill(i, 0, 24);
-                }
+                const fillAbove = (level, color) => {
+                    ctx.fillStyle = color;
+                    for (let i = 0; i < d.n; i++) {
+                        const r = level.rise[i], s = level.set[i];
+                        const hasR = Number.isFinite(r), hasS = Number.isFinite(s);
+                        if (hasR && hasS && s > r) fill(i, r, s);
+                        else if (hasR && hasS) { fill(i, 0, s); fill(i, r, 24); }   // Untergang nach Mitternacht
+                        else if (hasR) fill(i, r, 24);
+                        else if (hasS) fill(i, 0, s);
+                        else if (level.length[i] >= 24) fill(i, 0, 24);
+                    }
+                };
+                ctx.fillStyle = c.night;
+                ctx.fillRect(Math.round(L.x(0)), L.top, Math.round(L.x(d.n)) - Math.round(L.x(0)), bottomY - L.top);
+                for (let k = TWILIGHT.length - 1; k >= 0; k--) fillAbove(d.twilight[k], c[TWILIGHT[k].key]);
+                fillAbove(d.sun, c.day);
             }
 
             // Gitter: Monate senkrecht, Werte waagrecht
@@ -458,6 +597,15 @@
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
                 ctx.fillText(chart.unit, 4, 2);
+            }
+
+            // Zeiträume, auf die der Rundgang zeigt
+            if (tour && tourMarks) {
+                ctx.fillStyle = cssColor('--mark');
+                for (const [a, b] of tourMarks) {
+                    const x0 = Math.round(L.x(a)), x1 = Math.round(L.x(b + 1));
+                    ctx.fillRect(x0, L.top, x1 - x0, bottomY - L.top);
+                }
             }
 
             // Datenreihen; Lücken bei fehlenden Werten und bei Sprüngen (Sommerzeit, Polartag)
@@ -642,6 +790,399 @@
         }
 
     /////////////////////////////////////////////////////////////////
+    //                        Rundgänge                            //
+    /////////////////////////////////////////////////////////////////
+
+        // Rundgänge rechnen immer für denselben Ort, damit die Texte stimmen; danach gilt wieder der eigene Ort
+        const TOUR_PLACE = { lat: 50, lon: 10 };
+        const monthNamesLong = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September',
+                                'Oktober', 'November', 'Dezember'];
+
+        /** Index eines Kalendertags (Monat 0-basiert) im berechneten Jahr */
+        function dayIndex(month, day) {
+            return Math.round((Date.UTC(yearData.year, month, day) - Date.UTC(yearData.year, 0, 1)) / 86400000);
+        }
+
+        /** Tagesindex → "12. Dezember" */
+        function dateText(i) {
+            const date = new Date(Date.UTC(yearData.year, 0, 1 + i));
+            return date.getUTCDate() + '. ' + monthNamesLong[date.getUTCMonth()];
+        }
+
+        /** Minuten als Wort: "eine Minute", "3 Minuten" */
+        function minutesText(minutes) {
+            const m = Math.round(minutes);
+            return m === 1 ? 'eine Minute' : m + ' Minuten';
+        }
+
+        /** Betrag einer Zunahme ohne Vorzeichen: "3 min 43 s" */
+        function amountText(minutes) {
+            return gainString(Math.abs(minutes)).slice(1);
+        }
+
+        /** Index des Extremwerts in einem Bereich von Tagen */
+        function argExtreme(arr, from, to, sign) {
+            let best = -1;
+            for (let i = Math.max(0, from); i <= Math.min(arr.length - 1, to); i++) {
+                if (Number.isFinite(arr[i]) && (best < 0 || sign * arr[i] > sign * arr[best])) best = i;
+            }
+            return best;
+        }
+
+        /** Erster Tag eines Monats, an dem sich der Abstand zu UT ändert (Beginn/Ende der Sommerzeit), sonst -1 */
+        function clockChange(d, month) {
+            for (let i = Math.max(1, dayIndex(month, 1)); i < dayIndex(month + 1, 1); i++) {
+                if (d.offset[i] !== d.offset[i - 1]) return i;
+            }
+            return -1;
+        }
+
+        /** Summe der Änderung der Tageslänge über eine Woche um Tag i [min] */
+        function weekGain(d, i) {
+            let sum = 0;
+            for (let k = i - 3; k <= i + 3; k++) sum += d.gainLength[k] || 0;
+            return sum;
+        }
+
+        /** Dauer der bürgerlichen Dämmerung am Abend [min] */
+        function civilDusk(d, i) {
+            return (d.twilight[0].set[i] - d.sun.set[i]) * 60;
+        }
+
+        /** Uhrzeit im Fließtext: "8:19" */
+        function clockText(hours) {
+            return clockString(hours).replace(/^0(?=\d)/, '');
+        }
+
+        function meanOf(arr) {
+            const list = arr.filter(Number.isFinite);
+            return list.reduce((a, b) => a + b, 0) / list.length;
+        }
+
+        /**
+         * Schritte: title, text(d) → HTML, show (sichtbare Abschnitte gain/times/table), select(d) → Tag der Kennzahlen,
+         * marks(d) → hervorgehobene Zeiträume [[von, bis], …], range → Ausschnitt des Diagramms der Uhrzeiten [h],
+         * horizon → Höhe für Auf-/Untergang (Standard −0°50′). timeMode gilt für den ganzen Rundgang.
+         */
+        const TOURS = {
+            tageslaenge: {
+                title: 'Warum werden die Tage im Herbst so schnell kürzer?',
+                timeMode: 'de',
+                steps: [
+                    {
+                        title: 'Ein Jahr auf einen Blick',
+                        show: ['times'],
+                        select: d => argMinMax(d.length)[1],
+                        text: d => {
+                            const [lMin, lMax] = argMinMax(d.length);
+                            return `<p>Jede senkrechte Linie in diesem Diagramm ist ein Tag des Jahres ${d.year}, gerechnet
+                                für die Mitte Deutschlands. Unten verläuft die orange Kurve, der <b>Sonnenaufgang</b>, oben
+                                die grüne, der <b>Sonnenuntergang</b>. Dazwischen liegt der helle Tag: im Juni ein breites
+                                Band von ${durationString(d.length[lMax])}, im Dezember nur noch ${durationString(d.length[lMin])}.</p>
+                                <p>Spannend sind weniger die Extreme als die Übergänge. Wo die Kurven steil verlaufen,
+                                ändert sich von Tag zu Tag am meisten.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Der Herbst im Zeitraffer',
+                        show: ['times'],
+                        select: () => dayIndex(9, 1),
+                        marks: () => [[dayIndex(9, 1), dayIndex(10, 1)]],
+                        text: d => {
+                            const a = dayIndex(9, 1), b = dayIndex(10, 1), sw = clockChange(d, 9);
+                            const total = (d.set[a] - d.set[b]) * 60;
+                            const own = total - (d.offset[a] - d.offset[b]) * 60;
+                            return `<p>Am 1. Oktober geht die Sonne um ${clockText(d.set[a])} Uhr unter, am 1. November
+                                schon um ${clockText(d.set[b])} Uhr – ${minutesText(total)} früher, in einem einzigen
+                                Monat. Kein Wunder, dass sich der Herbst so plötzlich anfühlt.</p>
+                                <p>Eine Stunde davon geht allerdings auf das Konto der Uhr: Am ${dateText(sw)} endet die
+                                Sommerzeit, und die Kurven machen einen Sprung nach unten (am Vortag Sonnenuntergang um
+                                ${clockText(d.set[sw - 1])} Uhr, an diesem Tag um ${clockText(d.set[sw])} Uhr). Die
+                                übrigen ${minutesText(own)} nimmt sich die Sonne selbst, rund ${minutesText(own / (b - a))} an jedem
+                                Abend.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Minuten pro Tag',
+                        show: ['gain'],
+                        select: d => argExtreme(d.gainLength, dayIndex(7, 1), dayIndex(10, 30), -1),
+                        marks: d => {
+                            const i = argExtreme(d.gainLength, dayIndex(7, 1), dayIndex(10, 30), -1);
+                            return [[i - 3, i + 3]];
+                        },
+                        text: d => {
+                            const i = argExtreme(d.gainLength, dayIndex(7, 1), dayIndex(10, 30), -1);
+                            return `<p>Dieses Diagramm zeigt, wie viel Tageslicht von einem Tag zum nächsten hinzukommt oder
+                                verloren geht. Die blaue Kurve ist die Änderung der <b>Tageslänge</b>; die orange und die
+                                grüne zeigen, wie viel davon auf den Morgen und auf den Abend entfällt.</p>
+                                <p>Im Herbst liegt die Kurve tief im Minus. Am ${dateText(i)} ist der Tag
+                                ${amountText(d.gainLength[i])} kürzer als am Vortag, in dieser Woche zusammen
+                                ${minutesText(-weekGain(d, i))}. Gerecht verteilt ist das nicht: Am Abend fehlen
+                                ${amountText(d.gainSet[i])}, am Morgen nur ${amountText(d.gainRise[i])}. Der Herbst nimmt
+                                sich vor allem die Abende.</p>
+                                <p>Die Uhrumstellung taucht in diesem Diagramm nicht auf. Sie verschiebt die Uhrzeiten,
+                                die Länge des Tages bleibt dieselbe.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Stillstand um Weihnachten',
+                        show: ['gain'],
+                        select: d => argMinMax(d.length)[0],
+                        marks: d => {
+                            const s = argMinMax(d.length)[0];
+                            const marks = [[s - 14, Math.min(s + 14, d.n - 1)]];
+                            if (s + 14 >= d.n) marks.push([0, s + 14 - d.n]);
+                            return marks;
+                        },
+                        text: d => {
+                            const s = argMinMax(d.length)[0];
+                            return `<p>Ganz anders um die Wintersonnenwende: Hier schmiegt sich die Kurve an die Nulllinie.
+                                Im Monat vor dem ${dateText(s)} wird der Tag noch um
+                                ${minutesText((d.length[s - 30] - d.length[s]) * 60)} kürzer, in der letzten Woche davor
+                                nur noch um ${minutesText((d.length[s - 7] - d.length[s]) * 60)}.</p>
+                                <p>Das Gefühl täuscht also nicht: Wochenlang tut sich fast nichts. Am ${dateText(s)} ist der
+                                Tag mit ${durationString(d.length[s])} am kürzesten, danach geht es ebenso gemächlich
+                                wieder bergauf.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Der Frühling kommt über Nacht',
+                        show: ['gain', 'times'],
+                        select: d => argExtreme(d.gainLength, dayIndex(1, 1), dayIndex(3, 30), 1),
+                        marks: () => [[dayIndex(2, 1), dayIndex(3, 15)]],
+                        text: d => {
+                            const i = argExtreme(d.gainLength, dayIndex(1, 1), dayIndex(3, 30), 1);
+                            const sw = clockChange(d, 2);
+                            return `<p>Im März dreht sich das Bild um. Am ${dateText(i)} kommen ${amountText(d.gainLength[i])}
+                                Tageslicht hinzu, so viel wie an keinem anderen Tag des Jahres – ${minutesText(weekGain(d, i))}
+                                in einer Woche. Diesmal profitiert vor allem der Morgen: Die Sonne geht
+                                ${amountText(d.gainRise[i])} früher auf, aber nur ${amountText(d.gainSet[i])} später
+                                unter.</p>
+                                <p>Am ${dateText(sw)} verschiebt dann die Uhr eine ganze Stunde vom Morgen auf den Abend:
+                                Am Abend vor Beginn der Sommerzeit geht die Sonne um ${clockText(d.set[sw - 1])} Uhr unter,
+                                am nächsten Tag um ${clockText(d.set[sw])} Uhr. Nach Feierabend ist es plötzlich wieder
+                                hell – der Frühling kommt gefühlt über Nacht.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Hell ist nicht gleich hell',
+                        show: ['times'],
+                        select: d => argMinMax(d.length)[1],
+                        text: d => {
+                            const [s, j] = argMinMax(d.length);
+                            const noNight = !Number.isFinite(d.twilight[2].set[j]) && d.twilight[2].length[j] >= 24;
+                            return `<p>Mit dem Sonnenuntergang wird es nicht schlagartig dunkel. Die bläulichen Bänder sind
+                                die <b>Dämmerung</b>: Bis die Sonne 6° unter dem Horizont steht, reicht das Licht noch zum
+                                Lesen (bürgerliche Dämmerung), bis 12° ist über dem Meer der Horizont zu erkennen
+                                (nautische), erst ab 18° ist der Himmel richtig dunkel (astronomische).</p>
+                                <p>Die helle Dämmerung nach Sonnenuntergang dauert am ${dateText(s)}
+                                ${minutesText(civilDusk(d, s))}, am ${dateText(j)} ${minutesText(civilDusk(d, j))}.
+                                ${noNight ? `Und im Juni sinkt die Sonne hier nicht einmal 18° tief: Richtig dunkel wird es
+                                dann die ganze Nacht nicht.` : ''}</p>`;
+                        },
+                    },
+                    {
+                        title: 'Weiter auf eigene Faust',
+                        select: d => { const now = nowPosition(); return now ? now.index : 0; },
+                        text: () => `<p>Das war der Rundgang. Mit „Fertig“ gilt wieder der eigene Ort, und alle Einstellungen
+                            sind frei. Ein Vergleich lohnt sich: Je weiter nördlich, desto steiler die Kurven und desto
+                            größer der Unterschied zwischen Sommer und Winter – in Kiel kommen im März über vier Minuten
+                            am Tag hinzu.</p>
+                            <p>Ein Klick ins Diagramm zeigt die Werte eines Tages in den Kennzahlen.</p>`,
+                    },
+                ],
+            },
+            mittag: {
+                title: 'Das Rätsel vom 12. Dezember',
+                timeMode: 'cet',   // ohne Sommerzeit, damit die Mittagslinie nicht springt
+                steps: [
+                    {
+                        title: 'Ein Rätsel im Dezember',
+                        show: ['times'],
+                        range: [7, 17.5],
+                        select: d => argMinMax(d.set)[0],
+                        marks: d => [[dayIndex(11, 1), d.n - 1]],
+                        text: d => {
+                            const s = argMinMax(d.length)[0], sMin = argMinMax(d.set)[0], rMax = argMinMax(d.rise)[1];
+                            return `<p>Wann ist der kürzeste Tag? Am ${dateText(s)}, das ist bekannt. Seltsam nur: Am
+                                frühesten geht die Sonne schon am ${dateText(sMin)} unter (${clockText(d.set[sMin])} Uhr),
+                                und am spätesten geht sie erst um den Jahreswechsel auf (${dateText(rMax)},
+                                ${clockText(d.rise[rMax])} Uhr).</p>
+                                <p>Die Abende werden also schon vor Weihnachten wieder länger, die Morgen erst nach
+                                Neujahr. Wie passt das zusammen? (Alle Uhrzeiten in diesem Rundgang ohne Sommerzeit.)</p>`;
+                        },
+                    },
+                    {
+                        title: 'Die gestrichelte Linie',
+                        show: ['times'],
+                        strongNoon: true,
+                        select: d => argMinMax(d.length)[0],
+                        text: d => `<p>Die Lösung steckt in der gestrichelten Linie: dem <b>Mittag</b>. Gemeint ist der
+                            Moment, in dem die Sonne genau im Süden steht und ihren höchsten Punkt erreicht.</p>
+                            <p>Um 12 Uhr ist das hier nie. Die Uhrzeit (MEZ) ist für 15° östlicher Länge gemacht, die Mitte
+                            Deutschlands liegt bei 10°. Die Sonne braucht für jedes Grad vier Minuten, also ist hier im
+                            Mittel erst um ${clockText(meanOf(d.transit))} Uhr Mittag, mit Sommerzeit eine Stunde später.
+                            Am Westrand der Zeitzone ist es noch extremer: In Madrid, das ebenfalls die MEZ verwendet, ist
+                            im Sommer erst nach 14 Uhr Mittag.</p>`,
+                    },
+                    {
+                        title: 'Der Mittag wandert',
+                        show: ['times'],
+                        strongNoon: true,
+                        range: [11.75, 12.75],
+                        select: d => argMinMax(d.transit)[1],
+                        marks: d => {
+                            const [tMin, tMax] = argMinMax(d.transit);
+                            return [[tMax - 3, tMax + 3], [tMin - 3, tMin + 3]];
+                        },
+                        text: d => {
+                            const [tMin, tMax] = argMinMax(d.transit);
+                            const mean = meanOf(d.transit);
+                            return `<p>Vergrößert zeigt sich: Der Mittag bleibt nicht an seinem Platz. Er schlängelt sich
+                                durchs Jahr, am spätesten ist er am ${dateText(tMax)} (${clockText(d.transit[tMax])} Uhr),
+                                am frühesten am ${dateText(tMin)} (${clockText(d.transit[tMin])} Uhr) –
+                                ${minutesText((d.transit[tMax] - d.transit[tMin]) * 60)} auseinander.</p>
+                                <p>Eine Sonnenuhr geht deshalb mal ${minutesText((d.transit[tMax] - mean) * 60)} nach, mal
+                                ${minutesText((mean - d.transit[tMin]) * 60)} vor. Diese Abweichung hat einen eigenen
+                                Namen: die <b>Zeitgleichung</b>.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Die Auflösung',
+                        show: ['times'],
+                        range: [7.5, 17],
+                        select: d => argMinMax(d.length)[0],
+                        marks: d => { const s = argMinMax(d.length)[0]; return [[s - 10, Math.min(s + 10, d.n - 1)]]; },
+                        text: d => {
+                            const s = argMinMax(d.length)[0], a = s - 10;
+                            const half = ((d.length[a] - d.length[s]) / 2) * 60;
+                            const noon = (d.transit[s] - d.transit[a]) * 60;
+                            return `<p>Der helle Tag liegt fast symmetrisch um den Mittag: Die Sonne geht eine halbe
+                                Tageslänge vor dem Mittag auf und eine halbe Tageslänge danach unter.</p>
+                                <p>In den zehn Tagen vor dem ${dateText(s)} wird der halbe Tag nur noch
+                                ${minutesText(half)} kürzer, der Mittag rückt aber um ${minutesText(noon)} nach hinten. Am
+                                Abend gewinnt der Mittag: Die Sonne geht schon wieder später unter. Am Morgen ziehen beide
+                                in dieselbe Richtung, und der Aufgang rutscht bis über den Jahreswechsel weiter nach
+                                hinten.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Im Sommer dasselbe, nur kleiner',
+                        show: ['times'],
+                        range: [3, 22],
+                        select: d => argMinMax(d.length)[1],
+                        marks: d => [[argMinMax(d.rise)[0], argMinMax(d.set)[1]]],
+                        text: d => {
+                            const j = argMinMax(d.length)[1], rMin = argMinMax(d.rise)[0], sMax = argMinMax(d.set)[1];
+                            return `<p>Im Sommer passiert dasselbe, nur weniger auffällig: Am frühesten geht die Sonne am
+                                ${dateText(rMin)} auf, am spätesten am ${dateText(sMax)} unter, und der längste Tag liegt
+                                dazwischen, am ${dateText(j)}.</p>
+                                <p>Im Juni wandert der Mittag langsamer als im Dezember, deshalb liegen diese Tage näher
+                                beieinander.</p>`;
+                        },
+                    },
+                    {
+                        title: 'Und warum wandert der Mittag?',
+                        select: d => { const now = nowPosition(); return now ? now.index : 0; },
+                        text: d => {
+                            const [tMin, tMax] = argMinMax(d.transit);
+                            const summer = argExtreme(d.transit, dayIndex(5, 1), dayIndex(8, 30), 1);
+                            const spring = argExtreme(d.transit, dayIndex(3, 1), dayIndex(5, 30), -1);
+                            return `<p>Der wandernde Mittag erklärt nebenbei eine Beobachtung aus dem Rundgang zur
+                                Tageslänge. Im Frühjahr rückt der Mittag um ${minutesText((d.transit[tMax] - d.transit[spring]) * 60)}
+                                nach vorn, im Herbst sogar um ${minutesText((d.transit[summer] - d.transit[tMin]) * 60)}, und
+                                der ganze Tag rückt mit. Deshalb gewinnen im Frühjahr vor allem die Morgen, und im Herbst
+                                verlieren vor allem die Abende.</p>
+                                <p>Die Schlangenlinie selbst ist keine Eigenheit der Zeitzone oder des Ortes; jeder Ort auf
+                                der Erde zeigt sie in derselben Form. Ihre Ursache liegt in der Erde: in der leicht
+                                elliptischen Bahn um die Sonne und in der schräg stehenden Achse. Sichtbar wird das erst mit
+                                einem Blick auf die Erde von außen.</p>`;
+                        },
+                    },
+                ],
+            },
+        };
+
+        let tour = null;          // { name, index, saved } während eines Rundgangs
+        let tourMarks = null;     // hervorgehobene Zeiträume des Schritts
+        let tourButtons = true;   // Startknöpfe sichtbar (eingebettet nur mit data-tour)
+
+        function tourStepDef() {
+            return TOURS[tour.name].steps[tour.index];
+        }
+
+        /** Rundgang name ab Schritt index (0 = erster); merkt sich Ort und Einstellungen für das Ende */
+        function startTour(name, index = 0) {
+            if (!TOURS[name]) return;
+            const el = id => document.getElementById(id);
+            if (!tour) {
+                tour = { saved: { lat: el('lat').value, lon: el('lon').value, year: el('year').value,
+                                  timeMode: el('timeMode').value, horizon: el('horizon').value, selectDate } };
+            }
+            tour.name = name;
+            tour.index = Math.min(Math.max(index, 0), TOURS[name].steps.length - 1);
+            document.body.classList.add('touring');
+            for (const c of document.querySelectorAll('.controls input, .controls select, .controls button')) c.disabled = true;
+            el('tourStart').hidden = true;
+            el('tour').hidden = false;
+            el('lat').value = String(TOUR_PLACE.lat);
+            el('lon').value = String(TOUR_PLACE.lon);
+            el('year').value = new Date().getFullYear();
+            applyTourStep();
+            // eingebettet nicht scrollen, das würde die umgebende Seite verschieben
+            if (!kmEmbed.active) el('tour').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function endTour() {
+            const el = id => document.getElementById(id);
+            const saved = tour.saved;
+            tour = null;
+            tourMarks = null;
+            document.body.classList.remove('touring');
+            for (const c of document.querySelectorAll('.controls input, .controls select, .controls button')) c.disabled = false;
+            for (const id of ['secGain', 'secTimes', 'secTable']) el(id).hidden = false;
+            el('tour').hidden = true;
+            el('tourStart').hidden = !tourButtons;
+            el('lat').value = saved.lat;
+            el('lon').value = saved.lon;
+            el('year').value = saved.year;
+            el('timeMode').value = saved.timeMode;
+            el('horizon').value = saved.horizon;
+            selectDate = saved.selectDate;
+            recompute(false);
+        }
+
+        function tourStep(delta) {
+            const next = tour.index + delta;
+            if (next >= TOURS[tour.name].steps.length) { endTour(); return; }
+            tour.index = Math.max(0, next);
+            applyTourStep();
+        }
+
+        /** Einstellungen, Abschnitte, Markierungen und Text des Schritts */
+        function applyTourStep() {
+            const el = id => document.getElementById(id);
+            const def = TOURS[tour.name], step = tourStepDef();
+            el('timeMode').value = def.timeMode;
+            el('horizon').value = step.horizon || '-0.8333';
+            const show = step.show || ['gain', 'times', 'table'];
+            el('secGain').hidden = !show.includes('gain');
+            el('secTimes').hidden = !show.includes('times');
+            el('secTable').hidden = !show.includes('table');
+            recompute(true);
+            const d = yearData;
+            if (step.select) selectedIndex = Math.min(Math.max(step.select(d), 0), d.n - 1);
+            tourMarks = step.marks ? step.marks(d) : null;
+            el('tourTitle').textContent = step.title;
+            el('tourCount').textContent = `Schritt ${tour.index + 1} von ${def.steps.length} · Mitte Deutschlands (50° N, 10° O)`;
+            el('tourText').innerHTML = step.text(d);
+            el('tourBack').disabled = tour.index === 0;
+            el('tourNext').textContent = tour.index === def.steps.length - 1 ? 'Fertig' : 'Weiter →';
+            updateTable();
+            drawCharts();
+        }
+
+    /////////////////////////////////////////////////////////////////
     //                   Ausgabe und Steuerung                     //
     /////////////////////////////////////////////////////////////////
 
@@ -664,27 +1205,36 @@
             const i = selectedIndex;
             const now = nowPosition();
             const isToday = now && now.index === i;
+            const T = terms();
             const rows = [
                 { type: 'category', text: `<b>${isToday ? 'Heute, ' : ''}${dayToString(i)}</b> (${offsetString(d.offset[i])})` },
-                { type: 'row', key: 'Sonnenaufgang', value: clockString(d.rise[i]) },
+                { type: 'row', key: T.rise, value: clockString(d.rise[i]) },
                 { type: 'row', key: 'Höchststand (Mittag)', value: clockString(d.transit[i]) },
-                { type: 'row', key: 'Sonnenuntergang', value: clockString(d.set[i]) },
-                { type: 'row', key: 'Tageslänge', value: durationString(d.length[i]) },
-                { type: 'row', key: 'Zunahme am Morgen (Aufgang früher)', value: gainString(d.gainRise[i]) },
-                { type: 'row', key: 'Zunahme am Abend (Untergang später)', value: gainString(d.gainSet[i]) },
-                { type: 'row', key: 'Zunahme Tageslänge', value: gainString(d.gainLength[i]) },
+                { type: 'row', key: T.set, value: clockString(d.set[i]) },
+                { type: 'row', key: T.length, value: durationString(d.length[i]) },
+                { type: 'row', key: `Zunahme am Morgen (${T.morning})`, value: gainString(d.gainRise[i]) },
+                { type: 'row', key: `Zunahme am Abend (${T.evening})`, value: gainString(d.gainSet[i]) },
+                { type: 'row', key: T.gainLength, value: gainString(d.gainLength[i]) },
             ];
+            rows.push({ type: 'category', text: '<b>Dämmerung</b> (Beginn am Morgen, Ende am Abend)' });
+            if (horizonAltitude < -1) {
+                rows.push({ type: 'row', key: 'Sonne', value: twilightText(d.sun, i, 'Aufgang', 'Untergang') });
+            }
+            TWILIGHT.forEach((t, k) => {
+                rows.push({ type: 'row', key: `${t.name} (${t.altitude.toString().replace('-', '−')}°)`,
+                            value: twilightText(d.twilight[k], i) });
+            });
             const [lMin, lMax] = argMinMax(d.length);
             const [rMin, rMax] = argMinMax(d.rise);
             const [sMin, sMax] = argMinMax(d.set);
             const [gMin, gMax] = argMinMax(d.gainLength);
             rows.push({ type: 'category', text: `<b>Jahr ${d.year}</b> (${zoneDescription()})` });
-            rows.push(extremeRow('Kürzester Tag', d.length, lMin, durationString));
-            rows.push(extremeRow('Längster Tag', d.length, lMax, durationString));
-            rows.push(extremeRow('Frühester Sonnenaufgang', d.rise, rMin, clockString));
-            rows.push(extremeRow('Spätester Sonnenaufgang', d.rise, rMax, clockString));
-            rows.push(extremeRow('Frühester Sonnenuntergang', d.set, sMin, clockString));
-            rows.push(extremeRow('Spätester Sonnenuntergang', d.set, sMax, clockString));
+            rows.push(extremeRow(T.shortest, d.length, lMin, durationString));
+            rows.push(extremeRow(T.longest, d.length, lMax, durationString));
+            rows.push(extremeRow(T.earliestRise, d.rise, rMin, clockString));
+            rows.push(extremeRow(T.latestRise, d.rise, rMax, clockString));
+            rows.push(extremeRow(T.earliestSet, d.set, sMin, clockString));
+            rows.push(extremeRow(T.latestSet, d.set, sMax, clockString));
             rows.push(extremeRow('Stärkste Zunahme', d.gainLength, gMax, gainString));
             rows.push(extremeRow('Stärkste Abnahme', d.gainLength, gMin, gainString));
             renderOutputTable('outputTable', rows);
@@ -725,6 +1275,12 @@
             }
             selectedIndex = Math.min(selectedIndex, yearData.n - 1);
             document.getElementById('zoneText').textContent = zoneDescription();
+            const T = terms();
+            document.getElementById('legendGainLength').textContent = T.length;
+            document.getElementById('legendGainRise').textContent = `am Morgen (${T.legendMorning})`;
+            document.getElementById('legendGainSet').textContent = `am Abend (${T.legendEvening})`;
+            document.getElementById('legendRise').textContent = T.rise;
+            document.getElementById('legendSet').textContent = T.set;
             updateTable();
             drawCharts();
         }
@@ -786,11 +1342,22 @@
             // (50° N, 8° O); folgt, wenn ein anderes Modell oder ein anderer Tab einen Ort merkt (embed.js)
             let first = true;
             kmEmbed.usePlace({ lat: 50, lon: 8 }, (lat, lon) => {
+                // während eines Rundgangs erst danach übernehmen
+                if (tour) { tour.saved.lat = String(lat); tour.saved.lon = String(lon); return; }
                 document.getElementById('lat').value = String(lat);
                 document.getElementById('lon').value = String(lon);
                 recompute(!first);
                 first = false;
             });
+
+            // Rundgänge: eigenständig alle Startknöpfe; eingebettet nur mit tour (data-tour), mit Namen nur dieser;
+            // mit step (data-schritt) startet der Rundgang sofort
+            const st = kmEmbed.state;
+            const wanted = (st.tourName && TOURS[st.tourName]) ? [st.tourName] : Object.keys(TOURS);
+            tourButtons = !kmEmbed.active || st.tour;
+            for (const b of document.querySelectorAll('#tourStart button')) b.hidden = !wanted.includes(b.dataset.tour);
+            document.getElementById('tourStart').hidden = !tourButtons;
+            if (st.step) startTour(wanted[0], st.step - 1);
             kmEmbed.ready();
 
             // Markierung der aktuellen Zeit jede Minute nachführen; Tageswechsel wählt den neuen Tag
@@ -805,6 +1372,7 @@
 </head>
 <body>
     <h1 data-embed="hide">Tageslänge im Jahr</h1>
+    <p data-embed="hide">Die Seite zeigt, wie sich Sonnenaufgang, Sonnenuntergang und Tageslänge im Lauf eines Jahres ändern. Im Herbst und im Frühjahr ändern sie sich von Tag zu Tag am stärksten, um die Sonnenwenden kaum.</p>
     <p data-embed="hide">Wie viele Minuten Tageslicht kommen jeden Tag hinzu – und wie verteilen sie sich auf den Morgen und den Abend? Die <b>Zunahme</b> ist die Änderung gegenüber dem Vortag: Am Morgen zählt, um wie viel früher die Sonne aufgeht, am Abend, um wie viel später sie untergeht. Beide zusammen ergeben die Zunahme der Tageslänge, negative Werte sind eine Abnahme.</p>
     <p data-embed="hide">Morgen und Abend tragen nicht gleich viel bei, weil sich auch der Mittag (der Höchststand der Sonne) im Lauf des Jahres verschiebt (<a href="https://de.wikipedia.org/wiki/Zeitgleichung">Zeitgleichung</a>). Deshalb liegt der früheste Sonnenuntergang schon Mitte Dezember und der späteste Sonnenaufgang erst Anfang Januar, obwohl der kürzeste Tag am 21. Dezember ist.</p>
 
@@ -823,6 +1391,8 @@
             <select id="timeMode">
                 <option value="local">Lokalzeit mit Sommerzeit</option>
                 <option value="standard">Zonenzeit ohne Sommerzeit</option>
+                <option value="de">MEZ mit Sommerzeit (Deutschland)</option>
+                <option value="cet">MEZ ohne Sommerzeit</option>
                 <option value="utc">UTC</option>
             </select>
         </label>
@@ -834,15 +1404,33 @@
             <select id="horizon">
                 <option value="-0.8333">−0°50′: Oberrand sichtbar am Horizont (üblich)</option>
                 <option value="0">0°: Sonnenmitte am Horizont, ohne Lichtbrechung</option>
+                <option value="-6">−6°: bürgerliche Dämmerung</option>
+                <option value="-12">−12°: nautische Dämmerung</option>
+                <option value="-18">−18°: astronomische Dämmerung</option>
             </select>
         </label>
     </div>
 
+    <div class="tour-start" id="tourStart">
+        <button data-tour="tageslaenge" onclick="startTour('tageslaenge')">▶ Rundgang: Warum werden die Tage im Herbst so schnell kürzer?</button>
+        <button data-tour="mittag" onclick="startTour('mittag')">▶ Rundgang: Das Rätsel vom 12. Dezember</button>
+    </div>
+    <div class="tour" id="tour" hidden>
+        <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
+        <div id="tourText"></div>
+        <div class="tour-nav">
+            <button id="tourBack" onclick="tourStep(-1)">← Zurück</button>
+            <button id="tourNext" onclick="tourStep(1)">Weiter →</button>
+            <button class="end" onclick="endTour()">Rundgang beenden</button>
+        </div>
+    </div>
+
+    <section id="secGain">
     <h2>Zunahme pro Tag</h2>
     <div class="legend">
-        <span style="--c: var(--length)">Tageslänge</span>
-        <span style="--c: var(--rise)">am Morgen (Sonnenaufgang früher)</span>
-        <span style="--c: var(--set)">am Abend (Sonnenuntergang später)</span>
+        <span style="--c: var(--length)" id="legendGainLength">Tageslänge</span>
+        <span style="--c: var(--rise)" id="legendGainRise">am Morgen (Sonnenaufgang früher)</span>
+        <span style="--c: var(--set)" id="legendGainSet">am Abend (Sonnenuntergang später)</span>
     </div>
     <div class="figure">
         <canvas id="gainChart" class="chart" role="img" aria-label="Diagramm: tägliche Änderung von Sonnenaufgang, Sonnenuntergang und Tageslänge über das Jahr, in Minuten pro Tag"></canvas>
@@ -851,22 +1439,36 @@
     <p class="hint">Minuten pro Tag. Die Zunahme ist am größten um die Tagundnachtgleichen (März, September) und null an den Sonnenwenden. Die Sommerzeit ändert sie nicht.</p>
     <p class="hint" data-embed="hide"><b>Warum liegt die stärkste Zunahme nicht genau auf der Tagundnachtgleiche?</b> Die Zunahme hängt von zwei Dingen ab: wie schnell sich der Sonnenstand ändert (am schnellsten an der Tagundnachtgleiche) und wie stark die Tageslänge darauf reagiert (dort am schwächsten). Beides gleicht sich fast aus, das Maximum ist deshalb sehr flach – bei 50° N ändert sich die Zunahme eine Woche lang nur um Bruchteile einer Sekunde. So verschieben schon kleine Effekte das Datum um einige Tage: die elliptische Erdbahn (die Erde läuft im März langsamer werdend, im September schneller werdend um die Sonne) und die Lichtbrechung am Horizont (Tag und Nacht sind schon einige Tage vor der Tagundnachtgleiche gleich lang). Die beiden heben sich teilweise auf: Mit Auf-/Untergang bei 0° bleibt nur die Erdbahn übrig, und das Maximum rückt weiter weg (50° N: 15. statt 18. März). Ab etwa 61° Breite wächst die Zunahme sogar bis kurz vor Polartag bzw. Polarnacht.</p>
 
+    </section>
+
+    <section id="secTimes">
     <h2>Sonnenaufgang und Sonnenuntergang</h2>
     <div class="legend">
-        <span style="--c: var(--rise)">Sonnenaufgang</span>
-        <span style="--c: var(--set)">Sonnenuntergang</span>
+        <span style="--c: var(--rise)" id="legendRise">Sonnenaufgang</span>
+        <span style="--c: var(--set)" id="legendSet">Sonnenuntergang</span>
         <span class="dashed" style="--c: var(--muted)">Höchststand (Mittag)</span>
-        <span class="area" style="--c: var(--day)">Tageslicht</span>
+        <span class="area" style="--c: var(--day)">Tag</span>
+        <span class="group">Dämmerung:
+            <span class="area" style="--c: var(--civil)">bürgerlich</span>
+            <span class="area" style="--c: var(--nautical)">nautisch</span>
+            <span class="area" style="--c: var(--astro)">astronomisch</span>
+        </span>
+        <span class="area" style="--c: var(--night)">Nacht</span>
     </div>
     <div class="figure">
         <canvas id="timesChart" class="chart" role="img" aria-label="Diagramm: Uhrzeiten von Sonnenaufgang, Mittag und Sonnenuntergang über das Jahr"></canvas>
         <div class="tooltip" id="timesTooltip"></div>
     </div>
     <p class="hint">Uhrzeit in der gewählten Zeit, der Kreis markiert die aktuelle Uhrzeit. Mit Sommerzeit springen die Kurven Ende März und Ende Oktober um eine Stunde. Klick ins Diagramm wählt einen Tag für die Kennzahlen.</p>
+    <p class="hint"><b>Dämmerung:</b> Die Sonne ist schon untergegangen, aber der Himmel ist noch nicht dunkel. Sie heißt bürgerlich, solange die Sonne höchstens 6° unter dem Horizont steht (draußen ist es hell genug zum Lesen), nautisch bis 12° (über dem Meer ist der Horizont noch zu erkennen) und astronomisch bis 18° (danach ist der Himmel ganz dunkel). Morgens dasselbe in umgekehrter Reihenfolge.</p>
 
+    </section>
+
+    <section id="secTable">
     <h2>Kennzahlen</h2>
     <div id="outputTable"></div>
+    </section>
 
-    <p class="hint" data-embed="hide">Berechnung mit <code>calculateSunRiseSet()</code> aus <code>astro.js</code> (Meeus, Kap. 15). Die übliche Höhe −0°50′ enthält die Lichtbrechung (34′) und den Sonnenradius (16′). Die Lokalzeit ist die Zeitzone des Browsers, auch wenn der Ort woanders liegt.</p>
+    <p class="hint" data-embed="hide">Berechnung mit <code>calculateSunRiseSet()</code> aus <code>astro.js</code> (Meeus, Kap. 15). Die übliche Höhe −0°50′ enthält die Lichtbrechung (34′) und den Sonnenradius (16′). Die Lokalzeit ist die Zeitzone des Browsers, auch wenn der Ort woanders liegt; „MEZ mit Sommerzeit“ rechnet unabhängig davon mit den Regeln für Deutschland.</p>
 </body>
 </html>

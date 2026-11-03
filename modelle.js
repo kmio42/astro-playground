@@ -17,7 +17,8 @@
  *   data-ansicht   Ansicht, Namen wie in VIEWS der Modellseite (z. B. „east“)
  *   data-schritt   Tourschritt ab 1 als Startzustand (Ebenen, Zeit, Ansicht wie in der Tour der Modellseite)
  *   data-tour      „ja“: Tour-Kasten mit Weiter/Zurück im Modell zeigen; bei Modellen mit mehreren Rundgängen
- *                  deren Name (erdemond: „height“, „nodes“, „apsides“)
+ *                  deren Name (erdemond: „height“, „nodes“, „apsides“; tageslaenge: „tageslaenge“, „mittag“ –
+ *                  dort erscheint ein Knopf „Rundgang“, mit data-schritt startet er sofort)
  *   data-ebenen    sichtbare Ebenen, Namen der Modellseite, z. B. „dome,zenith,axis,circle,sun“
  *   data-abspielen „tag“, „monat“ oder „jahr“
  *   data-bedienung „voll“ (Standard), „min“ (nur Datum und Uhrzeit) oder „keine“ (nur das Bild)
@@ -44,7 +45,7 @@
         himmelsachse: { page: 'Himmelsachse3D.html', title: '3D-Modell: Erdachse und Himmelsachse', ratio: '660/1100' },
         erdposition: { page: 'Erdposition.html', title: 'Modell: Erdposition und Sternzeit', ratio: '660/2800' },
         mond: { page: 'Mond.html', title: 'Modell: Mondbahn, Mondphase und Mondlauf am Himmel', ratio: '660/3800' },
-        tageslaenge: { page: 'Tageslaenge.html', title: 'Diagramm: Tageslänge im Jahr', ratio: '660/1850' },
+        tageslaenge: { page: 'Tageslaenge.html', title: 'Diagramm: Tageslänge im Jahr', ratio: '660/2100' },
         mondbahn: { page: 'Mondbahn.html', title: 'Diagramm: Bahnen von Erde und Mond um die Sonne', ratio: '660/3200' },
         // WebGL mit 3,6 MB Texturen: erst nach Klick laden, auf schmalen Bildschirmen und mit „Daten sparen“ die
         // kleinen Texturen (Parameter klein, 1,7 MB)
