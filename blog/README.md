@@ -112,7 +112,7 @@ Sobald der Erfahrungsbericht erschienen ist, wird „ein eigener Beitrag“ zum 
 5. `Erdbahn3D.html`:
    - Canvas 2D, schematisch, gemeinsamer Code in `canvas3d.js`;
    - Küstenlinien von Natural Earth 1:110 Mio. (gemeinfrei);
-   - Rundgang `erdbahn`.
+   - Rundgang `erdbahn` (erledigt, 9 Schritte; `canvas3d.js` und `coastlines.js` sind angelegt).
 6. Formeln für lange Zeiträume nach Meeus und der Rundgang `jahrhunderte`:
    - In `astro.js` und `cpp/astro.cpp` gemeinsam: allgemeine Verbesserungen wie die Schiefe nach
      Laskar 22.3 und der Kalender vor 1582.

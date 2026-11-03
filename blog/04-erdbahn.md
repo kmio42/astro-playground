@@ -26,9 +26,12 @@ ist bei uns Winter.
 
 ## Modelle
 
-- `erdposition`: Erdbahn mit Jahrespunkten, Perihel/Aphel; Erde mit geneigter Achse und Tag-/Nachtseite.
-- `mondbahn`: Diagramm der Entfernung zur Sonne über das Jahr.
-- `erdemond` mit `data-ansicht="fromSun"` und Ebene `equator`: welche Halbkugel zur Sonne geneigt ist.
+- `erdbahn` (`Erdbahn3D.html`) mit `data-tour="ja"`, 9 Schritte: 1 Ein Jahr von außen, 2 Die schräge Achse,
+  3 Juni: der Norden neigt sich zur Sonne, 4 Dezember: der Norden neigt sich weg, 5 Tag und Nacht gleich
+  lang, 6 Näher dran und trotzdem Winter (Perihel/Aphel, rund 7 % mehr Strahlung im Januar), 7 Schneller
+  in Sonnennähe (30,3 und 29,3 km/s, Halbjahre 186,4 und 178,9 Tage), 8 Ein Tag ist mehr als eine
+  Umdrehung (Überleitung zur Zeitgleichung), 9 Selbst ausprobieren.
+- Danach `tageslaenge` mit `data-tour="zeitgleichung"` für die beiden Anteile der Zeitgleichung.
 
 ## Notizen
 

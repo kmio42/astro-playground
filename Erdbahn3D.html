@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Die Bahn der Erde um die Sonne</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --muted: #8a8984;
+            --sun: #e39a00;
+            --sun-glow: rgba(240, 170, 20, 0.28);
+            --plane: rgba(227, 154, 0, 0.07);
+            --plane-line: rgba(160, 120, 40, 0.45);
+            --orbit: #6f6e69;
+            --earth-day: #9cc8ec;
+            --earth-night: #2d3b5e;
+            --earth-line: #4f6d8f;
+            --coast: #2f6b3a;
+            --grid: rgba(40, 60, 90, 0.35);
+            --summer: #eb6834;
+            --equinox: #8a8984;
+            --winter: #2a78d6;
+            --apsis: #1baf7a;
+            --axis: #7a59c9;
+            --place: #d0362b;
+            --sector: rgba(42, 120, 214, 0.18);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --muted: #8f8e86;
+                --sun: #f2b01e;
+                --sun-glow: rgba(242, 176, 30, 0.25);
+                --plane: rgba(242, 176, 30, 0.07);
+                --plane-line: rgba(242, 190, 90, 0.4);
+                --orbit: #9a998f;
+                --earth-day: #5b93cc;
+                --earth-night: #141d33;
+                --earth-line: #8fb1d8;
+                --coast: #a8dca2;
+                --grid: rgba(190, 210, 240, 0.3);
+                --summer: #f07a48;
+                --equinox: #9a998f;
+                --winter: #4a93ea;
+                --apsis: #2cc28c;
+                --axis: #a68cf0;
+                --place: #f0564a;
+                --sector: rgba(74, 147, 234, 0.22);
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --muted: #8f8e86;
+            --sun: #f2b01e;
+            --sun-glow: rgba(242, 176, 30, 0.25);
+            --plane: rgba(242, 176, 30, 0.07);
+            --plane-line: rgba(242, 190, 90, 0.4);
+            --orbit: #9a998f;
+            --earth-day: #5b93cc;
+            --earth-night: #141d33;
+            --earth-line: #8fb1d8;
+            --coast: #a8dca2;
+            --grid: rgba(190, 210, 240, 0.3);
+            --summer: #f07a48;
+            --equinox: #9a998f;
+            --winter: #4a93ea;
+            --apsis: #2cc28c;
+            --axis: #a68cf0;
+            --place: #f0564a;
+            --sector: rgba(74, 147, 234, 0.22);
+        }
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            touch-action: none;
+            cursor: grab;
+            border-radius: 6px;
+            background: var(--surface-2);
+        }
+        canvas.dragging { cursor: grabbing; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 20px;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls input[type="number"] { width: 5.5em; }
+        .controls input[type="text"] { width: 7em; }
+        .controls input.invalid { border-color: red; }
+        .controls .wide { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .controls .wide input[type="range"] { flex: 1; min-width: 80px; }
+        .controls .value { font-variant-numeric: tabular-nums; min-width: 7.5em; font-weight: 600; white-space: nowrap; }
+        .controls .group { display: flex; flex-wrap: wrap; gap: 6px; }
+        .feedback { color: var(--text-2); font-size: 0.9em; }
+        button { padding: 3px 10px; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            font-size: 0.9em;
+            color: var(--text-2);
+            margin: 6px 0 10px;
+        }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before {
+            background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px);
+        }
+        .legend .area::before { height: 10px; }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 16px; }
+        #info table { border-collapse: collapse; }
+        #info td { padding: 2px 14px 2px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+        #info td:first-child { color: var(--text-2); }
+        h2 { margin-top: 28px; }
+        .tour {
+            border-left: 4px solid var(--sun);
+            background: var(--surface-2);
+            border-radius: 6px;
+            padding: 10px 14px 12px;
+            margin-bottom: 10px;
+        }
+        .tour-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
+        .tour-head b { font-size: 1.1em; }
+        .tour-head span { color: var(--text-2); font-size: 0.9em; }
+        #tourText { min-height: 7.5em; }
+        #tourText p { margin: 8px 0; }
+        .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tour-nav .end { margin-left: auto; }
+        .start-tour { margin: 0 0 14px; }
+        .start-tour button { padding: 6px 14px; font-size: 1em; text-align: left; }
+        body.touring #kmPlace { display: none; }
+        button.active { font-weight: bold; outline: 2px solid var(--axis); outline-offset: -1px; }
+    </style>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script src="embed.js"></script>
+    <script src="canvas3d.js"></script>
+    <script src="coastlines.js"></script>
+    <script>
+        const { V } = canvas3d;
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zustand                                //
+    /////////////////////////////////////////////////////////////////
+
+        // Maßstab des Modells: mittlerer Bahnradius 1; Sonne und Erde stark vergrößert
+        const EARTH_R = 0.13;
+        const SUN_R = 0.11;
+        const ECC_FACTOR = 10;        // Übertreibung der Abweichung vom Kreis („Ellipse übertrieben“)
+        const GM_SUN = 1.32712440018e11;                    // [km³/s²]
+        const SEMI_MAJOR_KM = EARTH_SEMI_MAJOR_AXIS * AU_KM;
+
+        const state = {
+            year: new Date().getFullYear(),
+            day: 0,              // Tag im Jahr, 0 = 1. Januar; beim Abspielen mit Bruchteil
+            minutes: 720,        // Uhrzeit [min] in der Zeitzone der Anzeige
+            lat: 50,
+            lon: 10,
+            playYear: false,
+            playDay: false,
+            follow: null,        // { relAz } solange die Kamera der Erde folgt
+            show: { exaggerate: false, ecliptic: true, marks: true, axis: true, grid: true, coast: true, parallel: true },
+        };
+
+        // Ansichten: Kamera und Ziel; earth folgt der Erde, Blick quer zur Linie Sonne–Erde
+        const VIEWS = {
+            oblique: { cam: { az: 200, el: 28, dist: 3.6 } },
+            top:     { cam: { az: 180, el: 90, dist: 4.6 } },
+            edge:    { cam: { az: 200, el: 3, dist: 3.6 } },
+            earth:   { cam: { el: 12, dist: 1.0 }, relAz: 0 },
+        };
+
+        /**
+         * Ist eine Ebene sichtbar? Im Rundgang bestimmt der Schritt, sonst die Häkchen.
+         * Ebenen: ecliptic, marks, axis, polaris, grid, coast, parallel, place, sectors
+         */
+        function visible(layer) {
+            const step = tour && tour.step;
+            if (step && step.layers) return step.layers.includes(layer);
+            if (fixedLayers) return fixedLayers.includes(layer);
+            switch (layer) {
+                case 'polaris': case 'sectors': return false;
+                case 'place': return state.show.parallel;
+                default: return state.show[layer] ?? true;
+            }
+        }
+
+        /** Ellipse übertrieben? Im Rundgang vom Schritt */
+        function exaggerated() {
+            const step = tour && tour.step;
+            return step && step.exaggerate !== undefined ? step.exaggerate : state.show.exaggerate;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Berechnung                             //
+    /////////////////////////////////////////////////////////////////
+
+        // Zeitzone der Uhrzeiten: die des Browsers, im Rundgang die deutsche (MEZ/MESZ)
+        let displayZone = null;
+        const TOUR_ZONE = 'Europe/Berlin';
+
+        function daysInYear(year) {
+            return (new Date(year, 1, 29).getMonth() === 1) ? 366 : 365;
+        }
+
+        /** Zeitpunkt zu Tag im Jahr und Uhrzeit [min] in der Zeitzone der Anzeige */
+        function dateOfDay(year, day, minutes = 0) {
+            return zonedDate(year, 0, 1 + Math.floor(day), 0, minutes, displayZone);
+        }
+
+        function zoneOption() {
+            return displayZone ? { timeZone: displayZone } : {};
+        }
+
+        function currentJd() {
+            return julianDayFromDate(dateOfDay(state.year, state.day, state.minutes));
+        }
+
+        /** Ort der Erde im Modell (Sonne im Ursprung, x zum Frühlingspunkt, z zum Nordpol der Ekliptik) */
+        function earthPosition(jd) {
+            const sun = calculateSunPosition(jd);
+            const R = sun.distance / AU_KM;
+            const r = exaggerated() ? 1 + ECC_FACTOR * (R - 1) : R;
+            const L = sun.longitude + Math.PI;       // von der Sonne aus gesehen steht die Erde gegenüber
+            return [r * Math.cos(L), r * Math.sin(L), 0];
+        }
+
+        /** Richtung eines Punkts der Erdoberfläche (Breite, Länge in Grad) im Modell, Erdmitte im Ursprung */
+        function surfaceDir(lat, lon, theta, eps) {
+            const a = theta + lon * DEG2RAD, c = Math.cos(lat * DEG2RAD);
+            return V.rotX([c * Math.cos(a), c * Math.sin(a), Math.sin(lat * DEG2RAD)], -eps);
+        }
+
+        /** Bahngeschwindigkeit [km/s] im Abstand r [km] (Vis-viva-Gleichung) */
+        function orbitalSpeed(rKm) {
+            return Math.sqrt(GM_SUN * (2 / rKm - 1 / SEMI_MAJOR_KM));
+        }
+
+        let yearEvents = null;      // Jahrespunkte und Apsiden des eingestellten Jahres
+        function eventsOfYear(year) {
+            if (yearEvents && yearEvents.year === year) return yearEvents;
+            const jan1 = julianDayFromDate(new Date(Date.UTC(year, 0, 1)));
+            const seasons = [EquinoxType.Spring, EquinoxType.Summer, EquinoxType.Autumn, EquinoxType.Winter]
+                .map(t => calculateEquinoxSolstice(year, t));
+            const peri = calculateNextEarthApsis(jan1 - 10, ApsisType.Periapsis);
+            const aph = calculateNextEarthApsis(jan1 + 60, ApsisType.Apoapsis);
+            const prevAutumn = calculateEquinoxSolstice(year - 1, EquinoxType.Autumn);
+            yearEvents = { year, seasons, peri, aph, prevAutumn };
+            return yearEvents;
+        }
+
+        function computeScene() {
+            const jd = currentJd();
+            const eps = calculateObliquity(jd);
+            const sun = calculateSunPosition(jd);
+            const earth = earthPosition(jd);
+            const toSun = V.norm(V.scale(earth, -1));
+            const theta = calculateGreenwichSiderealTime(jd);
+            const pole = surfaceDir(90, 0, theta, eps);
+            const ev = eventsOfYear(state.year);
+            // Bahn über ein Jahr ab dem 1. Januar
+            const jan1 = julianDayFromDate(new Date(Date.UTC(state.year, 0, 1)));
+            const orbit = [];
+            for (let k = 0; k <= 366; k += 2) orbit.push(earthPosition(jan1 + k));
+            const equ = calculateEquatorial(sun, eps);
+            return { jd, eps, sun, earth, toSun, theta, pole, ev, orbit, dec: equ.dec,
+                     distance: sun.distance, speed: orbitalSpeed(sun.distance) };
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zeichnen                               //
+    /////////////////////////////////////////////////////////////////
+
+        let scene = null, colors = {};
+        const COLOR_NAMES = ['surface', 'surface-2', 'text', 'text-2', 'muted', 'sun', 'sun-glow', 'plane', 'plane-line',
+                             'orbit', 'earth-day', 'earth-night', 'earth-line', 'coast', 'grid', 'summer', 'equinox',
+                             'winter', 'apsis', 'axis', 'place', 'sector'];
+
+        function circleZ(radius, steps = 120) {
+            const pts = [];
+            for (let i = 0; i <= steps; i++) {
+                const a = 2 * Math.PI * i / steps;
+                pts.push([radius * Math.cos(a), radius * Math.sin(a), 0]);
+            }
+            return pts;
+        }
+
+        function shortDate(jd) {
+            return julianDayToDate(jd).toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' });
+        }
+
+        function drawPlane() {
+            if (!visible('ecliptic')) return;
+            const c = colors;
+            scene.fill(circleZ(1.45), c.plane);
+            scene.stroke(circleZ(1.45), { color: c['plane-line'], width: 1 });
+            // Richtung zum Frühlingspunkt
+            scene.stroke([[0, 0, 0], [1.45, 0, 0]], { color: c['plane-line'], width: 1, dash: [4, 4] });
+            scene.label([1.45, 0, 0], 'Richtung Frühlingspunkt', c['text-2'],
+                        { size: 11, dy: scene.width < 560 ? 28 : 13, align: 'right', halo: c['surface-2'] });
+            scene.label([-1.25, -1.0, 0], 'Ekliptik', c['text-2'], { size: 11, alpha: 0.8 });
+        }
+
+        function drawOrbit(S) {
+            const c = colors;
+            scene.stroke(S.orbit, { color: c.orbit, width: 1.5 });
+            if (visible('sectors')) drawSectors(S);
+            if (!visible('marks')) return;
+            const compact = scene.width < 560;      // schmaler Bildschirm: nur Datum bzw. Name
+            const names = ['Frühlingsanfang', 'Sommeranfang', 'Herbstanfang', 'Winteranfang'];
+            const cols = [c.equinox, c.summer, c.equinox, c.winter];
+            S.ev.seasons.forEach((jd, i) => {
+                const p = earthPosition(jd);
+                scene.dot(p, 4, cols[i]);
+                const out = V.scale(V.norm(p), 0.16);
+                scene.label(V.add(p, out), compact ? shortDate(jd) : `${names[i]}, ${shortDate(jd)}`, c['text-2'],
+                            { size: 11, halo: c['surface-2'] });
+            });
+            for (const [ap, name] of [[S.ev.peri, 'Perihel'], [S.ev.aph, 'Aphel']]) {
+                const p = earthPosition(ap.time);
+                scene.dot(p, 4, c.apsis);
+                scene.stroke([[0, 0, 0], p], { color: c.apsis, width: 1, dash: [2, 4] });
+                const out = V.scale(V.norm(p), -0.22);
+                scene.label(V.add(p, V.add(out, [0, 0, 0.05])), compact ? name : `${name}, ${shortDate(ap.time)}`, c.apsis,
+                            { size: 11, bold: true, halo: c['surface-2'] });
+            }
+        }
+
+        /** Zwei Fächer: der Weg der Erde in 30 Tagen nach Perihel und nach Aphel */
+        function drawSectors(S) {
+            for (const ap of [S.ev.peri, S.ev.aph]) {
+                const pts = [[0, 0, 0]];
+                for (let k = 0; k <= 30; k++) pts.push(earthPosition(ap.time + k));
+                scene.fill(pts, colors.sector);
+                scene.stroke(pts.concat([[0, 0, 0]]), { color: colors.winter, width: 1, alpha: 0.6 });
+            }
+        }
+
+        function drawSun() {
+            const c = colors, ctx = scene.ctx;
+            const s = scene.project([0, 0, 0]), rho = SUN_R * scene.pixelScale([0, 0, 0]);
+            const g = ctx.createRadialGradient(s[0], s[1], rho * 0.6, s[0], s[1], rho * 2.4);
+            g.addColorStop(0, c['sun-glow']);
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(s[0], s[1], rho * 2.4, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = c.sun;
+            ctx.beginPath();
+            ctx.arc(s[0], s[1], rho, 0, 2 * Math.PI);
+            ctx.fill();
+            scene.label([0, 0, 0], 'Sonne', c['text-2'], { size: 11, halo: c['surface-2'], dy: rho + 12 });
+        }
+
+        function drawEarth(S) {
+            const c = colors, ctr = S.earth, R = EARTH_R;
+            const facing = p => scene.facing(p, ctr);
+            const point = (lat, lon, r = R) => V.add(ctr, V.scale(surfaceDir(lat, lon, S.theta, S.eps), r));
+            const north = V.add(ctr, V.scale(S.pole, R * 1.75)), south = V.add(ctr, V.scale(S.pole, -R * 1.75));
+            const axisStyle = { color: c.axis, width: 2 };
+            if (visible('axis')) scene.stroke([south, north], axisStyle);
+
+            // Nah an der Erde liegt die Sonne außerhalb des Bildes: Richtung als Pfeil
+            if (state.follow) {
+                const a = V.add(ctr, V.scale(S.toSun, R * 1.3)), b = V.add(ctr, V.scale(S.toSun, R * 2.6));
+                scene.stroke([a, b], { color: c.sun, width: 2, dash: [5, 4] });
+                scene.label(b, 'zur Sonne', c.sun, { size: 12, bold: true, dy: -12, halo: c['surface-2'] });
+            }
+
+            scene.sphere(ctr, R, S.toSun, c['earth-day'], c['earth-night'], c['earth-line']);
+
+            if (visible('grid')) {
+                for (let lat = -60; lat <= 60; lat += 30) {
+                    const pts = [];
+                    for (let lon = 0; lon <= 360; lon += 6) pts.push(point(lat, lon));
+                    scene.strokeWhere(pts, facing, { color: c.grid, width: lat === 0 ? 1.4 : 0.8 });
+                }
+                for (let lon = 0; lon < 360; lon += 30) {
+                    const pts = [];
+                    for (let lat = -90; lat <= 90; lat += 6) pts.push(point(lat, lon));
+                    scene.strokeWhere(pts, facing, { color: c.grid, width: 0.8 });
+                }
+            }
+            if (visible('coast') && typeof COASTLINES !== 'undefined') {
+                for (const line of COASTLINES) {
+                    const pts = [];
+                    for (let i = 0; i < line.length; i += 2) pts.push(point(line[i + 1], line[i]));
+                    scene.strokeWhere(pts, facing, { color: c.coast, width: 1 });
+                }
+            }
+            if (visible('parallel')) {
+                // Breitenkreis des Orts: auf der Tagseite durchgezogen, auf der Nachtseite gestrichelt
+                const pts = [];
+                for (let lon = 0; lon <= 360; lon += 3) pts.push(point(state.lat, lon));
+                const lit = p => V.dot(V.sub(p, ctr), S.toSun) >= 0;
+                scene.strokeWhere(pts, p => facing(p) && lit(p), { color: c.place, width: 2 });
+                scene.strokeWhere(pts, p => facing(p) && !lit(p), { color: c.place, width: 1.5, dash: [3, 3] });
+            }
+            if (visible('place')) {
+                const p = point(state.lat, state.lon);
+                if (facing(p)) scene.dot(p, 3.5, c.place, { ring: c.surface });
+            }
+            if (visible('axis')) {
+                // der zur Kamera zeigende Teil der Achse liegt vor der Kugel
+                const front = V.dot(S.pole, scene.basis.toEye) >= 0 ? 1 : -1;
+                scene.stroke([V.add(ctr, V.scale(S.pole, front * R)), front > 0 ? north : south], axisStyle);
+                scene.label(V.add(north, V.scale(S.pole, R * 0.35)), 'N', c.axis, { bold: true, size: 12, halo: c['surface-2'] });
+            }
+            if (visible('polaris')) {
+                const tip = V.add(ctr, V.scale(S.pole, R * 4));
+                scene.stroke([north, tip], { color: c.axis, width: 1.5, dash: [4, 4] });
+                scene.label(V.add(tip, V.scale(S.pole, R * 0.4)), 'zum Polarstern', c.axis, { size: 11, halo: c['surface-2'] });
+            }
+        }
+
+        function draw() {
+            if (!scene) return;
+            colors = canvas3d.readColors(COLOR_NAMES);
+            const S = computeScene();
+            if (state.follow && !scene.tween) {
+                scene.target = S.earth;
+                const L = Math.atan2(S.earth[1], S.earth[0]) * RAD2DEG;
+                scene.cam.az = ((state.follow.relAz - L) % 360 + 360) % 360;
+            }
+            scene.begin();
+            drawPlane();
+            drawOrbit(S);
+            // Sonne und Erde von hinten nach vorn
+            const bodies = [{ z: scene.project([0, 0, 0])[2], draw: drawSun }, { z: scene.project(S.earth)[2], draw: () => drawEarth(S) }];
+            bodies.sort((a, b) => b.z - a.z).forEach(b => b.draw());
+            updateInfo(S);
+            tour.render(tourValues(S));
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Anzeige                                //
+    /////////////////////////////////////////////////////////////////
+
+        function formatNumber(x, digits) {
+            return x.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        }
+
+        function clock(hours) {
+            const m = Math.round(hours * 60);
+            return `${Math.floor(m / 60) % 24}:${String(m % 60).padStart(2, '0')}`;
+        }
+
+        function duration(hours) {
+            const m = Math.round(hours * 60);
+            return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+        }
+
+        function zoneName() {
+            try {
+                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short', ...zoneOption() })
+                    .formatToParts(dateOfDay(state.year, state.day, 720)).find(p => p.type === 'timeZoneName');
+                if (part) return part.value;
+            } catch (e) { /* ältere Browser */ }
+            return '';
+        }
+
+        /** Tageslänge am Ort für den eingestellten Tag, null bei Polartag/-nacht (dann text) */
+        function dayLength() {
+            const noon = dateOfDay(state.year, state.day, 720);
+            const loc = { latitude: state.lat * DEG2RAD, longitude: state.lon * DEG2RAD, elevation: 0 };
+            const rs = calculateSunRiseSet(julianDayFromDate(noon), loc, zoneOffsetHours(noon, displayZone));
+            if (rs.hasRise && rs.hasSet) return { hours: ((rs.set - rs.rise) % 24 + 24) % 24 };
+            return { hours: rs.maxAltitude > 0 ? 24 : 0 };
+        }
+
+        function seasonName(lon) {
+            const deg = ((lon * RAD2DEG) % 360 + 360) % 360;
+            const north = state.lat >= 0;
+            const names = north ? ['Frühling', 'Sommer', 'Herbst', 'Winter'] : ['Herbst', 'Winter', 'Frühling', 'Sommer'];
+            return names[Math.floor(deg / 90)];
+        }
+
+        function updateInfo(S) {
+            const d = dateOfDay(state.year, state.day);
+            const rows = [];
+            const add = (k, v) => rows.push(`<tr><td>${k}</td><td>${v}</td></tr>`);
+            add('Datum', d.toLocaleDateString('de-DE', { ...zoneOption(), weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+                + `, ${clock(state.minutes / 60)} ${zoneName()}`);
+            add('Entfernung Erde – Sonne', `${formatNumber(S.distance / 1e6, 2)} Mio. km`);
+            add('Geschwindigkeit der Erde', `${formatNumber(S.speed, 2)} km/s`);
+            add('Sonne von der Erde aus', `ekliptikale Länge ${formatNumber(((S.sun.longitude * RAD2DEG) % 360 + 360) % 360, 1)}°, `
+                + `Deklination ${formatNumber(S.dec * RAD2DEG, 1)}°`);
+            add('Jahreszeit', `${seasonName(S.sun.longitude)} (${state.lat >= 0 ? 'Nord' : 'Süd'}halbkugel, astronomisch)`);
+            const dl = dayLength();
+            add(`Tageslänge bei ${formatNumber(Math.abs(state.lat), 1)}° ${state.lat >= 0 ? 'N' : 'S'}`,
+                dl.hours >= 24 ? 'Polartag' : dl.hours <= 0 ? 'Polarnacht' : duration(dl.hours));
+            document.getElementById('info').innerHTML = `<table>${rows.join('')}</table>`;
+            document.getElementById('dayValue').textContent = d.toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' });
+            document.getElementById('timeValue').textContent = `${clock(state.minutes / 60)} ${zoneName()}`;
+            for (const [name, b] of Object.entries(viewButtons)) b.classList.toggle('active', currentView === name);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Rundgang                               //
+    /////////////////////////////////////////////////////////////////
+
+        function tourValues(S) {
+            const ev = S.ev, dl = dayLength();
+            const sector = ap => {
+                const a = calculateSunPosition(ap.time).longitude, b = calculateSunPosition(ap.time + 30).longitude;
+                return formatNumber(((b - a) * RAD2DEG % 360 + 360) % 360, 1);
+            };
+            const springNext = calculateEquinoxSolstice(state.year, EquinoxType.Spring);
+            const autumn = ev.seasons[2];
+            return {
+                date: shortDate(S.jd),
+                dec: formatNumber(Math.abs(S.dec * RAD2DEG), 1),
+                decSide: S.dec >= 0 ? 'nördlich' : 'südlich',
+                dayLen: dl.hours >= 24 ? 'die ganze Nacht hindurch' : duration(dl.hours),
+                lat: formatNumber(Math.abs(state.lat), 0),
+                periDate: shortDate(ev.peri.time), aphDate: shortDate(ev.aph.time),
+                periDist: formatNumber(ev.peri.distance / 1e6, 1), aphDist: formatNumber(ev.aph.distance / 1e6, 1),
+                moreSun: formatNumber(((ev.aph.distance / ev.peri.distance) ** 2 - 1) * 100, 0),
+                vPeri: formatNumber(orbitalSpeed(ev.peri.distance), 1), vAph: formatNumber(orbitalSpeed(ev.aph.distance), 1),
+                secPeri: sector(ev.peri), secAph: sector(ev.aph),
+                summerHalf: formatNumber(autumn - springNext, 1),
+                winterHalf: formatNumber(springNext - ev.prevAutumn, 1),
+                halfDiff: formatNumber((autumn - springNext) - (springNext - ev.prevAutumn), 1),
+            };
+        }
+
+        const BASE = ['ecliptic', 'sun', 'earth'];
+        const TOUR_STEPS = [
+            {
+                title: 'Ein Jahr von außen',
+                layers: [...BASE], view: 'oblique', playYear: true, exaggerate: false,
+                text: v => `<p>Wie sieht ein Jahr von außen aus? Die Erde läuft in gut 365 Tagen einmal um die Sonne,
+                    hier im Zeitraffer. Ihre Bahn liegt in einer Ebene, der <b>Ekliptik</b> (die helle Scheibe).</p>
+                    <p>Sonne und Erde sind im Modell stark vergrößert. Maßstabsgetreu wäre die Erde bei dieser Bahngröße
+                    nicht einmal einen Bildpunkt groß.</p>`,
+            },
+            {
+                title: 'Die schräge Achse',
+                layers: [...BASE, 'axis', 'polaris'], view: 'oblique', playYear: true, exaggerate: false,
+                text: v => `<p>Die Erde dreht sich um ihre <b>Achse</b> (lila). Die steht nicht senkrecht auf der
+                    Bahnebene, sondern um 23,44° gekippt – und, das ist das Entscheidende, sie zeigt das ganze Jahr in
+                    dieselbe Richtung: zum Polarstern.</p>
+                    <p>Im Lauf des Jahres neigt sich deshalb mal der Nordpol der Sonne zu, mal der Südpol. Mehr braucht
+                    es nicht für die Jahreszeiten.</p>`,
+            },
+            {
+                title: 'Juni: der Norden neigt sich zur Sonne',
+                layers: [...BASE, 'axis', 'grid', 'coast', 'parallel', 'place'], view: 'earth', event: EquinoxType.Summer,
+                minutes: 12 * 60, exaggerate: false,
+                text: v => `<p>Am ${v.date} ist die Nordhalbkugel der Sonne zugeneigt. Die Sonne steht ${v.dec}°
+                    ${v.decSide} des Äquators, und ihre Strahlen treffen bei uns steil auf.</p>
+                    <p>Die rote Linie ist der Breitenkreis ${v.lat}° N, auf dem die Mitte Deutschlands liegt (Punkt).
+                    Der größere Teil von ihm liegt auf der Tagseite (durchgezogen), nur ein kleiner auf der Nachtseite
+                    (gestrichelt): Der Tag dauert ${v.dayLen}. Rund um den Nordpol geht die Sonne gar nicht unter.</p>`,
+            },
+            {
+                title: 'Dezember: der Norden neigt sich weg',
+                layers: [...BASE, 'axis', 'grid', 'coast', 'parallel', 'place'], view: 'earth', event: EquinoxType.Winter,
+                minutes: 12 * 60, exaggerate: false,
+                text: v => `<p>Ein halbes Jahr später steht die Erde auf der anderen Seite der Sonne. Die Achse zeigt
+                    noch immer in dieselbe Richtung, doch jetzt neigt sich der Nordpol von der Sonne weg. Die Sonne steht
+                    ${v.dec}° ${v.decSide} des Äquators.</p>
+                    <p>Vom Breitenkreis ${v.lat}° N liegt nur noch ein kurzes Stück im Licht: Der Tag dauert
+                    ${v.dayLen}, und die Sonne steht mittags flach. Rund um den Nordpol bleibt es dunkel.</p>`,
+            },
+            {
+                title: 'Tag und Nacht gleich lang',
+                layers: [...BASE, 'axis', 'grid', 'coast', 'parallel', 'place'], view: 'earth', event: EquinoxType.Spring,
+                minutes: 12 * 60, exaggerate: false,
+                text: v => `<p>Dazwischen, am ${v.date}, ist die Achse weder zur Sonne hin noch von ihr weg geneigt,
+                    sondern zur Seite. Die Grenze zwischen Tag und Nacht läuft durch beide Pole.</p>
+                    <p>Jeder Breitenkreis liegt jetzt zur Hälfte im Licht – überall auf der Erde sind Tag und Nacht
+                    ungefähr gleich lang, bei ${v.lat}° N ${v.dayLen}. Daher der Name <b>Tagundnachtgleiche</b>.</p>`,
+            },
+            {
+                title: 'Näher dran und trotzdem Winter',
+                layers: [...BASE, 'marks'], view: 'top', exaggerate: true, apsis: 'peri', minutes: 12 * 60,
+                text: v => `<p>Die Bahn ist kein genauer Kreis, sondern eine leichte <b>Ellipse</b>; hier ist die
+                    Abweichung zehnfach übertrieben. Am ${v.periDate} ist die Erde der Sonne am nächsten
+                    (<b>Perihel</b>, ${v.periDist} Mio. km), am ${v.aphDate} am weitesten entfernt (<b>Aphel</b>,
+                    ${v.aphDist} Mio. km).</p>
+                    <p>Im Januar kommt deshalb rund ${v.moreSun} % mehr Sonnenstrahlung an als im Juli – und trotzdem ist
+                    bei uns Winter. Die geneigte Achse wiegt viel schwerer: Im Dezember steht die Sonne flach, und der Tag
+                    ist kurz. Auf der Südhalbkugel fallen Sonnennähe und Sommer dagegen zusammen.</p>`,
+            },
+            {
+                title: 'Schneller in Sonnennähe',
+                layers: [...BASE, 'marks', 'sectors'], view: 'top', exaggerate: true, apsis: 'peri', minutes: 12 * 60,
+                text: v => `<p>In Sonnennähe läuft die Erde schneller: im Perihel ${v.vPeri} km/s, im Aphel nur
+                    ${v.vAph} km/s. Die beiden Fächer zeigen den Weg in den 30 Tagen danach – ${v.secPeri}° nach dem
+                    Perihel, ${v.secAph}° nach dem Aphel.</p>
+                    <p>Deshalb sind die Jahreszeiten nicht gleich lang. Herbst und Winter zusammen dauern ${v.winterHalf}
+                    Tage, Frühling und Sommer ${v.summerHalf} – das Sommerhalbjahr der Nordhalbkugel ist ${v.halfDiff}
+                    Tage länger.</p>`,
+            },
+            {
+                title: 'Ein Tag ist mehr als eine Umdrehung',
+                layers: [...BASE, 'axis', 'grid', 'coast', 'place'], view: 'earth', apsis: 'peri', playDay: true,
+                exaggerate: false,
+                text: v => `<p>In 24 Stunden kommt die Erde auf ihrer Bahn rund ein Grad voran. Damit die Sonne wieder
+                    im Süden steht, muss sie sich deshalb etwas mehr als einmal um sich selbst drehen.</p>
+                    <p>Anfang Januar, in Sonnennähe, kommt sie weiter voran als im Mittel, und dieses Extra-Stück wird
+                    größer: Der Mittag rutscht Tag für Tag ein wenig nach hinten. Das ist der eine Teil der
+                    <b>Zeitgleichung</b>; den anderen liefert die schräge Achse. Beides zeigt der Rundgang „Warum wandert
+                    der Mittag?“ im Modell zur Tageslänge.</p>`,
+            },
+            {
+                title: 'Selbst ausprobieren',
+                layers: null, view: 'oblique',
+                text: v => `<p>Damit ist der Rundgang zu Ende. Mit dem Regler „Tag“ lässt sich jeder Tag einstellen,
+                    „Zur Erde“ fliegt die Kamera mit der Erde mit; Ziehen dreht die Ansicht, das Mausrad zoomt.</p>
+                    <p>Mit „Fertig“ gilt wieder der eigene Ort – der rote Breitenkreis zeigt dann, wie sich die Tageslänge
+                    dort übers Jahr ändert.</p>`,
+            },
+        ];
+
+        // Rundgang rechnet für einen festen Ort und mit deutscher Uhrzeit
+        const TOUR_PLACE = { lat: 50, lon: 10 };
+        let savedPlace = null;
+
+        function fixPlace(on) {
+            const ids = ['lat', 'lon', 'latSlider'];
+            if (on) {
+                savedPlace = { lat: document.getElementById('lat').value, lon: document.getElementById('lon').value };
+                displayZone = TOUR_ZONE;
+                setPlaceInputs(TOUR_PLACE.lat, TOUR_PLACE.lon);
+            } else {
+                displayZone = null;
+                if (savedPlace) setPlaceInputs(savedPlace.lat, savedPlace.lon);
+                savedPlace = null;
+                setPlay('year', false);
+                setPlay('day', false);
+            }
+            for (const id of ids) document.getElementById(id).disabled = on;
+            for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = on;
+        }
+
+        function applyTourStep(step) {
+            setPlay('year', !!step.playYear);
+            setPlay('day', !!step.playDay);
+            if (step.event !== undefined) jumpToEvent(step.event);
+            if (step.apsis) jumpToApsis(step.apsis);
+            if (step.minutes !== undefined) setMinutes(step.minutes);
+            if (step.view) setView(step.view);
+            requestDraw();
+        }
+
+        let tour = null;
+        let fixedLayers = null;     // Ebenen aus der Adresse (layers)
+
+    /////////////////////////////////////////////////////////////////
+    //                      Bedienung                              //
+    /////////////////////////////////////////////////////////////////
+
+        let frameRequested = false;
+        function requestDraw() {
+            if (frameRequested) return;
+            frameRequested = true;
+            requestAnimationFrame(() => { frameRequested = false; draw(); });
+        }
+
+        function parseCoordinate(text) {
+            const s = text.trim().replace(',', '.');
+            if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+            try { return dmsToDecimal(s); } catch (e) { return NaN; }
+        }
+
+        function setPlaceInputs(lat, lon) {
+            document.getElementById('lat').value = String(lat);
+            document.getElementById('lon').value = String(lon);
+            readLocationInputs();
+        }
+
+        function readLocationInputs() {
+            const latInput = document.getElementById('lat'), lonInput = document.getElementById('lon');
+            const lat = parseCoordinate(latInput.value), lon = parseCoordinate(lonInput.value);
+            const latOk = Number.isFinite(lat) && Math.abs(lat) <= 90;
+            const lonOk = Number.isFinite(lon) && Math.abs(lon) <= 180;
+            latInput.classList.toggle('invalid', !latOk);
+            lonInput.classList.toggle('invalid', !lonOk);
+            if (latOk) { state.lat = lat; document.getElementById('latSlider').value = lat; }
+            if (lonOk) state.lon = lon;
+            requestDraw();
+        }
+
+        function saveLocation() {
+            localStorage.setItem('latitude', document.getElementById('lat').value.trim());
+            localStorage.setItem('longitude', document.getElementById('lon').value.trim());
+            document.getElementById('locationFeedback').textContent = 'Ort gespeichert';
+        }
+
+        function setYear(year) {
+            state.year = year;
+            const slider = document.getElementById('daySlider');
+            slider.max = daysInYear(year) - 1;
+            state.day = Math.min(state.day, daysInYear(year) - 1);
+            slider.value = Math.floor(state.day);
+            document.getElementById('year').value = year;
+            requestDraw();
+        }
+
+        function setDay(day) {
+            state.day = day;
+            document.getElementById('daySlider').value = Math.floor(day);
+            requestDraw();
+        }
+
+        function setMinutes(minutes) {
+            state.minutes = ((minutes % 1440) + 1440) % 1440;
+            document.getElementById('timeSlider').value = Math.round(state.minutes);
+            requestDraw();
+        }
+
+        /** Tag eines Zeitpunkts (JD) im eingestellten Jahr, in der Zeitzone der Anzeige */
+        function dayOfJd(jd) {
+            const p = zonedParts(julianDayToDate(jd), displayZone);
+            return Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(state.year, 0, 1)) / 86400000);
+        }
+
+        function jumpToEvent(type) {
+            setDay(dayOfJd(calculateEquinoxSolstice(state.year, type)));
+        }
+
+        function jumpToApsis(which) {
+            const ev = eventsOfYear(state.year);
+            setDay(dayOfJd((which === 'peri' ? ev.peri : ev.aph).time));
+        }
+
+        function showDate(date) {
+            const p = zonedParts(date, displayZone);
+            setYear(p.year);
+            setDay(Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(p.year, 0, 1)) / 86400000));
+            setMinutes(p.hours * 60 + p.minutes);
+        }
+
+        function showNow() {
+            showDate(new Date());
+        }
+
+        let currentView = 'oblique';
+        const viewButtons = {};
+
+        /** Ansicht wählen; earth folgt danach der Erde */
+        function setView(name, instant = false) {
+            const v = VIEWS[name];
+            if (!v) return;
+            currentView = name;
+            let target = [0, 0, 0], cam = { ...v.cam };
+            if (v.relAz !== undefined) {
+                const earth = earthPosition(currentJd());
+                const L = Math.atan2(earth[1], earth[0]) * RAD2DEG;
+                target = earth;
+                cam.az = ((v.relAz - L) % 360 + 360) % 360;
+                state.follow = { relAz: v.relAz };
+            } else {
+                state.follow = null;
+            }
+            scene.animateTo({ cam, target }, instant ? 1 : 800);
+            if (instant) scene.finish();
+            startLoop();
+        }
+
+        // Abspielen und Kamerafahrt in einer gemeinsamen Schleife
+        let loopRunning = false, lastTime = 0;
+        function startLoop() {
+            if (loopRunning || !kmEmbed.visible) return;
+            loopRunning = true;
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function loop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+            const n = daysInYear(state.year);
+            if (state.playYear) {
+                state.day = (state.day + 30 * dt) % n;                 // 30 Tage pro Sekunde
+                document.getElementById('daySlider').value = Math.floor(state.day);
+            }
+            if (state.playDay) setMinutes(state.minutes + 180 * dt); // 3 Stunden pro Sekunde
+            if (scene.tween && state.follow) scene.tween.to.target = earthPosition(currentJd());
+            scene.step(now);
+            draw();
+            if (!kmEmbed.visible) {
+                loopRunning = false;        // außerhalb des Bildes: anhalten, onVisibility setzt fort
+            } else if (state.playYear || state.playDay || scene.tween) {
+                requestAnimationFrame(loop);
+            } else {
+                loopRunning = false;
+            }
+        }
+
+        function setPlay(which, on) {
+            const key = which === 'year' ? 'playYear' : 'playDay';
+            state[key] = on;
+            if (!on && which === 'year') state.day = Math.floor(state.day);
+            document.getElementById('playYear').textContent = state.playYear ? '❚❚ Jahr' : '▶ Jahr';
+            document.getElementById('playDay').textContent = state.playDay ? '❚❚ Tag' : '▶ Tag';
+            if (state.playYear || state.playDay) startLoop(); else requestDraw();
+        }
+
+        function togglePlay(which) {
+            setPlay(which, !(which === 'year' ? state.playYear : state.playDay));
+        }
+
+        /**
+         * Startzustand aus der Adresse (embed.js): Rundgang, Zeitpunkt t, Ansicht view, Ebenen layers
+         * (ecliptic, marks, axis, polaris, grid, coast, parallel, place, sectors; exaggerate übertreibt die
+         * Ellipse) und Abspielen play (day/year)
+         */
+        function applyEmbedState(s) {
+            tour.fromEmbedState(s, kmEmbed.active);
+            if (s.t) showDate(s.t);
+            if (s.view && VIEWS[s.view]) setView(s.view, true);
+            if (s.layers) {
+                fixedLayers = s.layers;
+                state.show.exaggerate = s.layers.includes('exaggerate');
+                for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
+            }
+            if (s.play) {
+                setPlay('year', s.play === 'year' || s.play === 'month');
+                setPlay('day', s.play === 'day');
+            }
+            scene.finish();
+            requestDraw();
+        }
+
+        window.onload = function () {
+            scene = new canvas3d.Scene(document.getElementById('view'),
+                { cam: { ...VIEWS.oblique.cam }, aspect: 0.66, minHeight: 360, maxHeight: 680, minDist: 0.3, maxDist: 8 });
+            scene.enableInteraction(() => {
+                if (state.follow) {
+                    const earth = earthPosition(currentJd());
+                    state.follow.relAz = scene.cam.az + Math.atan2(earth[1], earth[0]) * RAD2DEG;
+                }
+                currentView = null;
+                requestDraw();
+            });
+            tour = new canvas3d.Tour({
+                steps: TOUR_STEPS, apply: applyTourStep, fixPlace,
+                placeLabel: 'Mitte Deutschlands (50° N, 10° O), deutsche Uhrzeit', onChange: requestDraw,
+            });
+            for (const name of Object.keys(VIEWS)) viewButtons[name] = document.getElementById('view-' + name);
+
+            kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
+                // während eines Rundgangs erst danach übernehmen
+                if (savedPlace) { savedPlace.lat = String(lat); savedPlace.lon = String(lon); return; }
+                setPlaceInputs(lat, lon);
+            });
+            document.getElementById('lat').addEventListener('input', readLocationInputs);
+            document.getElementById('lon').addEventListener('input', readLocationInputs);
+            document.getElementById('latSlider').addEventListener('input', ev => {
+                document.getElementById('lat').value = Number(ev.target.value).toFixed(1);
+                readLocationInputs();
+            });
+            document.getElementById('year').addEventListener('input', ev => {
+                const y = parseInt(ev.target.value, 10);
+                if (Number.isFinite(y) && y >= 1000 && y <= 3000) setYear(y);
+            });
+            document.getElementById('daySlider').addEventListener('input', ev => setDay(Number(ev.target.value)));
+            document.getElementById('timeSlider').addEventListener('input', ev => setMinutes(Number(ev.target.value)));
+            for (const key of Object.keys(state.show)) {
+                const box = document.getElementById('show-' + key);
+                box.checked = state.show[key];
+                box.addEventListener('change', () => { state.show[key] = box.checked; requestDraw(); });
+            }
+
+            scene.resize();
+            showNow();
+            applyEmbedState(kmEmbed.state);
+            new ResizeObserver(() => { scene.resize(); draw(); }).observe(document.getElementById('view'));
+            kmEmbed.onVisibility(visible => {
+                if (visible && (state.playYear || state.playDay || scene.tween)) startLoop();
+            });
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
+            kmEmbed.ready();
+        };
+    </script>
+</head>
+<body>
+    <h1 data-embed="hide">Die Bahn der Erde um die Sonne</h1>
+    <p data-embed="hide">Die Erde läuft in einem Jahr auf einer leicht elliptischen Bahn um die Sonne. Ihre Achse steht
+    dabei 23,44° schräg zur Bahnebene und zeigt immer in dieselbe Richtung, zum Polarstern. Daraus folgen die
+    Jahreszeiten, die wechselnde Tageslänge und ein Teil der Zeitgleichung.</p>
+    <p class="start-tour" id="tourStart" hidden><button onclick="tour.start()">▶ Rundgang: Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?</button>
+    <span class="feedback">Führt in neun Schritten durch das Modell.</span></p>
+
+    <div class="controls" data-control="basic">
+        <div class="wide">
+            <label for="daySlider">Tag</label>
+            <input type="range" id="daySlider" min="0" max="364" step="1">
+            <span class="value" id="dayValue"></span>
+        </div>
+        <div class="group">
+            <button id="playYear" onclick="togglePlay('year')">▶ Jahr</button>
+            <button onclick="jumpToEvent(EquinoxType.Spring)" title="Frühlingsanfang">März</button>
+            <button onclick="jumpToEvent(EquinoxType.Summer)" title="Sommeranfang">Juni</button>
+            <button onclick="jumpToEvent(EquinoxType.Autumn)" title="Herbstanfang">September</button>
+            <button onclick="jumpToEvent(EquinoxType.Winter)" title="Winteranfang">Dezember</button>
+            <button onclick="jumpToApsis('peri')" title="sonnennächster Punkt">Perihel</button>
+            <button onclick="jumpToApsis('aph')" title="sonnenfernster Punkt">Aphel</button>
+        </div>
+    </div>
+    <div class="controls" data-control="extra">
+        <div class="wide">
+            <label for="timeSlider">Uhrzeit</label>
+            <input type="range" id="timeSlider" min="0" max="1435" step="5">
+            <span class="value" id="timeValue"></span>
+        </div>
+        <div class="group">
+            <button id="playDay" onclick="togglePlay('day')">▶ Tag</button>
+            <button onclick="showNow()">Jetzt</button>
+        </div>
+    </div>
+
+    <div class="tour" id="tour" hidden>
+        <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
+        <div id="tourText"></div>
+        <div class="tour-nav">
+            <button id="tourBack">← Zurück</button>
+            <button id="tourNext">Weiter →</button>
+            <button class="end" onclick="tour.end()">Rundgang beenden</button>
+        </div>
+    </div>
+
+    <canvas id="view" role="img" aria-label="3D-Modell: die Erde mit geneigter Achse auf ihrer Bahn um die Sonne; die Werte stehen in der Tabelle unter dem Bild"></canvas>
+    <div class="legend">
+        <span style="--c: var(--orbit)">Erdbahn</span>
+        <span class="area" style="--c: var(--plane-line)">Ekliptik (Bahnebene)</span>
+        <span style="--c: var(--axis)">Erdachse</span>
+        <span style="--c: var(--place)">Breitenkreis des Orts (gestrichelt: Nachtseite)</span>
+        <span style="--c: var(--apsis)">Perihel und Aphel</span>
+    </div>
+
+    <div class="controls" data-control="extra">
+        <span>Ansicht:</span>
+        <div class="group">
+            <button id="view-oblique" onclick="setView('oblique')">Schräg</button>
+            <button id="view-top" onclick="setView('top')">Von oben</button>
+            <button id="view-edge" onclick="setView('edge')">Von der Seite</button>
+            <button id="view-earth" onclick="setView('earth')">Zur Erde</button>
+        </div>
+        <label><input type="checkbox" id="show-exaggerate"> Ellipse übertrieben (×10)</label>
+        <label><input type="checkbox" id="show-ecliptic"> Ekliptik</label>
+        <label><input type="checkbox" id="show-marks"> Jahrespunkte</label>
+        <label><input type="checkbox" id="show-axis"> Achse</label>
+        <label><input type="checkbox" id="show-grid"> Gradnetz</label>
+        <label><input type="checkbox" id="show-coast"> Küsten</label>
+        <label><input type="checkbox" id="show-parallel"> Breitenkreis des Orts</label>
+    </div>
+
+    <div id="kmPlace" data-control="place" hidden></div>
+    <div id="info"></div>
+
+    <h2 data-embed="hide">Ort</h2>
+    <div class="controls" data-embed="hide">
+        <label>Breite <input type="text" id="lat"></label>
+        <input type="range" id="latSlider" min="-90" max="90" step="0.5" aria-label="Breite">
+        <label>Länge (Ost +) <input type="text" id="lon"></label>
+        <label>Jahr <input type="number" id="year" min="1000" max="3000" step="1"></label>
+        <button onclick="saveLocation()">Ort merken</button>
+        <span class="feedback" id="locationFeedback"></span>
+    </div>
+
+    <h2 data-embed="hide">Wie lese ich das?</h2>
+    <ul class="hint" data-embed="hide">
+        <li>Die Sonne steht in der Mitte, die Erde läuft gegen den Uhrzeigersinn um sie herum (von Norden gesehen).
+        Sonne und Erde sind stark vergrößert; die Abstände stimmen, die Ellipse lässt sich zehnfach übertreiben.</li>
+        <li>Die <b>Erdachse</b> (lila) zeigt immer in dieselbe Richtung. Die dunkle Seite der Erde hat Nacht; der rote
+        Breitenkreis des eingestellten Orts ist auf der Tagseite durchgezogen, auf der Nachtseite gestrichelt – sein
+        Anteil im Licht entspricht der Tageslänge.</li>
+        <li><b>♈ Frühlingspunkt:</b> die Richtung, in der die Sonne zu Frühlingsanfang von der Erde aus steht; von hier
+        aus wird die ekliptikale Länge gezählt.</li>
+        <li><b>Ziehen</b> dreht die Ansicht, das <b>Mausrad</b> oder zwei Finger zoomen. „Zur Erde“ folgt der Erde und
+        schaut quer zur Linie Sonne–Erde.</li>
+        <li>Berechnung mit <code>astro.js</code> nach Meeus (Sonnenposition, Schiefe der Ekliptik, Sternzeit, Perihel
+        und Aphel, Jahrespunkte). Küstenlinien: Made with Natural Earth (gemeinfrei).</li>
+    </ul>
+</body>
+</html>

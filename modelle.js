@@ -47,6 +47,7 @@
         erdposition: { page: 'Erdposition.html', title: 'Modell: Erdposition und Sternzeit', ratio: '660/2800' },
         mond: { page: 'Mond.html', title: 'Modell: Mondbahn, Mondphase und Mondlauf am Himmel', ratio: '660/3800' },
         tageslaenge: { page: 'Tageslaenge.html', title: 'Diagramm: Tageslänge im Jahr', ratio: '660/2100' },
+        erdbahn: { page: 'Erdbahn3D.html', title: '3D-Modell: Die Bahn der Erde um die Sonne', ratio: '660/1250' },
         mondbahn: { page: 'Mondbahn.html', title: 'Diagramm: Bahnen von Erde und Mond um die Sonne', ratio: '660/3200' },
         // WebGL mit 3,6 MB Texturen: erst nach Klick laden, auf schmalen Bildschirmen und mit „Daten sparen“ die
         // kleinen Texturen (Parameter klein, 1,7 MB)
