@@ -1,10 +1,9 @@
-# Zeigt die Erdachse immer zum Polarstern?
+# Änderungen über Jahrtausende
 
 <!-- Beitrag 5 der Reihe (Wegweiser: Teil 6). Modell: erdbahn3d.html, Rundgang „jahrhunderte“ (9 Schritte),
      Zeitraffer 8001 v. Chr. bis 12 000 (longterm.js, Gültigkeit der Formeln nach Meeus). -->
 
-*Teil 6 der Reihe „Sonne, Erde, Mond“. Zuletzt: „Warum ist es im Winter kalt, obwohl die Erde der Sonne
-näher ist?“*
+*Teil 6 der Reihe „Sonne, Erde, Mond“: Blick über Jahrtausende. Zuletzt: „Erdbahn und Jahreszeiten“*
 
 Der Polarstern im Norden, das Perihel Anfang Januar, die 23,44° der Erdachse, Frühlingsanfang am 20. März –
 in den letzten Teilen klang das alles nach festen Größen. Für ein Menschenleben sind sie das auch. Doch als
@@ -59,7 +58,7 @@ Wer in alten Kalendern oder Chroniken blättert, stößt auf eine weitere Versch
 astronomisch ist: Bis 1893 hatte fast jede Stadt in Deutschland ihre eigene Ortszeit, Mittag war überall
 ungefähr um 12 Uhr. Erst seit dem 1. April 1893 gilt die einheitliche MEZ.
 
-## Und der Mond?
+## Ausblick: der Mond
 
 Bisher ging es um Sonne und Erde. Der Mond macht vieles davon mit, seine Bahn ist geneigt, elliptisch und
 wandert ebenfalls – nur viel schneller. Damit beschäftigen sich die nächsten Teile.

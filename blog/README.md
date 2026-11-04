@@ -18,16 +18,16 @@ danach der Mond.
 
 ## Die Reihe
 
-| Teil | Beitrag | Leitfrage (Arbeitstitel) | Modell, Rundgang | Stand |
-|-----:|---------|--------------------------|------------------|-------|
-| 1a | [Tageslänge](01a-tageslaenge.md) | Warum werden die Tage im Herbst so schnell kürzer? | `tageslaenge`, Rundgang `tageslaenge` | Entwurf |
-| 1b | [Mittag](01b-mittag.md) | Warum geht die Sonne am 12. Dezember am frühesten unter? | `tageslaenge`, Rundgang `mittag` | Entwurf |
-| 2 | [Tagbogen](02-tagbogen.md) | Läuft die Sonne im Winter auf einer kleineren Bahn? | `tagbogen`, Rundgang (10 Schritte) | Entwurf |
-| 3 | [Himmelsachse](03-himmelsachse.md) | Warum steht der Polarstern immer an derselben Stelle? | `himmelsachse`, Rundgang (11 Schritte) | Entwurf |
-| 4 | [Erdbahn](04-erdbahn.md) | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `erdbahn` (erdbahn3d.html), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | Entwurf |
-| 5 | [Jahrhunderte](05-jahrhunderte.md) | Zeigt die Erdachse immer zum Polarstern? | `erdbahn`, Rundgang `jahrhunderte` | Entwurf |
-| 6 ff. | [Mond](06-mond.md) | (später festlegen) | `erdemond`, `mond`, `mondbahn` | Ideen |
-| – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Vorgeschichte im Entwurf, sonst Stoff |
+| Teil | Beitrag | Titel | Leitfrage | Modell, Rundgang | Stand |
+|-----:|---------|-------|-----------|------------------|-------|
+| 1a | [Tageslänge](01a-tageslaenge.md) | Tageslänge im Jahreslauf | Warum werden die Tage im Herbst so schnell kürzer? | `tageslaenge`, Rundgang `tageslaenge` | veröffentlicht |
+| 1b | [Mittag](01b-mittag.md) | Mittag im Jahreslauf | Warum geht die Sonne am 12. Dezember am frühesten unter? | `tageslaenge`, Rundgang `mittag` | veröffentlicht |
+| 2 | [Tagbogen](02-tagbogen.md) | Tagbogen der Sonne | Läuft die Sonne im Winter auf einer kleineren Bahn? | `tagbogen`, Rundgang (10 Schritte) | veröffentlicht |
+| 3 | [Himmelsachse](03-himmelsachse.md) | Himmelsachse und Himmelskoordinaten | Warum steht der Polarstern immer an derselben Stelle? | `himmelsachse`, Rundgang (11 Schritte) | veröffentlicht |
+| 4 | [Erdbahn](04-erdbahn.md) | Erdbahn und Jahreszeiten | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `erdbahn` (erdbahn3d.html), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | veröffentlicht |
+| 5 | [Jahrhunderte](05-jahrhunderte.md) | Änderungen über Jahrtausende | Zeigt die Erdachse immer zum Polarstern? | `erdbahn`, Rundgang `jahrhunderte` | veröffentlicht |
+| 6 ff. | [Mond](06-mond.md) | – | (später festlegen) | `erdemond`, `mond`, `mondbahn` | Ideen |
+| – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Erfahrungen mit Claude Code | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Vorgeschichte im Entwurf, sonst Stoff |
 
 - Teil 1 bleibt bei Alltagsbeobachtungen. 1b löst das Rätsel vom 12. Dezember mit dem wandernden
   Mittag; die Ursachen der Zeitgleichung kommen in Teil 4.

@@ -1,9 +1,9 @@
-# Das Rätsel vom 12. Dezember
+# Mittag im Jahreslauf
 
 <!-- Teil 1b. Modell: tageslaenge.html, Rundgang „mittag“ (6 Schritte). Zahlen: 50° N, 10° O, 2026,
      MEZ ohne Sommerzeit. -->
 
-*Teil 2 der Reihe „Sonne, Erde, Mond“. Teil 1: „Warum werden die Tage im Herbst so schnell kürzer?“*
+*Teil 2 der Reihe „Sonne, Erde, Mond“: Blick auf die Uhr. Teil 1: „Tageslänge im Jahreslauf“*
 
 Ein Blick in die Tabelle der Sonnenuntergänge bringt eine Überraschung: Der kürzeste Tag des Jahres
 ist der 21. Dezember, das steht in jedem Kalender. Am frühesten geht die Sonne aber schon um den
@@ -52,7 +52,7 @@ Das Wandern über das Jahr ist eine andere Sache. Es hat jeder Ort, mit derselbe
 eine schmale Acht, das **Analemma** – beides ist nichts anderes als diese Linie. Wer an einer
 Sonnenuhr vorbeikommt, kann einmal nach einer solchen Acht suchen.
 
-## Woher kommt die Schlangenlinie?
+## Was der wandernde Mittag erklärt
 
 Der wandernde Mittag erklärt nebenbei auch die Beobachtung aus dem ersten Teil: Im Frühjahr wie im
 Herbst rückt der Mittag nach vorn, und der ganze Tag rückt mit. Deshalb gewinnen im Frühjahr vor allem

@@ -1,9 +1,9 @@
-# Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?
+# Erdbahn und Jahreszeiten
 
 <!-- Beitrag 4 der Reihe (Wegweiser: Teil 5). Modelle: erdbahn3d.html (Rundgang „erdbahn“, 9 Schritte),
      tageslaenge.html (Rundgang „zeitgleichung“, 5 Schritte). Zahlen: 2026, MEZ. -->
 
-*Teil 5 der Reihe „Sonne, Erde, Mond“. Zuletzt: „Warum steht der Polarstern immer an derselben Stelle?“*
+*Teil 5 der Reihe „Sonne, Erde, Mond“: Blick auf die Erdbahn. Zuletzt: „Himmelsachse und Himmelskoordinaten“*
 
 Anfang Januar ist die Erde der Sonne so nah wie im ganzen Jahr nicht – rund fünf Millionen Kilometer näher
 als im Juli. Und trotzdem ist bei uns Winter. Wie passt das zusammen?
@@ -47,7 +47,7 @@ Von der Erde aus erscheint dieselbe Bewegung umgekehrt: Die Sonne scheint im Lau
 entlang der **Ekliptik** um den Himmel zu wandern, schräg zum Himmelsäquator. Ihr Abstand vom
 Äquator ist die Deklination aus dem letzten Teil – darum pendelt sie zwischen +23,44° und −23,44°.
 
-## Das Rätsel vom 12. Dezember, aufgelöst
+## Ursachen der Zeitgleichung
 
 Im zweiten Teil wanderte der Mittag übers Jahr hin und her, und daraus folgte, dass der früheste
 Sonnenuntergang schon um den 12. Dezember liegt. Jetzt lassen sich die Ursachen zeigen: die Ellipse, weil
@@ -78,7 +78,7 @@ hinten – daher der früheste Sonnenuntergang am 12. Dezember.</li>
 Auf Fotos der Sonne – nur mit Sonnenfilter! – lässt sich die Ellipse sogar nachweisen: Mit demselben
 Objektiv aufgenommen, ist die Sonnenscheibe im Januar gut 3 % größer als im Juli.
 
-## Bleibt das immer so?
+## Ausblick: lange Zeiträume
 
 Die Achse zeigt zum Polarstern, das Perihel liegt Anfang Januar, die Neigung beträgt 23,44° – das klingt
 nach festen Größen. Für ein Menschenleben sind sie das auch. Über Jahrtausende gerät dagegen alles in

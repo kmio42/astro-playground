@@ -1,11 +1,11 @@
-# Warum werden die Tage im Herbst so schnell kürzer?
+# Tageslänge im Jahreslauf
 
 <!-- Teil 1a. Modell: tageslaenge.html, Rundgang „tageslaenge“ (7 Schritte). Zahlen: 50° N, 10° O, 2026,
      Uhrzeit mit Sommerzeit wie auf der Uhr. -->
 
-*Teil 1 der Reihe „Sonne, Erde, Mond“: vom Beobachten zum Erklären.*
+*Teil 1 der Reihe „Sonne, Erde, Mond“: Blick auf die Uhr.*
 
-Im Herbst fällt mir als Abendmensch besonders auf, dass die Sonne innerhalb weniger Tage deutlich
+Im Herbst fällt mir als Abentyp besonders auf, dass die Sonne innerhalb weniger Tage deutlich
 früher untergeht. Um die Jahreswende scheint sich dann kaum noch etwas zu tun, und im Frühjahr kommt
 die Zeit, in der die Tage plötzlich wieder spürbar länger werden. Täuscht das Gefühl? Und wenn nicht:
 Wie stark ändert sich die Tageslänge von Tag zu Tag, und wann im Jahr am meisten?
@@ -60,7 +60,7 @@ unterschiedlich viel abbekommen, klärt sich im nächsten Teil.
 Wer abends öfter draußen ist, kann das in den nächsten Wochen selbst verfolgen, am besten an einem
 festen Ort und zu einer festen Uhrzeit, etwa auf dem Heimweg.
 
-## Und was ist mit dem 12. Dezember?
+## Ausblick: der früheste Sonnenuntergang
 
 Beim Herumklicken im Dezember fällt noch etwas auf: Am frühesten geht die Sonne schon um den
 12. Dezember unter, nicht am kürzesten Tag. Wie das zusammenpasst, ist das Thema des nächsten Teils.

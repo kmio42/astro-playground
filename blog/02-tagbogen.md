@@ -1,10 +1,10 @@
-# Läuft die Sonne im Winter auf einer kleineren Bahn?
+# Tagbogen der Sonne
 
 <!-- Beitrag 2 der Reihe (Wegweiser: Teil 3). Modell: tagbogen3d.html, Rundgang (10 Schritte). Zahlen: 50° N,
      10° O, 2026, MEZ (ohne Sommerzeit). -->
 
-*Teil 3 der Reihe „Sonne, Erde, Mond“. Bisher: „Warum werden die Tage im Herbst so schnell kürzer?“ und
-„Das Rätsel vom 12. Dezember“.*
+*Teil 3 der Reihe „Sonne, Erde, Mond“: Blick an den Himmel. Bisher: „Tageslänge im Jahreslauf“ und
+„Mittag im Jahreslauf“.*
 
 Im Sommer steht die Sonne mittags hoch, und es ist bis spät am Abend hell; im Winter bleibt sie niedrig,
 und schon am Nachmittag wird es dunkel. Läuft die Sonne im Winter auf einer kleineren Bahn als im Sommer,
@@ -60,7 +60,7 @@ Im Sommer überstreicht die Sonne zwischen Auf- und Untergang rund 260° des Hor
 Wer im Winter einmal darauf achtet, wo genau die Sonne untergeht, und im Sommer an derselben Stelle
 wieder hinschaut, wird staunen, wie weit der Punkt am Horizont gewandert ist.
 
-## Warum wandert der Kreis?
+## Ausblick: die Himmelsachse
 
 Bleibt die Frage, warum der Kreis im Lauf des Jahres auf und ab wandert und warum er so schräg zum
 Horizont steht. Die Antwort liegt in der Achse, um die sich der Himmel dreht – und die hat mit der

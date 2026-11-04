@@ -1,9 +1,9 @@
-# Warum steht der Polarstern immer an derselben Stelle?
+# Himmelsachse und Himmelskoordinaten
 
 <!-- Beitrag 3 der Reihe (Wegweiser: Teil 4). Modell: himmelsachse3d.html, Rundgang (11 Schritte). Zahlen: 50° N,
      10° O, 2026. -->
 
-*Teil 4 der Reihe „Sonne, Erde, Mond“. Zuletzt: „Läuft die Sonne im Winter auf einer kleineren Bahn?“*
+*Teil 4 der Reihe „Sonne, Erde, Mond“: Blick auf die Erde. Zuletzt: „Tagbogen der Sonne“*
 
 Wer nachts eine Weile in den Himmel schaut, sieht die Sterne wandern: Sie gehen im Osten auf und im
 Westen unter, genau wie die Sonne. Nur einer scheint festzustehen, Stunde um Stunde, Nacht für Nacht –
@@ -59,7 +59,7 @@ Den Polarstern findet man übrigens am einfachsten, wenn man das weiß: Er steht
 über dem Horizont, wie die geografische Breite angibt – in Deutschland also etwa auf halber Höhe zwischen
 Horizont und Zenit.
 
-## Und warum pendelt die Deklination?
+## Ausblick: die Erdbahn
 
 Bleibt die letzte Frage: Warum steht die Sonne im Juni 23,44° nördlich des Himmelsäquators und im Dezember
 ebenso weit südlich? Dafür muss man noch weiter hinaus, bis man die ganze Bahn der Erde um die Sonne
