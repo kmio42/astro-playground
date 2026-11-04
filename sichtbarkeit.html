@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sichtbarkeitsrechner für Sonne und Mond</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <!-- Leaflet 1.9.4 liegt im Projekt (lib/leaflet), damit beim Öffnen keine Daten an ein CDN gehen -->
+    <link rel="stylesheet" href="lib/leaflet/leaflet.css">
     <style>
         :root {
             color-scheme: light;
@@ -335,7 +336,7 @@
         .popup input[type="number"] { width: 5em; }
         .popup .value { color: #555; font-size: 0.92em; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="lib/leaflet/leaflet.js"></script>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
     <script src="visibility.js"></script>
@@ -1394,7 +1395,6 @@
         const OVERPASS_SERVERS = [
             'https://overpass-api.de/api/interpreter',
             'https://overpass.kumi.systems/api/interpreter',
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
         ];
         // Geländekacheln im Terrarium-Format. Mapterhorn: Bodenmodell (in Deutschland DGM1 der Länder), 512 px;
         // AWS Terrain Tiles: Ersatz, Oberflächenmodell (EU-DEM, Dächer teils enthalten), 256 px
@@ -2451,12 +2451,13 @@
 
         function initMap() {
             if (typeof L === 'undefined') {
-                document.getElementById('map').innerHTML = '<p class="hint" style="padding:12px">Karte nicht verfügbar (Leaflet konnte nicht geladen werden – keine Internetverbindung?).</p>';
+                document.getElementById('map').innerHTML = '<p class="hint" style="padding:12px">Karte nicht verfügbar (lib/leaflet/leaflet.js fehlt).</p>';
                 return;
             }
             // OSM-Kacheln verlangen einen Referer; von file:// aus kommt nur „Access blocked“
             if (location.protocol === 'file:') document.getElementById('mapFileHint').style.display = '';
-            leafletMap = L.map('map').setView([latitude, longitude], 17);
+            // Ausschnitt erst beim ersten Anzeigen (placeMovables), damit vorher keine Kacheln geladen werden
+            leafletMap = L.map('map');
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende',
@@ -4227,17 +4228,23 @@
             Adresse dieser Seite; bei Karte, Gebäuden und Gelände außerdem den abgefragten Ausschnitt, also ungefähr den
             gewählten Ort:</p>
         <ul class="privacy">
-            <li><b>Kartenbibliothek Leaflet</b> von cdnjs (Cloudflare, Inc., USA) – beim Öffnen der Seite
-                (<a href="https://www.cloudflare.com/privacypolicy/">Datenschutz</a>).</li>
             <li><b>Kartenbilder</b> von OpenStreetMap (OpenStreetMap Foundation, Großbritannien) – sobald die Karte zu sehen ist
                 (<a href="https://osmfoundation.org/wiki/Privacy_Policy">Datenschutz</a>).</li>
             <li><b>Gebäude</b> über die Overpass-API (overpass-api.de, Deutschland; bei Ausfall overpass.kumi.systems,
-                Österreich, und maps.mail.ru, Russland) – nur nach „Umgebung laden“.</li>
+                Österreich) – nur nach „Umgebung laden“.</li>
             <li><b>Geländehöhen</b> von Mapterhorn (tiles.mapterhorn.com), bei Ausfall aus den Terrain Tiles bei Amazon Web
                 Services (USA, <a href="https://aws.amazon.com/privacy/">Datenschutz</a>) – nur nach „Umgebung laden“.</li>
         </ul>
-        <p class="hint">Ohne „Umgebung laden“ werden keine Gebäude- und Geländedaten abgefragt. Wer die Karte nicht braucht,
-            kann Sichtbereiche und Horizontlinie auch von Hand eintragen.</p>
+        <p>Die Kartenbibliothek Leaflet liegt auf dem Server dieser Website; beim Öffnen der Seite geht nichts an andere
+            Anbieter. Die Kartenbilder werden geladen, weil die Karte zum Einrichten gebraucht wird (berechtigtes Interesse,
+            Art. 6 Abs. 1 lit. f DSGVO). Gebäude und Geländehöhen werden erst abgefragt, wenn man „Umgebung laden“ drückt.
+            Die Anbieter verarbeiten die Anfragen in eigener Verantwortung; für das Vereinigte Königreich gilt ein
+            Angemessenheitsbeschluss der EU, Amazon ist nach dem EU-US Data Privacy Framework zertifiziert. Wer die Karte
+            nicht braucht, kann Sichtbereiche und Horizontlinie auch von Hand eintragen.</p>
+        <p>Das Speichern der Eingaben im Browser ist für die Funktion der Seite nötig (§ 25 Abs. 2 Nr. 2 TDDDG); es
+            geschieht nur auf diesem Gerät. Verantwortlich ist der im <a href="https://kmio.de/impressum.html">Impressum</a>
+            Genannte; die Rechte der Betroffenen und weitere Angaben stehen in der allgemeinen
+            <a href="https://kmio.de/datenschutz.html">Datenschutzerklärung</a>.</p>
 
         <div class="step-nav intro-nav">
             <button type="button" class="primary" onclick="setView('setup')">Einrichten</button>
@@ -4265,7 +4272,7 @@
                     </span>
                 </div>
                 <p class="hint">Das Laden dauert meist 10 bis 60 Sekunden. Bei großem Umkreis oder überlastetem Server kann es auch
-                    ein paar Minuten dauern – die Seite versucht es dann nacheinander bei bis zu drei Servern.</p>
+                    ein paar Minuten dauern – die Seite versucht es dann nacheinander bei zwei Servern.</p>
                 <p class="hint" id="envStatus"></p>
                 <div id="mapSlot1"></div>
                 <details class="more" data-more="house">

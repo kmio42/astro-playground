@@ -164,7 +164,7 @@ Nacht (dunkel). Darunter die Kurve „Sonnenstunden pro Tag“.
 Tabelle (`renderOutputTable`), Bahnen des Tages im Horizontdiagramm. Startdatum beim Öffnen: heute;
 Blättern mit `createTimeControls()`.
 
-**Karte** (Leaflet 1.9.4 von cdnjs, Kacheln von `tile.openstreetmap.org` mit Namensnennung):
+**Karte** (Leaflet 1.9.4 aus `lib/leaflet/`, Kacheln von `tile.openstreetmap.org` mit Namensnennung):
 
 - Standortmarker zum Verschieben; setzt `latitude`/`longitude` aus `ui.js` und speichert per `saveData()`.
 - Sichtbereiche als Kreissektoren (≈ 100 m Radius), Horizontlinie als Strahlen.
