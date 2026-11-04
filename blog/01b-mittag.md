@@ -21,7 +21,7 @@ Teil kaum beachtet wurde: die gestrichelte Linie des **Mittags**. Der Rundgang r
 Deutschlands und ohne Sommerzeit, damit keine Sprünge stören.
 
 <div class="km-modell" id="mittag" data-modell="tageslaenge" data-tour="mittag"
-     data-ebenen="times,eot,table">
+     data-ebenen="times,table">
 <ul>
 <li>Kürzester Tag ist der 21. Dezember, der früheste Sonnenuntergang ist am 12. Dezember (16:18 Uhr),
 der späteste Sonnenaufgang am 31. Dezember (8:19 Uhr).</li>

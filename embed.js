@@ -232,15 +232,17 @@
         return `${text}° ${value < 0 ? negative : positive}`;
     }
 
-    /** Ortszeile „📍 50° N, 10° O · ändern“ mit aufklappbarer Eingabe im Element #kmPlace */
+    /** Ortszeile „📍 Breite [Regler] Ort: 50° N, 10° O · ändern“ (Regler vorn, damit er beim Ziehen nicht wandert)
+        mit aufklappbarer Eingabe im Element #kmPlace */
     function placeLine(place) {
         const box = document.getElementById('kmPlace');
         if (!box) return null;
         box.hidden = false;
         box.classList.add('km-place');
         box.innerHTML = `
-            <div class="km-place-line"><span class="km-place-text"></span>
+            <div class="km-place-line"><span>📍 Breite</span>
                 <input type="range" class="km-place-slider" min="-90" max="90" step="0.5" aria-label="Breite">
+                <span class="km-place-text"></span>
                 <button type="button" class="km-place-own"></button>
                 <button type="button" class="km-place-toggle" aria-expanded="false">ändern</button></div>
             <div class="km-place-form" hidden>
@@ -331,7 +333,7 @@
                 const p = place.get();
                 const where = `${formatDegrees(p.lat, 'N', 'S')}, ${formatDegrees(p.lon, 'O', 'W')}`;
                 const label = { text: 'Ort laut Text', stored: 'Dein Ort', typed: 'Ort' }[p.source] || 'Ort';
-                $('.km-place-text').textContent = `📍 ${label}: ${where}`;
+                $('.km-place-text').textContent = `${label}: ${where}`;
                 slider.value = p.lat;
                 own.hidden = p.source !== 'text';
                 own.textContent = 'eigenen Ort verwenden';
@@ -366,6 +368,7 @@
         .km-place { margin: 6px 0; font-size: 0.92em; }
         .km-place[hidden], .km-place [hidden] { display: none !important; }
         .km-place-line { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+        .km-place-text { font-variant-numeric: tabular-nums; }
         .km-place-slider { width: min(200px, 40vw); margin: 0; align-self: center; accent-color: var(--accent, #1a5fb4); }
         .km-place-line button { padding: 0; border: 0; background: none; color: var(--accent, #1a5fb4);
             font: inherit; text-decoration: underline; cursor: pointer; }
