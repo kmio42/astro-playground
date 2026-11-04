@@ -1670,6 +1670,10 @@
         // „Umgebung laden“: Gebäude (Overpass) und Gelände (Terrarium) parallel; eigene Korrekturen bleiben
         async function loadEnvironment() {
             if (envLoading) return;
+            if (placeFresh) {
+                document.getElementById('envStatus').textContent = 'Erst in der Karte das eigene Haus suchen und den Marker daraufsetzen.';
+                return;
+            }
             let env = state.environment;
             const here = { latitude, longitude };
             envLoading = { buildings: null, terrain: null, started: Date.now(), overpass: null,
@@ -2109,7 +2113,7 @@
         }
 
         // Auge in der Draufsicht mit der Maus verschieben
-        let sceneTopView = null;        // { v, cs } der letzten Draufsicht
+        let sceneTopView = null;        // { v, cs, sun, patch, level } der letzten Draufsicht
         function setupSceneInteraction() {
             const canvas = document.getElementById('sceneTop');
             let drag = null;
@@ -2119,7 +2123,7 @@
             };
             const nearEye = (px, py) => {
                 const t = sceneTopView;
-                return currentView === 'setup' && t && Math.hypot(px - t.v.X(t.cs.eye[0]), py - t.v.Y(t.cs.eye[1])) <= 14;
+                return t && Math.hypot(px - t.v.X(t.cs.eye[0]), py - t.v.Y(t.cs.eye[1])) <= 14;
             };
             // Position in der Draufsicht → Augenangabe
             const eyeAt = (px, py) => eyeFromScenePoint(sceneTopView.cs.scene, sceneTopView.v.toX(px), sceneTopView.v.toY(py));
@@ -2139,7 +2143,8 @@
                 // Vorschau ohne Neuberechnung der Maske
                 const ex = e.x, ey = e.place === 'room' ? -t.cs.scene.wall - e.y : e.y;
                 const preview = { ...t.cs, eye: [ex, ey, t.cs.eye[2]] };
-                drawSceneTop(canvas, preview, null, null, null);
+                // Unter „Ergebnis“ bleiben Sonne und Fleck stehen (der Fleck hängt nicht vom Auge ab)
+                drawSceneTop(canvas, preview, t.sun, t.patch, t.level);
                 canvas.style.cursor = 'grabbing';
             });
             const finish = () => {
@@ -2174,7 +2179,8 @@
             if (!shown('sceneTop')) return;
             const cs = vpc.scene, sc = cs.scene;
             document.getElementById('sceneTopCaption').textContent = 'Draufsicht von oben: oben ist außen, unten ' +
-                (sc.room ? 'die Rückwand' : 'die Hauswand') + '; links und rechts mit Blick nach draußen.';
+                (sc.room ? 'die Rückwand' : 'die Hauswand') + '; links und rechts mit Blick nach draußen. ' +
+                'Den blauen Punkt (Auge) ziehen, um die Person zu verschieben.';
             document.getElementById('sceneFrontCaption').textContent = sc.room
                 ? 'Fensterwand von innen gesehen: oben die Decke, unten der Fußboden; links und rechts wie in der Draufsicht' +
                   (sc.balcony ? ', dahinter der Balkon.' : '.')
@@ -2205,7 +2211,7 @@
             if (R) { x0 = -s; x1 = R.width + s; y0 = -2 * s - R.depth; }
             if (B) { x0 = Math.min(x0, B.from); x1 = Math.max(x1, B.to); y1 = B.depth; }
             const v = fitView(x0 - 0.5, x1 + 0.5, y0 - 0.3, y1 + 0.9, w, h);
-            sceneTopView = { v, cs };
+            sceneTopView = { v, cs, sun, patch, level };
             const rect = (ax, ay, bx, by) => ctx.fillRect(v.X(ax), v.Y(by), (bx - ax) * v.k, (by - ay) * v.k);
             const line = (ax, ay, bx, by) => { ctx.beginPath(); ctx.moveTo(v.X(ax), v.Y(ay)); ctx.lineTo(v.X(bx), v.Y(by)); ctx.stroke(); };
             ctx.fillStyle = css('--surface');
@@ -2419,6 +2425,10 @@
     /////////////////////////////////////////////////////////////////
 
         let leafletMap = null, locationMarker = null;
+        // Erster Aufruf ohne gespeicherten Ort: Karte zeigt Deutschland, kein Marker, bis ein Ort gewählt ist
+        const OVERVIEW = [[47.3, 5.9], [55.0, 15.0]];     // Deutschland
+        let placeFresh = false, freshKey = null;
+        const MARKER_TITLE = 'Standort (ziehen oder in die Karte klicken)';
         let overlayLayer = null, directionLayer = null, buildingLayer = null, shadowLayer = null, edgeLayer = null;
         let terrainAttributions = new Set();     // in der Karte angezeigte Geländequellen
         const VP_COLORS = ['--accent', '--moon', '--sun', '--text-2'];
@@ -2457,7 +2467,8 @@
             directionLayer = L.layerGroup().addTo(leafletMap);
             edgeLayer = L.layerGroup().addTo(leafletMap);
             leafletMap.on('popupclose', () => edgeLayer.clearLayers());
-            locationMarker = L.marker([latitude, longitude], { draggable: true, title: 'Standort (ziehen zum Verschieben)' }).addTo(leafletMap);
+            locationMarker = L.marker([latitude, longitude], { draggable: true, title: MARKER_TITLE });
+            if (!placeFresh) locationMarker.addTo(leafletMap);
             // Mit eingerastetem Raum/Balkon steht der Marker auf dem Auge und bleibt beim Ziehen darin
             const constrained = latlng => {
                 const vp = anchoredViewpoint();
@@ -2485,7 +2496,35 @@
                     setLocation(p.lat, p.lng);
                 }
             });
+            // Klick in die Karte setzt den Marker. Weit herausgezoomt geht es dabei näher heran (z. B. 5 → 9 → 13 → 17),
+            // damit man sich zum eigenen Haus durchklicken kann. Gebäude öffnen weiter ihr Popup; Doppelklick zoomt nur.
+            let clickTimer = null;
+            leafletMap.on('click', ev => {
+                clearTimeout(clickTimer);
+                clickTimer = setTimeout(() => mapClicked(ev.latlng, constrained), 250);
+            });
+            leafletMap.on('dblclick', () => clearTimeout(clickTimer));
             drawBuildings();
+        }
+
+        function mapClicked(latlng, constrained) {
+            // Unter „Ergebnis“ ist die Karte nur Anzeige; dort nur zum ersten Ortswahl
+            if (currentView !== 'setup' && !placeFresh) return;
+            const zoom = leafletMap.getZoom();
+            if (zoom < 15) leafletMap.flyTo(latlng, Math.min(17, zoom + 4), { duration: 0.6 });
+            const c = constrained(latlng);
+            if (c) {
+                // Eingerastet: nur ein Klick in Raum bzw. Balkon (oder knapp daneben) verschiebt das Auge
+                const sc = normalizeScene(c.vp.scene);
+                const [x, y] = sceneFromLatLng(sc, latlng.lat, latlng.lng);
+                const ey = c.eye.place === 'room' ? -sc.wall - c.eye.y : c.eye.y;
+                if (Math.hypot(x - c.eye.x, y - ey) > 2) return;
+                c.vp.scene.eye = c.eye;
+                maskChanged();
+                return;
+            }
+            placeFresh = false;     // vor setLocation, sonst springt drawMap sofort auf Zoom 17
+            setLocation(latlng.lat, latlng.lng);
         }
 
         // Gebäude nach Höhe eingefärbt; geschätzte Höhen gestrichelt, eigenes Gebäude grau
@@ -2510,7 +2549,7 @@
                     ? { color: '#6b6a64', weight: 1.5, fillColor: '#9a9993', fillOpacity: 0.25 }
                     : { color: '#2f5f3a', weight: estimated ? 1 : 1.5, dashArray: estimated ? '4 3' : null,
                         fillColor: heightColor(b.height), fillOpacity: 0.6 };
-                L.polygon(b.rings, { ...style, pane: 'buildings' })
+                L.polygon(b.rings, { ...style, pane: 'buildings', bubblingMouseEvents: false })
                     .on('click', ev => openBuildingPopup(b, ev.latlng))
                     .bindTooltip(`${buildingTitle(b)}: ${fmtNum(b.height)} m${estimated ? ' (geschätzt)' : ''}${own ? ' – eigenes Gebäude' : ''}`, { sticky: true })
                     .addTo(buildingLayer);
@@ -2732,13 +2771,26 @@
         function drawMap() {
             if (!leafletMap || !shown('map')) return;
             const here = [latitude, longitude];
+            const note = document.getElementById('markerNote');
+            // Ort über Koordinaten oder GPS gewählt: Übersicht verlassen
+            if (placeFresh && latitude + '|' + longitude !== freshKey) {
+                placeFresh = false;
+                leafletMap.setView(here, Math.max(leafletMap.getZoom(), 17));
+            }
+            if (placeFresh) {
+                note.textContent = 'Das eigene Haus suchen: In die Karte klicken – das zoomt näher heran und setzt den Marker. ' +
+                    'Ganz nah setzt ein Klick nur noch den Marker; man kann ihn auch ziehen.';
+                overlayLayer.clearLayers();
+                directionLayer.clearLayers();
+                return;
+            }
+            if (!leafletMap.hasLayer(locationMarker)) locationMarker.addTo(leafletMap);
             locationMarker.setLatLng(here);
             const anchored = anchoredViewpoint();
             locationMarker.getElement()?.setAttribute('title', anchored
-                ? `Auge in „${anchored.name}“ – nur innerhalb von Raum bzw. Balkon verschiebbar` : 'Standort (ziehen zum Verschieben)');
-            const note = document.getElementById('markerNote');
+                ? `Auge in „${anchored.name}“ – nur innerhalb von Raum bzw. Balkon verschiebbar` : MARKER_TITLE);
             note.textContent = anchored ? `Der Marker steht auf dem Auge in „${anchored.name}“. Er lässt sich nur innerhalb von ` +
-                `Raum bzw. Balkon verschieben; genauer geht es im Schritt Raum/Balkon (blauen Punkt in der Draufsicht ziehen).` : '';
+                `Raum bzw. Balkon verschieben (ziehen oder hineinklicken); genauer geht es im Schritt Raum/Balkon (blauen Punkt in der Draufsicht ziehen).` : '';
             if (!leafletMap.getBounds().pad(-0.1).contains(here)) leafletMap.panTo(here);
             overlayLayer.clearLayers();
             directionLayer.clearLayers();
@@ -3748,7 +3800,8 @@
             if (leafletMap && mapSlot) {
                 leafletMap.invalidateSize();
                 if (!mapShown) {
-                    leafletMap.setView([latitude, longitude], 17);
+                    if (placeFresh) leafletMap.fitBounds(OVERVIEW);
+                    else leafletMap.setView([latitude, longitude], 17);
                     mapShown = true;
                 }
                 // Schritt 4: auf den Winkel vom Auge aus einstellen
@@ -4011,6 +4064,11 @@
                 latitude = 52.52;
                 longitude = 13.405;
                 fillSiderealTime(siderealTimeHours(currentJd()));
+                // Ganz neu (nichts eingerichtet): Karte startet mit der Übersicht statt in Berlin
+                if (!isConfigured()) {
+                    placeFresh = true;
+                    freshKey = latitude + '|' + longitude;
+                }
             }
             // Standard: Lokalzeit
             document.getElementById('localTime').checked = true;
@@ -4155,7 +4213,7 @@
                 <span class="step-num">1</span><span class="step-title">Haus/Umgebung</span><span class="step-summary" id="step1Summary"></span>
             </button>
             <div class="step-body">
-                <p class="hint">Den Marker in der Karte auf das eigene Haus ziehen. „Umgebung laden“ holt die Nachbarhäuser aus
+                <p class="hint">Den Marker in der Karte auf das eigene Haus ziehen oder dorthin klicken. „Umgebung laden“ holt die Nachbarhäuser aus
                     OpenStreetMap und die Geländehöhen. Danach das eigene Haus anklicken – es zählt dann nicht als Hindernis.</p>
                 <div class="controls">
                     <button type="button" id="envLoad" onclick="loadEnvironment()">Umgebung laden</button>
