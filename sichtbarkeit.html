@@ -98,6 +98,8 @@
         }
         .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
         .bar + .bar { margin-top: 6px; }
+        .vp-pick { display: inline-flex; align-items: center; gap: 4px; }
+        .icon-button { min-width: 2em; padding: 1px 6px; font-weight: 600; line-height: 1.3; }
         .brand { font-weight: 700; font-size: 1.1em; margin-right: auto; }
         @media (max-width: 520px) { .brand-long { display: none; } }   /* schmal: Kopfleiste einzeilig */
         .tabs { display: inline-flex; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; }
@@ -2082,6 +2084,10 @@
                 children.push(el('div', { className: 'controls' }, [
                     field(b, 'from', 'von'), field(b, 'to', 'bis'), field(b, 'depth', 'Tiefe'), field(b, 'parapet', 'Brüstung'),
                 ]));
+                // Die Platte darüber verdeckt viel vom Himmel, deshalb nicht unter „Mehr“
+                children.push(el('div', { className: 'controls' }, [
+                    checkbox(b, 'slab', 'Balkonplatte darüber (Balkon des Stockwerks darüber)'), field(b, 'ceiling', 'in', 'm Höhe'),
+                ]));
             }
 
             const more = [
@@ -2099,7 +2105,6 @@
                 const b = sc.balcony;
                 more.push(el('div', { className: 'controls' }, [
                     checkbox(b, 'glass', 'Brüstung aus Glas'),
-                    checkbox(b, 'slab', 'Balkonplatte darüber'), field(b, 'ceiling', 'in'),
                     checkbox(b, 'dividerLeft', 'Trennwand links'), checkbox(b, 'dividerRight', 'Trennwand rechts'),
                 ]));
             }
@@ -2108,7 +2113,7 @@
                 vp.scene = null;
                 maskChanged();
             } }));
-            children.push(moreDetails('scene', 'Mehr: Fassadenrichtung, Wandstärke, Auge als Zahlen, Balkonplatte, Trennwände …', more));
+            children.push(moreDetails('scene', 'Mehr: Fassadenrichtung, Wandstärke, Auge als Zahlen, Glasbrüstung, Trennwände …', more));
             box.replaceChildren(...children);
         }
 
@@ -3762,6 +3767,15 @@
             else applyView(view);
         }
 
+        // Datenschutzhinweise (in der Einführung) aus der Fußzeile aufrufen
+        function showPrivacy() {
+            if (currentView !== 'intro') {
+                applyView('intro');                         // sofort, damit hashchange nicht mehr nach oben scrollt
+                location.hash = '#' + VIEW_HASH.intro;
+            }
+            document.getElementById('datenschutz').scrollIntoView({ block: 'start' });
+        }
+
         function applyView(view) {
             const changed = view !== currentView;
             currentView = view;
@@ -4178,7 +4192,10 @@
             </details>
         </div>
         <div class="bar" id="contextBar">
-            <label>Standpunkt <select id="viewpointSelect"></select></label>
+            <span class="vp-pick">
+                <label>Standpunkt <select id="viewpointSelect"></select></label>
+                <button type="button" class="icon-button" title="Neuer Standpunkt" aria-label="Neuer Standpunkt" onclick="newViewpoint()">+</button>
+            </span>
             <span class="timebar" id="timeBar"></span>
         </div>
     </header>
@@ -4193,10 +4210,35 @@
             Balkon mit Fenstern, Balkonplatte und Brüstung. Daraus ermittelt die Seite, wann Sonne und Mond in einem freien
             Bereich stehen.</p>
         <p>Alle Eingaben werden im Browser gespeichert; „Exportieren“ (Menü ⋯) sichert sie als Datei. Mehrere Standpunkte
-            (z. B. „Balkon“ und „Küchenfenster“) legt man über das Menü an; „Alle Standpunkte“ in der Ansicht „Ergebnis“
+            (z. B. „Balkon“ und „Küchenfenster“) legt man mit „+“ neben der Standpunkt-Auswahl an; „Alle Standpunkte“ in der Ansicht „Ergebnis“
             zeigt, wann man von irgendeinem aus etwas sieht.</p>
         <p class="callout">Dies ist ein Hobbyprojekt, entstanden mit Hilfe von Claude Code. Es erhebt keinen Anspruch auf
             Funktion und Vollständigkeit.</p>
+
+        <h2 id="datenschutz">Datenschutz</h2>
+        <p><b>Alle Eingaben bleiben im Browser.</b> Ort, Standpunkte, Maße von Raum und Balkon, Beobachtungen sowie die
+            geladenen Gebäude und Geländehöhen speichert die Seite nur im Speicher dieses Browsers (localStorage). Nichts davon
+            wird an den Server dieser Seite geschickt; es gibt keine Konten, keine Cookies und keine Statistik oder
+            Reichweitenmessung. Der gemerkte Ort gilt auch für die anderen Modelle dieser Website. „Mein Standort“ fragt die
+            Position beim Browser ab; auch sie bleibt im Browser. Löschen: Menü ⋯ → „Alle Eingaben löschen“ oder die
+            Websitedaten im Browser entfernen.</p>
+        <p><b>Externe Inhalte.</b> Einige Daten lädt der Browser direkt bei den jeweiligen Anbietern, nicht über diese
+            Website. Dabei erhält der Anbieter wie bei jedem Abruf einer Webseite die IP-Adresse, Angaben zum Browser und die
+            Adresse dieser Seite; bei Karte, Gebäuden und Gelände außerdem den abgefragten Ausschnitt, also ungefähr den
+            gewählten Ort:</p>
+        <ul class="privacy">
+            <li><b>Kartenbibliothek Leaflet</b> von cdnjs (Cloudflare, Inc., USA) – beim Öffnen der Seite
+                (<a href="https://www.cloudflare.com/privacypolicy/">Datenschutz</a>).</li>
+            <li><b>Kartenbilder</b> von OpenStreetMap (OpenStreetMap Foundation, Großbritannien) – sobald die Karte zu sehen ist
+                (<a href="https://osmfoundation.org/wiki/Privacy_Policy">Datenschutz</a>).</li>
+            <li><b>Gebäude</b> über die Overpass-API (overpass-api.de, Deutschland; bei Ausfall overpass.kumi.systems,
+                Österreich, und maps.mail.ru, Russland) – nur nach „Umgebung laden“.</li>
+            <li><b>Geländehöhen</b> von Mapterhorn (tiles.mapterhorn.com), bei Ausfall aus den Terrain Tiles bei Amazon Web
+                Services (USA, <a href="https://aws.amazon.com/privacy/">Datenschutz</a>) – nur nach „Umgebung laden“.</li>
+        </ul>
+        <p class="hint">Ohne „Umgebung laden“ werden keine Gebäude- und Geländedaten abgefragt. Wer die Karte nicht braucht,
+            kann Sichtbereiche und Horizontlinie auch von Hand eintragen.</p>
+
         <div class="step-nav intro-nav">
             <button type="button" class="primary" onclick="setView('setup')">Einrichten</button>
             <button type="button" onclick="setView('result')">Zum Ergebnis</button>
@@ -4371,6 +4413,8 @@
                 die Uhrzeit genau.</p>
             <p class="hint" id="roomEmpty"></p>
             <div id="roomDetails">
+                <p class="callout">Wo man sitzt oder steht, lässt sich hier ändern: in der Draufsicht unten den blauen Punkt
+                    (Auge) ziehen. Das gilt dann für alle Übersichten dieser Seite, auch die Sonne oben und den Mond.</p>
                 <p id="roomSeason"></p>
                 <div class="legend">
                     <span class="swatch" style="--c: var(--sun)">großer Fleck</span>
@@ -4545,7 +4589,8 @@
                 EU/ESA), ersatzweise aus den <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a>
                 (Mapzen, AWS Open Data; u. a. SRTM, EU-DEM © Copernicus).</p>
         </details>
-        <p class="imprint"><a href="https://kmio.de/impressum.html">Impressum</a></p>
+        <p class="imprint"><a href="#einfuehrung" onclick="event.preventDefault(); showPrivacy()">Datenschutz</a> ·
+            <a href="https://kmio.de/impressum.html">Impressum</a></p>
     </footer>
 </body>
 </html>
