@@ -264,6 +264,8 @@
                 update();
             } else if (type === 'latitude' && !isNaN(value)) {
                 latitude = value;
+                const slider = document.getElementById('latitudeSlider');
+                if (slider) slider.value = value;
                 update();
             }
         }
@@ -417,6 +419,8 @@
         .ui-field { display: flex; flex-direction: column; gap: 2px; font-size: 0.85em; color: var(--text-2, inherit); }
         .ui-field input { font-size: calc(1em / 0.85); width: 11em; color: var(--text, inherit); }
         .ui-field .ui-input { display: flex; align-items: center; gap: 4px; }
+        .ui-slider { flex-basis: 100%; display: flex; }
+        .ui-slider input { width: min(100%, 34em); margin: 0; accent-color: var(--accent, #2a78d6); }
         .ui-actions { display: flex; flex-wrap: wrap; gap: 6px; }
         .ui-hint { color: var(--text-2, #555555); font-size: 0.85em; margin-top: 6px; }
         .ui-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; align-items: center; }
@@ -476,6 +480,9 @@
         function createLocationControls(containerId) {
             injectUiStyles();
             const container = document.getElementById(containerId);
+            // Breiten-Regler, außer die Seite schaltet ihn ab (data-slider="none", z. B. Ort aus der Karte)
+            const slider = container.dataset.slider === 'none' ? '' : `
+            <div class="ui-slider"><input type="range" id="latitudeSlider" min="-90" max="90" step="0.5" aria-label="Breitengrad"></div>`;
             container.innerHTML = `
     <div class="ui-panel ui-location">
         <div class="ui-head"><span class="ui-title">Beobachtungsort auf Erde</span></div>
@@ -491,7 +498,7 @@
             <div class="ui-actions">
                 <button type="button" onclick="useGpsLocation()" title="Aktuelle GPS-Position verwenden">📍 GPS-Position</button>
                 <button type="button" onclick="saveData()" title="Ort für nächsten Seitenaufruf lokal merken">Ort merken</button>
-            </div>
+            </div>${slider}
         </div>
         <div class="ui-hint" id="ui-coord-hint">z. B. 48.8566 oder 48°51'22"N, Länge 2.3522 oder 2°20'15"E</div>
         <div id="gps-feedback" class="feedback ui-hint" aria-live="polite"></div>
@@ -599,6 +606,17 @@
             });
             document.getElementById('longitude').addEventListener('input', function () {
                 validateCoordinate(this.value.trim(), 'longitude');
+            });
+            // Breiten-Regler schreibt ins Textfeld; Neuberechnung höchstens einmal pro Bild
+            const latSlider = document.getElementById('latitudeSlider');
+            let latFrame = null;
+            if (latSlider) latSlider.addEventListener('input', () => {
+                if (latFrame !== null) return;
+                latFrame = requestAnimationFrame(() => {
+                    latFrame = null;
+                    document.getElementById('latitude').value = String(Number(latSlider.value));
+                    validateCoordinate(String(Number(latSlider.value)), 'latitude');
+                });
             });
             document.getElementById('localTime').addEventListener('change', function () {
                 useLocalTime = this.checked;

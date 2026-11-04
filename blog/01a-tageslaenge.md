@@ -16,7 +16,7 @@ zaghaft beim Programmieren half – mit Resultaten, die noch nicht durchgehend �
 Reihe war die KI ein wesentlich größerer Helfer; mehr dazu am Ende.
 
 In dieser Reihe möchte ich den Weg zu dem, was ich dabei gelernt habe, geordnet aufbereiten. Sie
-beginnt mit Erscheinungen, die man selbst beobachten kann, ganz ohne Astronomie; die Erklärungen
+beginnt mit Erscheinungen, die man selbst beobachten kann, ganz ohne vertiefende Astronomie; die Erklärungen
 folgen Schritt für Schritt in den nächsten Teilen. Gerechnet wird wieder mit den Formeln von Jean
 Meeus, diesmal stecken sie aber vor allem in interaktiven 3D-Modellen, die man selbst erkunden kann.
 
@@ -26,7 +26,8 @@ Das Modell zeigt Sonnenaufgang, Sonnenuntergang und **Tageslänge** für jeden T
 Rundgang führt in sieben Schritten durch die Stellen, an denen es spannend wird; er rechnet für die
 Mitte Deutschlands. Danach gilt der eigene Ort, sofern man einen eingetragen hat.
 
-<div class="km-modell" id="tageslaenge" data-modell="tageslaenge" data-tour="tageslaenge">
+<div class="km-modell" id="tageslaenge" data-modell="tageslaenge" data-tour="tageslaenge"
+     data-ebenen="gain,times,table">
 <ul>
 <li>In der Mitte Deutschlands ist der Tag im Juni 16 h 22 min lang, im Dezember nur 8 h 04 min.</li>
 <li>Im Oktober geht die Sonne am Monatsende gut zwei Stunden früher unter als am Anfang. Eine Stunde
@@ -45,9 +46,9 @@ Sommerzeit dann eine Stunde vom Morgen auf den Abend.</li>
 
 ## Das Gefühl täuscht nicht
 
-Die Tage werden nicht gleichmäßig kürzer und länger. Um die **Tagundnachtgleichen** im März und
-September ändert sich die Tageslänge am schnellsten, um die **Sonnenwenden** im Juni und Dezember
-kaum.
+Die Tage werden nicht gleichmäßig kürzer und länger. Um die **Tagundnachtgleichen** (Äquinoktien) im
+März und September ändert sich die Tageslänge am schnellsten, um die **Sonnenwenden** (Solstitien) im
+Juni und Dezember kaum.
 
 Gerecht verteilt ist das auch nicht: Im Herbst verlieren vor allem die Abende, im Frühjahr gewinnen
 vor allem die Morgen. Dazu kommt die Uhr. Die Umstellung auf die Winterzeit Ende Oktober fällt genau in
@@ -68,10 +69,12 @@ Beim Herumklicken im Dezember fällt noch etwas auf: Am frühesten geht die Sonn
 
 - **Sonnenaufgang, Sonnenuntergang:** der Moment, in dem der obere Rand der Sonne den Horizont berührt.
 - **Tageslänge:** die Zeit zwischen Sonnenaufgang und Sonnenuntergang.
-- **Sonnenwende:** die Tage um den 21. Juni und 21. Dezember mit dem längsten und dem kürzesten Tag;
-  die Tageslänge ändert sich dort kaum.
-- **Tagundnachtgleiche:** die Tage um den 20. März und 23. September, an denen Tag und Nacht fast
-  gleich lang sind; die Tageslänge ändert sich dort am schnellsten.
+- **Sonnenwende** (Solstitium, von lat. *sol* „Sonne“ und *sistere* „stillstehen“): die Tage um den
+  21. Juni und 21. Dezember mit dem längsten und dem kürzesten Tag; die Tageslänge ändert sich dort
+  kaum.
+- **Tagundnachtgleiche** (Äquinoktium, von lat. *aequus* „gleich“ und *nox* „Nacht“): die Tage um den
+  20. März und 23. September, an denen Tag und Nacht fast gleich lang sind; die Tageslänge ändert sich
+  dort am schnellsten.
 - **Dämmerung:** die Zeit vor Sonnenaufgang und nach Sonnenuntergang, in der der Himmel noch hell ist;
   bürgerlich bis 6°, nautisch bis 12°, astronomisch bis 18° Sonnenstand unter dem Horizont.
 

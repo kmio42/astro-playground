@@ -11,7 +11,8 @@ ist der 21. Dezember, das steht in jedem Kalender. Am frühesten geht die Sonne 
 Weihnachten wieder länger, die Morgen erst nach Neujahr.
 
 Im ersten Teil ging es darum, wie schnell sich die Tageslänge über das Jahr ändert. Diesmal geht es
-um die Frage, wo der Tag eigentlich liegt – und warum er nicht still hält.
+um die Lage des Tages auf der Uhr: Wann ist seine Mitte, und warum verschiebt sie sich im Lauf des
+Jahres?
 
 ## Die Lösung steckt im Mittag
 
@@ -19,7 +20,8 @@ Wieder hilft das Diagramm der Auf- und Untergänge, diesmal mit dem Blick auf ei
 Teil kaum beachtet wurde: die gestrichelte Linie des **Mittags**. Der Rundgang rechnet für die Mitte
 Deutschlands und ohne Sommerzeit, damit keine Sprünge stören.
 
-<div class="km-modell" id="mittag" data-modell="tageslaenge" data-tour="mittag">
+<div class="km-modell" id="mittag" data-modell="tageslaenge" data-tour="mittag"
+     data-ebenen="times,eot,table">
 <ul>
 <li>Kürzester Tag ist der 21. Dezember, der früheste Sonnenuntergang ist am 12. Dezember (16:18 Uhr),
 der späteste Sonnenaufgang am 31. Dezember (8:19 Uhr).</li>

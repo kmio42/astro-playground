@@ -1320,6 +1320,18 @@
     Kreis nach oben und unten wandert, wie sich Auf- und Untergangsrichtung ändern und wie viel vom Kreis
     über dem Horizont liegt.</p>
 
+    <div id="kmPlace" data-control="place" hidden></div>
+    <div class="controls" data-embed="hide">
+        <label>Breite <input type="text" id="lat"></label>
+        <input type="range" id="latSlider" min="-90" max="90" step="0.5" aria-label="Breite">
+        <label>Länge (Ost +) <input type="text" id="lon"></label>
+        <label>Jahr <input type="number" id="year" min="1000" max="3000" step="1"></label>
+        <button onclick="saveLocation()">Ort merken</button>
+        <span class="feedback" id="locationFeedback"></span>
+    </div>
+    <p class="hint" data-embed="hide">Mit dem Breiten-Regler den Ort nach Norden oder Süden schieben: Am Äquator stehen die Kreise
+    senkrecht und sind immer halb über dem Horizont, am Pol liegen sie waagerecht – dann gibt es Polartag und
+    Polarnacht.</p>
     <div class="controls" data-control="basic">
         <div class="wide">
             <label for="daySlider">Tag</label>
@@ -1381,21 +1393,7 @@
         <label><input type="checkbox" id="show-shadow"> Schatten eines Stabs</label>
     </div>
 
-    <div id="kmPlace" data-control="place" hidden></div>
     <div id="info"></div>
-
-    <h2 data-embed="hide">Ort</h2>
-    <div class="controls" data-embed="hide">
-        <label>Breite <input type="text" id="lat"></label>
-        <input type="range" id="latSlider" min="-90" max="90" step="0.5" aria-label="Breite">
-        <label>Länge (Ost +) <input type="text" id="lon"></label>
-        <label>Jahr <input type="number" id="year" min="1000" max="3000" step="1"></label>
-        <button onclick="saveLocation()">Ort merken</button>
-        <span class="feedback" id="locationFeedback"></span>
-    </div>
-    <p class="hint" data-embed="hide">Mit dem Breiten-Regler den Ort nach Norden oder Süden schieben: Am Äquator stehen die Kreise
-    senkrecht und sind immer halb über dem Horizont, am Pol liegen sie waagerecht – dann gibt es Polartag und
-    Polarnacht.</p>
 
     <h2 data-embed="hide">Wie lese ich das?</h2>
     <ul class="hint" data-embed="hide">

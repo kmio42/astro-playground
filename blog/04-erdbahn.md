@@ -54,7 +54,8 @@ Sonnenuntergang schon um den 12. Dezember liegt. Jetzt lassen sich die Ursachen 
 die Erde in Sonnennähe schneller läuft, und die schräge Achse, weil die Sonne entlang der Ekliptik, die Uhr
 aber entlang des Äquators zählt.
 
-<div class="km-modell" id="zeitgleichung" data-modell="tageslaenge" data-tour="zeitgleichung">
+<div class="km-modell" id="zeitgleichung" data-modell="tageslaenge" data-tour="zeitgleichung"
+     data-ebenen="times,eot,table">
 <ul>
 <li>Die Zeitgleichung verschiebt den Mittag: Mitte Februar ist er 14 Minuten später als im Mittel,
 Mitte Mai 4 Minuten früher, Ende Juli 7 Minuten später und Anfang November 16 Minuten früher.</li>

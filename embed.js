@@ -201,6 +201,8 @@
             stored: () => readStored() !== null,
             useOwn() { ownPlace = true; update(); },
             type(lat, lon) { typed = { lat, lon }; update(); },
+            // Breiten-Regler: gilt auch gegenüber einem Ort laut Text als eigene Eingabe
+            slide(lat) { ownPlace = true; typed = { lat, lon: current.lon }; update(); },
             save(lat, lon) {
                 try {
                     localStorage.setItem('latitude', String(lat));
@@ -238,6 +240,7 @@
         box.classList.add('km-place');
         box.innerHTML = `
             <div class="km-place-line"><span class="km-place-text"></span>
+                <input type="range" class="km-place-slider" min="-90" max="90" step="0.5" aria-label="Breite">
                 <button type="button" class="km-place-own"></button>
                 <button type="button" class="km-place-toggle" aria-expanded="false">ändern</button></div>
             <div class="km-place-form" hidden>
@@ -251,6 +254,7 @@
         const $ = sel => box.querySelector(sel);
         const form = $('.km-place-form'), toggle = $('.km-place-toggle'), own = $('.km-place-own');
         const latInput = $('.km-place-lat'), lonInput = $('.km-place-lon'), feedback = $('.km-place-feedback');
+        const slider = $('.km-place-slider');
 
         function inputs() {
             const lat = parseCoordinate(latInput.value, 90), lon = parseCoordinate(lonInput.value, 180);
@@ -283,6 +287,17 @@
                 toggle.setAttribute('aria-expanded', 'true');
                 fillInputs();
             }
+        });
+        // Regler: höchstens eine Neuberechnung pro Bild; die geöffnete Eingabe zeigt die neue Breite
+        let slideFrame = null;
+        slider.addEventListener('input', () => {
+            if (slideFrame !== null) return;
+            slideFrame = requestAnimationFrame(() => {
+                slideFrame = null;
+                feedback.textContent = '';
+                place.slide(Number(slider.value));
+                if (!form.hidden) fillInputs();
+            });
         });
         latInput.addEventListener('input', onInput);
         lonInput.addEventListener('input', onInput);
@@ -317,6 +332,7 @@
                 const where = `${formatDegrees(p.lat, 'N', 'S')}, ${formatDegrees(p.lon, 'O', 'W')}`;
                 const label = { text: 'Ort laut Text', stored: 'Dein Ort', typed: 'Ort' }[p.source] || 'Ort';
                 $('.km-place-text').textContent = `📍 ${label}: ${where}`;
+                slider.value = p.lat;
                 own.hidden = p.source !== 'text';
                 own.textContent = 'eigenen Ort verwenden';
                 toggle.hidden = p.source === 'text';
@@ -350,6 +366,7 @@
         .km-place { margin: 6px 0; font-size: 0.92em; }
         .km-place[hidden], .km-place [hidden] { display: none !important; }
         .km-place-line { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+        .km-place-slider { width: min(200px, 40vw); margin: 0; align-self: center; accent-color: var(--accent, #1a5fb4); }
         .km-place-line button { padding: 0; border: 0; background: none; color: var(--accent, #1a5fb4);
             font: inherit; text-decoration: underline; cursor: pointer; }
         .km-place-form { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; }

@@ -1236,6 +1236,15 @@
         let tourMarks = null;     // hervorgehobene Zeiträume des Schritts
         let tourButtons = true;   // Startknöpfe sichtbar (eingebettet nur mit data-tour)
 
+        // Abschnitte der Seite; layers (data-ebenen) wählt eine Auswahl, z. B. ohne Zeitgleichung in Teil 1
+        const SECTIONS = { gain: 'secGain', times: 'secTimes', eot: 'secEot', table: 'secTable' };
+        let pageSections = Object.keys(SECTIONS);
+
+        /** zeigt nur die genannten Abschnitte */
+        function showSections(names) {
+            for (const [name, id] of Object.entries(SECTIONS)) document.getElementById(id).hidden = !names.includes(name);
+        }
+
         function tourStepDef() {
             return TOURS[tour.name].steps[tour.index];
         }
@@ -1269,7 +1278,7 @@
             tourMarks = null;
             document.body.classList.remove('touring');
             for (const c of document.querySelectorAll('.controls input, .controls select, .controls button')) c.disabled = false;
-            for (const id of ['secGain', 'secTimes', 'secEot', 'secTable']) el(id).hidden = false;
+            showSections(pageSections);
             el('tour').hidden = true;
             el('tourStart').hidden = !tourButtons;
             el('lat').value = saved.lat;
@@ -1294,11 +1303,7 @@
             const def = TOURS[tour.name], step = tourStepDef();
             el('timeMode').value = def.timeMode;
             el('horizon').value = step.horizon || '-0.8333';
-            const show = step.show || ['gain', 'times', 'eot', 'table'];
-            el('secGain').hidden = !show.includes('gain');
-            el('secTimes').hidden = !show.includes('times');
-            el('secTable').hidden = !show.includes('table');
-            el('secEot').hidden = !show.includes('eot');
+            showSections(step.show || pageSections);
             recompute(true);
             const d = yearData;
             if (step.select) selectedIndex = Math.min(Math.max(step.select(d), 0), d.n - 1);
@@ -1448,6 +1453,11 @@
             // Jahr und Tag der Kennzahlen aus der Adresse (t), sonst heute
             selectDate = kmEmbed.state.t;
             document.getElementById('year').value = (selectDate || new Date()).getFullYear();
+
+            // Auswahl der Abschnitte aus der Adresse (layers), unbekannte Namen zählen nicht
+            const wantedSections = (kmEmbed.state.layers || []).filter(name => SECTIONS[name]);
+            if (wantedSections.length) pageSections = wantedSections;
+            showSections(pageSections);
 
             for (const id of ['lat', 'lon', 'year']) {
                 document.getElementById(id).addEventListener('input', () => recompute(true));
