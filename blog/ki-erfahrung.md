@@ -63,17 +63,56 @@ Seit ein paar Wochen erlebe ich nun meinen persönlichen „KI-Schock“: Mit de
 den neuen Modellen ist unglaublich viel möglich, und das Ergebnis ist im Verhältnis erstaunlich
 fehlerfrei. Es gehen Dinge, die vor wenigen Monaten für mich noch unvorstellbar gewesen wären. Heute
 entstehen ganze interaktive 3D-Modelle wie mit einem Fingerschnippen.
+Nach einem beeindruckenden Versuch, ein 3d-Modell mit Erde und Mond generieren zu lassen, kam die Idee zur folgenden Reihe.
 
-<!-- Portierung JS ← C++: Commit cb87c68 vom 2026-10-26; Abweichung JS/C++ etwa 1e-11. -->
+## 2. Arbeitsweise (Entwurf)
+
+<!-- Nach Angabe des Autors vom 2026-11-04: Modelle per Vibe-Coding, es ging um den Inhalt, nicht
+     um das Wie; astro.js wird architektonisch überwacht. Zu prüfen: „Code kaum gelesen“ und der
+     Schlusssatz mit dem Hörensagen sind Annahmen. Belege: JS/C++ etwa 1e-11 (cb87c68),
+     NASA-Vergleich in cpp/Testbench-Mond.md, Zeitraffer-Formeln in longterm.js. -->
+
+Ich beginne Claude Code-Projekte mit einer Planungsphase. Für diese Reihe habe ich zum Beispiel Claude Code genommen und mit folgendem Prompt gestartet:
+
+> Erstelle als Markdown eine didaktisch sinnvolle Erklärung zu den Themen: Die Sonnenbahn im Laufe des Jahres am Himmel (Aufgangszeit, Mittagszeit, Untergang, Höhe der Bahn, eventuell Steilheit bei Auf- und Untergang  wie schnell verschwindet die Sonne am Horizont) und damit verbunden die Bahn der Erde um die Sonne (Sommer länger als Winter wegen Elliptischer Bahn...) . Erkläre in einem eigenen Abschnitt dann auch, was sich im Laufe der Jahrhunderte geändert hat/ändert. Verweise auf die vorhanden Skripte zur Visualisierung.
+
+Zwei Tage später, als aus dieser Erklärung schon die Modelle zum Tagbogen und zur Himmelsachse
+entstanden waren, folgte ein konkreterer Plan:
+
+> Grundplan für die Seite: Neben Ausprobieren/Experimentieren (Spielwiese) möchte ich einen didaktisch-sinnvollen Weg aus mehreren Wordpress-Beiträgen schaffen und dem Phänomen Tageslänge, Auf- und Untergang, Zeitgleichung, Tagesbogen (horizont-Koordinatensystem), Himmelsachse (Wechsel zu  Äquatorialen Koordinatensystem) zu Erdbahn um die Sonne (Ekliptikales Koordinatensystem) schaffen. Anschließend soll der Mond mit betrachtet werden und einige Aspekte des Mondes und der Mondbahn mit erklärt werden. In Wordpress darf ein persönlicher Ton mit spannenden Eingangsfragen sein. Die Seiten für sich sollen eher sachlich gehalten sein. Tutorials in den Plugins [gemeint: Modelle] sollen auch in den Wordpress-Seiten verfügbar sein. Merke dir das.
+
+Dieser Plan wurde dann mit dem sogenannten "Grilling-Skill" verfeinert. Es handelt sich dabei um Text-Anweisungen, die unsichtbar hinzugefügt werden und die KI zu einem Frage-Antwort-Verfahren mit kritischen Nachfragen bringt.
+So wurde z.B. die Zielgruppe (Laien/allgemeine Schulbildung) und das Alleinstellungsmerkmal (interaktive 3d-Modelle mit integrierten Tutorials) geklärt und eine sinnvolle Reihenfolge festgelegt.
+Für den gewünschten sprachlichen Stil habe ich unter anderem mehrere alte, selbstgeschriebene Artikel lesen und einen Musterbeitrag verfassen lassen, den ich dann redigiert habe. Gelernte Regeln waren beispielsweise:
+
+> - **Keine direkte Anrede**, weder „du“ noch „Sie“.
+> - **„Ich“ möglichst vermeiden**, lieber „fällt mir auf“ als „merke ich“, sonst unpersönlich oder Passiv. Erlebnisse werden nie erfunden.
+> - **Lebhaft, aber nicht flapsig**: neugierig, trockener und selbstironischer Humor, beiläufig. Keine saloppen Zuspitzungen.
+> - **Sätze** mittellang bis lang, dazwischen kurze Akzentsätze.
+> - **Sachlich-gehoben** mit vereinzelten Alltagswörtern wie „Bastellösung“ oder „Crashkurs“.
+> - **Fachbegriffe** nicht erzwingen. Ein Schlüsselwort steht **fett** beim ersten Auftreten, kurz in Klammern oder im Nebensatz erklärt.
+
+Einmal "gelernt", sind die folgenden Texte zu 90 Prozent automatisch KI-generiert, nur gelegentlich habe ich noch eingegriffen.
+
+Die Modelle sind durch **Vibe-Coding** entstanden:
+Programmieren nach Gefühl. Beschreiben, was man sehen möchte, Ergebnis anschauen und sagen,
+was anders sein soll. Der Programmcode selbst tritt dabei in den Hintergrund. Es geht um den
+Inhalt, nicht um das Wie. Die KI testet größtenteils selbst, macht zum Beispiel virtuelle Bildschirmfotos und analysiert diese.
+
+Wobei ich auch beim **Vibe-Coding** auf eine starke Planung setze. Ich lasse mir Umsetzungsvorschläge machen und greife in die Planung ein. Bei einem Plan in mehreren Schritten kontrolliere ich die Ergebnisse, bevor ich die KI wieder einige Minuten programmieren- und testen lasse.
+
+Ein anderes herangehen nutze ich bei Programmteilen, die mir wichtig sind - wie beispielsweise die eigentlichen astronomischen Berechnungen. Hier verfolge ich Programmierstil und Schnittstellen und achte darauf, dass sie "menschenlesbar" bleiben. Konkret basieren sie noch auf den ursprünglichen Formeln aus dem Buch "Astronomische Algorithmen" von Jean Meeus und sind sehr gut getestet.
+
+
 
 ## Stoff (zum Auswählen)
 
-Aus der Arbeit an der Reihe, als Gedächtnisstütze:
-- Die Berechnungen folgen weiter Meeus; die KI hat `astro.js` und die C++-Fassung parallel gehalten.
-- Die Modelle wurden in einem Browser ohne Bildschirm (headless) getestet, mit Bildschirmfotos auf
+Aus der Arbeit an der Reihe, als Gedächtnisstütze (✓ = in Abschnitt 2 verwendet):
+- ✓ Die Berechnungen folgen weiter Meeus; die KI hat `astro.js` und die C++-Fassung parallel gehalten.
+- ✓ Die Modelle wurden in einem Browser ohne Bildschirm (headless) getestet, mit Bildschirmfotos auf
   Computer- und Handybreite, hell und dunkel.
-- Die Zahlen in den Rundgangstexten werden im Modell berechnet statt abgeschrieben.
-- Das didaktische Konzept entstand in einem Frage-Antwort-Verfahren („Grilling“): Die KI stellt Fragen
+- ✓ Die Zahlen in den Rundgangstexten werden im Modell berechnet statt abgeschrieben.
+- ✓ Das didaktische Konzept entstand in einem Frage-Antwort-Verfahren („Grilling“): Die KI stellt Fragen
   mit einem Vorschlag, der Autor entscheidet.
 - Der Textstil wurde an älteren Blogbeiträgen ausgerichtet; Korrekturen des Autors (kein „Ich“, nicht
   flapsig, kein Vorgriff) flossen als Regeln ein.
