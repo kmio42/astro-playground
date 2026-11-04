@@ -1,13 +1,13 @@
 # Erfahrungen mit Claude Code
 
-<!-- Eigener Beitrag außerhalb der Reihe; alle Teile verweisen am Ende darauf. Noch kein Text: hier
-     Stoff sammeln. Die Erfahrungen und Urteile sind die des Autors; nichts davon erfinden. -->
+<!-- Eigener Beitrag außerhalb der Reihe; alle Teile verweisen am Ende darauf. Abschnitte 1–2 als Entwurf,
+     Stoff unten. Die Erfahrungen und Urteile sind die des Autors; nichts davon erfinden. -->
 
 ## Mögliche Gliederung
 
 1. **Vorgeschichte:** das erste Projekt mit zaghafter KI-Hilfe („Sternzeit und Erdposition“), Resultate
    noch nicht durchgehend überzeugend.
-2. **Diesmal:** Was Claude Code gemacht hat und was beim Autor blieb (Ideen, Entscheidungen, Prüfen,
+2. **Arbeitsweise:** Was Claude Code gemacht hat und was beim Autor blieb (Ideen, Entscheidungen, Prüfen,
    Stil).
 3. **Was gut klappte**
 4. **Wo es hakte**
@@ -65,14 +65,39 @@ fehlerfrei. Es gehen Dinge, die vor wenigen Monaten für mich noch unvorstellbar
 entstehen ganze interaktive 3D-Modelle wie mit einem Fingerschnippen.
 Nach einem beeindruckenden Versuch, ein 3D-Modell mit Erde und Mond generieren zu lassen, kam die Idee zur folgenden Reihe.
 
+<!-- Fakten aus Git und Sitzungsverlauf (Sitzung 970e4733, Commits f7d63eb, 8309bfc, ea580a6),
+     Uhrzeiten MEZ. „Beim zweiten Hinsehen“: Autor schrieb „stimmt nicht“, sechs Minuten später
+     „Es scheint zu stimmen“. -->
+
+An einem Abend Ende Oktober bat ich Claude Code um ein Konzept:
+
+> Erstelle ein interaktives 3d-Modell von Erde und Mond, wo man die Ekliptik-Ebene und Mondbahn sieht, Knoten und Apsiden und die beleuchteten Seiten. Nutze für Mond das cgi-kit und suche wenn möglich für Erde eine Entsprechung. Die Implementierung soll ohne nachladen aus dem Internet funktionieren. Erstelle ein Konzept
+
+Auf meine Frage nach dem Aufwand mit einer fertigen 3D-Bibliothek oder mit eigenem **WebGL** (der
+3D-Grafik des Browsers) fiel die Wahl auf eigenes WebGL. Gut zwei Stunden später stand das Modell mit
+Erde und Mond, Ekliptik, Mondbahn, Knoten und Apsiden, die Oberflächen aus Bilddaten der NASA. Eine
+knappe halbe Stunde danach kamen Schatten und Finsternisse dazu, nach einer weiteren halben Stunde
+eine Erklärung aller Einstellungen und geführte Rundgänge. Von mir kam dazwischen etwa ein Dutzend kurzer Anweisungen, oft nur „mache weiter“ oder „committe“. Einmal meldete ich, die Ausrichtung der Erde zur Sonne stimme nicht – beim
+zweiten Hinsehen stimmte sie doch. In gut drei Stunden entstanden rund 3200 Zeilen Programmcode, ein
+Konzeptpapier mit gut 400 Zeilen und Tests für die Bahnberechnung.
+
 ## 2. Arbeitsweise (Entwurf)
 
-<!-- Nach Angabe des Autors vom 2026-11-04: Modelle per Vibe-Coding, es ging um den Inhalt, nicht
-     um das Wie; astro.js wird architektonisch überwacht. Zu prüfen: „Code kaum gelesen“ und der
-     Schlusssatz mit dem Hörensagen sind Annahmen. Belege: JS/C++ etwa 1e-11 (cb87c68),
-     NASA-Vergleich in cpp/Testbench-Mond.md, Zeitraffer-Formeln in longterm.js. -->
+<!-- Vom Autor geschrieben; Reihenfolge, Erklärungen in Klammern und Testbelege am 2026-11-05 ergänzt.
+     Belege: JS/C++ etwa 1e-11 (cb87c68), NASA-Vergleich in cpp/Testbench-Mond.md. -->
 
-Ich beginne Claude-Code-Projekte mit einer Planungsphase. Für diese Reihe habe ich zum Beispiel Claude Code genommen und mit folgendem Prompt gestartet:
+Die Modelle sind durch **Vibe-Coding** entstanden:
+Programmieren nach Gefühl. Beschreiben, was man sehen möchte, Ergebnis anschauen und sagen,
+was anders sein soll. Der Programmcode selbst tritt dabei in den Hintergrund. Es geht um den
+Inhalt, nicht um das Wie. Die KI testet größtenteils selbst, macht zum Beispiel virtuelle Bildschirmfotos und analysiert diese.
+
+Allerdings setze ich auch beim Vibe-Coding auf eine starke Planung. Ich beginne Claude-Code-Projekte
+mit einer Planungsphase, lasse mir Umsetzungsvorschläge machen und greife in die Planung ein. Bei
+einem Plan in mehreren Schritten kontrolliere ich die Ergebnisse, bevor ich die KI wieder einige
+Minuten programmieren und testen lasse.
+
+Für diese Reihe habe ich zum Beispiel Claude Code genommen und mit folgendem **Prompt** (der
+Anweisung an die KI) gestartet:
 
 > Erstelle als Markdown eine didaktisch sinnvolle Erklärung zu den Themen: Die Sonnenbahn im Laufe des Jahres am Himmel (Aufgangszeit, Mittagszeit, Untergang, Höhe der Bahn, eventuell Steilheit bei Auf- und Untergang  wie schnell verschwindet die Sonne am Horizont) und damit verbunden die Bahn der Erde um die Sonne (Sommer länger als Winter wegen Elliptischer Bahn...) . Erkläre in einem eigenen Abschnitt dann auch, was sich im Laufe der Jahrhunderte geändert hat/ändert. Verweise auf die vorhanden Skripte zur Visualisierung.
 
@@ -81,7 +106,7 @@ entstanden waren, folgte ein konkreterer Plan:
 
 > Grundplan für die Seite: Neben Ausprobieren/Experimentieren (Spielwiese) möchte ich einen didaktisch-sinnvollen Weg aus mehreren Wordpress-Beiträgen schaffen und dem Phänomen Tageslänge, Auf- und Untergang, Zeitgleichung, Tagesbogen (horizont-Koordinatensystem), Himmelsachse (Wechsel zu  Äquatorialen Koordinatensystem) zu Erdbahn um die Sonne (Ekliptikales Koordinatensystem) schaffen. Anschließend soll der Mond mit betrachtet werden und einige Aspekte des Mondes und der Mondbahn mit erklärt werden. In Wordpress darf ein persönlicher Ton mit spannenden Eingangsfragen sein. Die Seiten für sich sollen eher sachlich gehalten sein. Tutorials in den Plugins [gemeint: Modelle] sollen auch in den Wordpress-Seiten verfügbar sein. Merke dir das.
 
-Dieser Plan wurde dann mit dem sogenannten „Grilling-Skill“ verfeinert. Es handelt sich dabei um Textanweisungen, die unsichtbar hinzugefügt werden und die KI zu einem Frage-Antwort-Verfahren mit kritischen Nachfragen bringen.
+Dieser Plan wurde dann mit dem sogenannten „Grilling-Skill“ verfeinert. Es handelt sich dabei um Textanweisungen, die der Anfrage unsichtbar hinzugefügt werden und die KI zu einem Frage-Antwort-Verfahren mit kritischen Nachfragen bringen.
 So wurden z. B. die Zielgruppe (Laien/allgemeine Schulbildung) und das Alleinstellungsmerkmal (interaktive 3D-Modelle mit integrierten Tutorials) geklärt und eine sinnvolle Reihenfolge festgelegt.
 Für den gewünschten sprachlichen Stil ließ ich unter anderem mehrere alte, selbstgeschriebene Artikel lesen und einen Musterbeitrag verfassen, den ich dann redigierte. Gelernte Regeln waren beispielsweise:
 
@@ -94,15 +119,11 @@ Für den gewünschten sprachlichen Stil ließ ich unter anderem mehrere alte, se
 
 Nachdem die KI den Stil „gelernt“ hatte, entstanden die folgenden Texte zu 90 Prozent automatisch; nur gelegentlich griff ich noch ein.
 
-Die Modelle sind durch **Vibe-Coding** entstanden:
-Programmieren nach Gefühl. Beschreiben, was man sehen möchte, Ergebnis anschauen und sagen,
-was anders sein soll. Der Programmcode selbst tritt dabei in den Hintergrund. Es geht um den
-Inhalt, nicht um das Wie. Die KI testet größtenteils selbst, macht zum Beispiel virtuelle Bildschirmfotos und analysiert diese.
-
-Allerdings setze ich auch beim Vibe-Coding auf eine starke Planung. Ich lasse mir Umsetzungsvorschläge machen und greife in die Planung ein. Bei einem Plan in mehreren Schritten kontrolliere ich die Ergebnisse, bevor ich die KI wieder einige Minuten programmieren und testen lasse.
-
-Ein anderes Herangehen nutze ich bei Programmteilen, die mir wichtig sind – wie beispielsweise die eigentlichen astronomischen Berechnungen. Hier verfolge ich Programmierstil und Schnittstellen und achte darauf, dass sie „menschenlesbar“ bleiben. Konkret basieren sie noch auf den ursprünglichen Formeln aus dem Buch *Astronomische Algorithmen* von Jean Meeus und sind sehr gut getestet.
-
+Ein anderes Herangehen nutze ich bei Programmteilen, die mir wichtig sind – wie beispielsweise die
+eigentlichen astronomischen Berechnungen. Hier verfolge ich Programmierstil und Schnittstellen (wie
+die Modelle die Rechenfunktionen aufrufen) und achte darauf, dass sie „menschenlesbar“ bleiben.
+Konkret basieren sie noch auf den ursprünglichen Formeln aus dem Buch *Astronomische Algorithmen*
+von Jean Meeus und sind sehr gut getestet.
 
 ## Stoff (zum Auswählen)
 
@@ -110,11 +131,14 @@ Aus der Arbeit an der Reihe, als Gedächtnisstütze (✓ = in Abschnitt 2 verwen
 - ✓ Die Berechnungen folgen weiter Meeus; die KI hat `astro.js` und die C++-Fassung parallel gehalten.
 - ✓ Die Modelle wurden in einem Browser ohne Bildschirm (headless) getestet, mit Bildschirmfotos auf
   Computer- und Handybreite, hell und dunkel.
-- ✓ Die Zahlen in den Rundgangstexten werden im Modell berechnet statt abgeschrieben.
+- Die Zahlen in den Rundgangstexten werden im Modell berechnet statt abgeschrieben.
 - ✓ Das didaktische Konzept entstand in einem Frage-Antwort-Verfahren („Grilling“): Die KI stellt Fragen
   mit einem Vorschlag, der Autor entscheidet.
-- Der Textstil wurde an älteren Blogbeiträgen ausgerichtet; Korrekturen des Autors (kein „Ich“, nicht
+- ✓ Der Textstil wurde an älteren Blogbeiträgen ausgerichtet; Korrekturen des Autors (kein „Ich“, nicht
   flapsig, kein Vorgriff) flossen als Regeln ein.
+- Abend des 3. November (für „Was gut klappte“): nach dem Grilling ab 19:57 Uhr entstanden bis 22:26 Uhr
+  die Rundgänge in Tageslänge, das Zeitgleichungsdiagramm, Erdbahn3D mit Rundgang und der Zeitraffer
+  über Jahrtausende (Commits c1192f6 bis ae97eb9).
 - Einbettung in den Blog: Der erste Ansatz lud die Modelle in der Vorschau nicht, der zweite
   funktionierte.
 
