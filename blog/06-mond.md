@@ -15,7 +15,7 @@ Mondphase und Sichel bekommen keinen eigenen Teil.
 | 6 | Bahn um die Sonne ([Entwurf](06-mondbahn.md)) | Umkreist der Mond die Erde oder die Sonne? | `mondbahn`, Ansicht `geo`, Rundgang `schleifen` (umgesetzt) |
 | 7 | Neigung und Knoten ([Entwurf](07-knoten.md)) | Warum gibt es nicht bei jedem Vollmond eine Finsternis? | `mondbahn3d`, Rundgang `knoten` (umgesetzt) |
 | 8 | Finsternisse | Wie lassen sich Finsternisse vorhersagen? | `erdemond`, Rundgang `nodes`; evtl. zweiter Platzhalter `apsides` |
-| 9 | Mondbahn im Horizontsystem | Warum steht der Vollmond im Winter hoch? | neu: `mondbogen3d` mit Rundgang |
+| 9 | Mondbahn im Horizontsystem | Warum steht der Vollmond im Winter hoch? | `mondbogen`, Rundgang `mondbogen` (umgesetzt) |
 
 Bausteine wie in der Reihe: Rundgänge für 50° N, 10° O, Bezugsjahr 2026, deutsche Zeit; einzelne
 Schritte dürfen in andere Jahre springen. Neue Seiten werden einbettbar (`embed.js`, `MODELS` in
@@ -113,6 +113,13 @@ Uhrzeit, Breite, Ansichten, Abspielen):
   (5) Vollmond Juni 2026 tief, (6) ein Monat im Zeitraffer, (7) große Mondwende 2025: bis etwa 68° Höhe,
   17–18 h am Himmel, (8) kleine Mondwende um 2034, (9) Erntemond im September, (10) frei. Zahlen im
   Modell prüfen.
+- Umgesetzt am 2026-11-05 (Zahlen aus dem Modell, 50° N, 10° O, deutsche Zeit): (2) 17. Dezember 2026, Dekl.
+  +5,9° in 24 h, Aufgang 12:15 bei 87°, Untergang 18.12. 1:11 bei 278° statt 273°; (3) 30. Dezember 2026 ohne
+  Aufgang (29.12. 23:44, 31.12. 1:00); (4) Vollmond 24. Dezember 2026, Dekl. 27,3°, 67°, 17 h 48 min über dem
+  Horizont; (5) Vollmond 30. Juni 2026, −27,2°, 13°, 7 h 10 min; (7) 7. März 2025, 28,7°, 69°, 18 h 05 min;
+  (8) 26. März 2034, 18,1°, 58°, 15 h 36 min; (9) Erntemond 26. September 2026: Aufgang 14–18 min später je
+  Abend, um den Vollmond am 3. März 2026 74–85 min. Abweichung: Standard-Zeitraum der Spirale ±1 Tag um den
+  Zeitpunkt (Regler 0,5–7 Tage); der Weg ist geozentrisch gezeichnet (Parallaxe knapp 1°, im Text erwähnt).
 
 Voraussetzung: Umbau von `calculateMoonRiseSet` in `astro.js` und `cpp/astro.cpp` gemeinsam, gleiche
 API. RA, Dec und Entfernung kubisch an 12-h-Stützstellen interpolieren (reicht laut Testbench), Höhe mit
@@ -133,7 +140,7 @@ Newton-Schritt Δm nach Meeus. `cpp/Plan-Mondaufgang.md` entsprechend anpassen.
 2. `mondbahn3d.html` mit Rundgang (erledigt), Textentwurf Teil 7 (`07-knoten.md`).
 3. Texte der Rundgänge in `erdemond3d.html` (erledigt: `nodes` überarbeitet, in `apsides` und `height` Daten und Begriffe).
 4. Umbau Mondaufgang in `astro.js`/`astro.cpp` (erledigt, Halbierung bis 0,1 s statt 1 s; Ergebnis in `cpp/Plan-Mondaufgang.md`).
-5. `mondbogen3d.html` mit Rundgang.
+5. `mondbogen3d.html` mit Rundgang (erledigt am 2026-11-05; Ablauf in `CLAUDE.md`), danach Textentwurf Teil 9.
 
 ## Notizen
 

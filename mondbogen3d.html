@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Der Mondbogen</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --muted: #8a8984;
+            --ground: rgba(196, 214, 178, 0.72);
+            --ground-line: #6f7f62;
+            --sun: #e39a00;
+            --day-fill: rgba(237, 161, 0, 0.12);
+            --night: #5b6f9a;
+            --moon: #1f8585;
+            --moon-below: #5b8f99;
+            --moon-day: #f6f2e4;
+            --moon-night: #4b4d57;
+            --major: #d0362b;
+            --minor: #8a8984;
+            --axis: #7a59c9;
+            --north: #d0362b;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --muted: #8f8e86;
+                --ground: rgba(52, 66, 44, 0.85);
+                --ground-line: #9fb08f;
+                --sun: #f2b01e;
+                --day-fill: rgba(242, 176, 30, 0.12);
+                --night: #8fa3d6;
+                --moon: #4fc8c0;
+                --moon-below: #7fa9b3;
+                --moon-day: #ece7d6;
+                --moon-night: #3a3c44;
+                --major: #f0564a;
+                --minor: #9a998f;
+                --axis: #a68cf0;
+                --north: #f0564a;
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --muted: #8f8e86;
+            --ground: rgba(52, 66, 44, 0.85);
+            --ground-line: #9fb08f;
+            --sun: #f2b01e;
+            --day-fill: rgba(242, 176, 30, 0.12);
+            --night: #8fa3d6;
+            --moon: #4fc8c0;
+            --moon-below: #7fa9b3;
+            --moon-day: #ece7d6;
+            --moon-night: #3a3c44;
+            --major: #f0564a;
+            --minor: #9a998f;
+            --axis: #a68cf0;
+            --north: #f0564a;
+        }
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            touch-action: none;
+            cursor: grab;
+            border-radius: 6px;
+            background: var(--surface-2);
+        }
+        canvas.dragging { cursor: grabbing; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 20px;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls input[type="number"] { width: 5.5em; }
+        .controls input[type="text"] { width: 7em; }
+        .controls input.invalid { border-color: red; }
+        .controls .wide { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .controls .wide input[type="range"] { flex: 1; min-width: 80px; }
+        .controls .value { font-variant-numeric: tabular-nums; min-width: 7.5em; font-weight: 600; white-space: nowrap; }
+        .controls .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .controls .jump { display: inline-flex; gap: 2px; align-items: center; }
+        .controls .jump span { margin-right: 4px; }
+        .feedback { color: var(--text-2); font-size: 0.9em; }
+        button { padding: 3px 10px; }
+        button.active { font-weight: bold; outline: 2px solid var(--moon); outline-offset: -1px; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            font-size: 0.9em;
+            color: var(--text-2);
+            margin: 6px 0 10px;
+        }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before {
+            background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px);
+        }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 16px; }
+        #info table { border-collapse: collapse; }
+        #info td { padding: 2px 14px 2px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+        #info td:first-child { color: var(--text-2); }
+        h2 { margin-top: 28px; }
+        .tour {
+            border-left: 4px solid var(--moon);
+            background: var(--surface-2);
+            border-radius: 6px;
+            padding: 10px 14px 12px;
+            margin-bottom: 10px;
+        }
+        .tour-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
+        .tour-head b { font-size: 1.1em; }
+        .tour-head span { color: var(--text-2); font-size: 0.9em; }
+        #tourText { min-height: 7.5em; }
+        #tourText p { margin: 8px 0; }
+        .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tour-nav .end { margin-left: auto; }
+        .start-tour { margin: 0 0 14px; }
+        .start-tour button { padding: 6px 14px; font-size: 1em; text-align: left; }
+        body.touring #kmPlace { display: none; }
+    </style>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script src="embed.js"></script>
+    <script src="canvas3d.js"></script>
+    <script src="orbit3d.js"></script>
+    <script>
+        const { V } = canvas3d;
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zustand                                //
+    /////////////////////////////////////////////////////////////////
+
+        // Himmel des Beobachters: Einheitskugel, x nach Osten, y nach Norden, z zum Zenit; die Scheibe ist der Horizont
+        const MAJOR_DEC = 28.6;          // große Mondwende: 23,4° + 5,1° [°]
+        const MINOR_DEC = 18.3;          // kleine Mondwende: 23,4° − 5,1° [°]
+        const SPAN_LIMITS = [0.5, 7];    // Zeitraum der Mondbahn ± Tage
+
+        const state = {
+            jd: julianDayFromDate(new Date()),
+            lat: 50,
+            lon: 10,
+            span: 1,             // Mondbahn von jd − span bis jd + span [d]
+            play: null,          // 'day' (2 Stunden pro Sekunde) oder 'month' (1 Tag pro Sekunde)
+            show: { sun: true, limits: false, axis: true, hours: true },
+        };
+
+        const VIEWS = {
+            oblique: { az: 205, el: 22, dist: 3.6 },
+            south:   { az: 0, el: 8, dist: 3.2 },     // hinter dem Beobachter, Blick nach Süden
+            east:    { az: 90, el: 0, dist: 3.6 },    // von Osten in Horizonthöhe
+            top:     { az: 180, el: 89, dist: 3.6 },
+        };
+
+        /**
+         * Ist eine Ebene sichtbar? Im Rundgang bestimmt der Schritt, mit layers aus der Adresse diese Liste, sonst
+         * die Häkchen. Ebenen: dome, zenith, axis, sun, path, moon, riseSet, hours, noon, limits
+         */
+        function visible(layer) {
+            const step = tour && tour.step;
+            if (step && step.layers) return step.layers.includes(layer);
+            if (fixedLayers) return fixedLayers.includes(layer);
+            switch (layer) {
+                case 'dome': case 'zenith': case 'axis': return state.show.axis;
+                case 'sun': return state.show.sun;
+                case 'limits': return state.show.limits;
+                case 'hours': return state.show.hours;
+                default: return true;
+            }
+        }
+
+        const COMPASS = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+        const DIRECTION_NAMES = ['Norden', 'Nordnordosten', 'Nordosten', 'Ostnordosten', 'Osten', 'Ostsüdosten',
+                                 'Südosten', 'Südsüdosten', 'Süden', 'Südsüdwesten', 'Südwesten', 'Westsüdwesten',
+                                 'Westen', 'Westnordwesten', 'Nordwesten', 'Nordnordwesten'];
+
+    /////////////////////////////////////////////////////////////////
+    //                      Berechnung                             //
+    /////////////////////////////////////////////////////////////////
+
+        // Zeitzone der Uhrzeiten: die des Browsers, im Rundgang die deutsche (MEZ/MESZ)
+        let displayZone = null;
+        const TOUR_ZONE = 'Europe/Berlin';
+
+        function zoneOption() {
+            return displayZone ? { timeZone: displayZone } : {};
+        }
+
+        function observerLocation() {
+            return { latitude: state.lat * DEG2RAD, longitude: state.lon * DEG2RAD, elevation: 0 };
+        }
+
+        /** Kalendertag und Uhrzeit eines Zeitpunkts in der Zeitzone der Anzeige */
+        function partsOf(jd) {
+            return zonedParts(julianDayToDate(jd), displayZone);
+        }
+
+        /** Wie partsOf, auf die volle Minute gerundet (für angezeigte Uhrzeiten) */
+        function minuteParts(jd) {
+            return partsOf(jd + 0.5 / 1440);
+        }
+
+        /** JD zu Datum (Monat ab 0) und Uhrzeit in der Zeitzone der Anzeige */
+        function jdOf(year, month, day, hours = 0, minutes = 0) {
+            return julianDayFromDate(zonedDate(year, month, day, hours, minutes, displayZone));
+        }
+
+        function sunEquatorial(jd) {
+            return calculateEquatorial(calculateSunPosition(jd), calculateObliquity(jd));
+        }
+
+        // Mondposition stündlich berechnet und zwischengespeichert, dazwischen kubisch interpoliert
+        // (Fehler unter 1″, siehe cpp/Testbench-Mond.md); so bleibt das Abspielen flüssig
+        const moonCache = new Map();
+        function moonNode(hour) {
+            let v = moonCache.get(hour);
+            if (!v) {
+                if (moonCache.size > 20000) moonCache.clear();
+                const jd = hour / 24;
+                const m = calculateMoonPosition(jd);
+                const e = calculateEquatorial(m, calculateObliquity(jd));
+                v = { ra: e.ra, dec: e.dec };
+                moonCache.set(hour, v);
+            }
+            return v;
+        }
+
+        /** Rektaszension und Deklination des Mondes (geozentrisch) [rad] */
+        function moonEquatorial(jd) {
+            const x = jd * 24, k = Math.floor(x), u = x - k;
+            const n = [moonNode(k - 1), moonNode(k), moonNode(k + 1), moonNode(k + 2)];
+            const w = [-u * (u - 1) * (u - 2) / 6, (u + 1) * (u - 1) * (u - 2) / 2,
+                       -(u + 1) * u * (u - 2) / 2, (u + 1) * u * (u - 1) / 6];
+            let ra = 0, dec = 0;
+            for (let i = 0; i < 4; i++) {
+                ra += w[i] * (n[1].ra + normalizeAngleSigned(n[i].ra - n[1].ra));
+                dec += w[i] * n[i].dec;
+            }
+            return { ra, dec };
+        }
+
+        /**
+         * Punkt am Himmel (Einheitskugel) aus Stundenwinkel H und Deklination dec. Der Tagkreis ist ein Kreis um
+         * die Himmelsachse p im Abstand dec vom Himmelsäquator.
+         */
+        function skyPoint(H, dec, phi) {
+            const sd = Math.sin(dec), cd = Math.cos(dec);
+            const sp = Math.sin(phi), cp = Math.cos(phi);
+            return [
+                -cd * Math.sin(H),
+                sd * cp - cd * Math.cos(H) * sp,
+                sd * sp + cd * Math.cos(H) * cp,
+            ];
+        }
+
+        /** Ort des Mondes am Himmel zum Zeitpunkt jd */
+        function moonPoint(jd, loc) {
+            const e = moonEquatorial(jd);
+            return skyPoint(calculateLocalSiderealTime(jd, loc) - e.ra, e.dec, loc.latitude);
+        }
+
+        /** Punkte eines Kreises fester Deklination, Stundenwinkel ab start über 360° */
+        function circlePoints(dec, phi, start, steps = 180) {
+            const pts = [];
+            for (let i = 0; i <= steps; i++) pts.push(skyPoint(start + 2 * Math.PI * i / steps, dec, phi));
+            return pts;
+        }
+
+        /** Polylinie am Horizont (z = 0) in Stücke darüber und darunter teilen, mit den Schnittpunkten */
+        function splitAtHorizon(points) {
+            const result = { above: [], below: [] };
+            let run = [points[0]];
+            let side = points[0][2] >= 0 ? 'above' : 'below';
+            for (let i = 1; i < points.length; i++) {
+                const p = points[i];
+                const s = p[2] >= 0 ? 'above' : 'below';
+                if (s !== side) {
+                    const q = points[i - 1];
+                    const t = q[2] / (q[2] - p[2]);
+                    const c = [q[0] + t * (p[0] - q[0]), q[1] + t * (p[1] - q[1]), 0];
+                    run.push(c);
+                    result[side].push(run);
+                    run = [c, p];
+                    side = s;
+                } else {
+                    run.push(p);
+                }
+            }
+            result[side].push(run);
+            return result;
+        }
+
+        /** Richtung [°] von Norden über Osten zu einem Himmelspunkt */
+        function azimuthOf(p) {
+            return normalizeDegrees(Math.atan2(p[0], p[1]) * RAD2DEG);
+        }
+
+        // Auf- und Untergänge je Kalendertag (calculateMoonRiseSet), zwischengespeichert
+        const riseSetCache = new Map();
+        function dayEvents(year, month, day) {
+            const key = `${year}-${month}-${day}|${displayZone}|${state.lat}|${state.lon}`;
+            let v = riseSetCache.get(key);
+            if (!v) {
+                if (riseSetCache.size > 2000) riseSetCache.clear();
+                const noon = zonedDate(year, month, day, 12, 0, displayZone);
+                const offset = zoneOffsetHours(noon, displayZone);
+                const r = calculateMoonRiseSet(julianDayFromDate(noon), observerLocation(), offset);
+                const base = julianDayFromDate(noon) - 0.5;      // Tagesbeginn bei der Zeitzone des Mittags
+                v = [];
+                if (r.hasRise) v.push({ type: 'rise', jd: base + r.rise / 24 });
+                if (r.hasSet) v.push({ type: 'set', jd: base + r.set / 24 });
+                if (r.hasTransit) v.push({ type: 'transit', jd: base + r.transit / 24 });
+                riseSetCache.set(key, v);
+            }
+            return v;
+        }
+
+        /** Alle Auf-, Untergänge und Durchgänge zwischen a und b, zeitlich sortiert */
+        function eventsBetween(a, b) {
+            const out = [];
+            const p = partsOf(a);
+            let noon = jdOf(p.year, p.month, p.day, 12);
+            for (; noon - 0.5 <= b + 0.1; noon += 1) {
+                const q = partsOf(noon);
+                for (const e of dayEvents(q.year, q.month, q.day)) {
+                    if (e.jd >= a && e.jd <= b) out.push(e);
+                }
+            }
+            return out.sort((x, y) => x.jd - y.jd);
+        }
+
+        /**
+         * Nördlichster (sign = 1) oder südlichster (−1) Stand des Mondes: das nächste Maximum von sign · δ nach jd
+         * (forward) bzw. davor; Raster 3 h, dann auf 5 min genau
+         */
+        function extremeDeclination(jd, sign, forward) {
+            const f = t => sign * moonEquatorial(t).dec;
+            const step = (forward ? 1 : -1) / 8;
+            let t = jd + step, a = f(jd), b = f(t);
+            for (let i = 0; i < 300; i++) {
+                const c = f(t + step);
+                if (b >= a && b >= c) break;
+                a = b; b = c; t += step;
+            }
+            let best = t, bestValue = f(t);
+            for (let x = t - 1 / 8; x <= t + 1 / 8; x += 1 / 288) {
+                const v = f(x);
+                if (v > bestValue) { bestValue = v; best = x; }
+            }
+            return best;
+        }
+
+        /** Alles, was für den eingestellten Zeitpunkt gezeichnet und angezeigt wird */
+        function computeScene() {
+            const loc = observerLocation(), phi = loc.latitude, jd = state.jd;
+
+            // Mondbahn über ±span, Punkte alle 10 min (bei langen Zeiträumen alle 20 min)
+            const dt = (state.span > 3 ? 20 : 10) / 1440;
+            const path = [];
+            for (let t = jd - state.span; t <= jd + state.span + 1e-9; t += dt) path.push(moonPoint(t, loc));
+
+            // Mond jetzt, genau berechnet
+            const moonEcl = calculateMoonPosition(jd);
+            const moonEqu = calculateEquatorial(moonEcl, calculateObliquity(jd));
+            const lst = calculateLocalSiderealTime(jd, loc);
+            const moon = skyPoint(lst - moonEqu.ra, moonEqu.dec, phi);
+            const moonHz = calculateHorizontal(moonEqu, lst, loc);
+
+            // Sonne und ihr Tagkreis am selben Tag
+            const sunEqu = sunEquatorial(jd);
+            const sun = skyPoint(lst - sunEqu.ra, sunEqu.dec, phi);
+
+            // Phase: Elongation und beleuchteter Anteil
+            const cosPsi = Math.sin(sunEqu.dec) * Math.sin(moonEqu.dec)
+                         + Math.cos(sunEqu.dec) * Math.cos(moonEqu.dec) * Math.cos(sunEqu.ra - moonEqu.ra);
+            const illuminated = (1 - cosPsi) / 2;
+            const waxing = normalizeAngle(moonEcl.longitude - calculateSunPosition(jd).longitude) < Math.PI;
+
+            // Auf- und Untergänge im Zeitraum, dazu der Durchgang über den Horizont, in dem der Mond gerade steht
+            // (über dem Horizont) oder der als nächster kommt
+            const events = eventsBetween(jd - Math.max(state.span, 2) - 1.2, jd + Math.max(state.span, 2) + 1.2);
+            const before = events.filter(e => e.type !== 'transit' && e.jd <= jd);
+            const after = events.filter(e => e.type !== 'transit' && e.jd > jd);
+            const last = before[before.length - 1];
+            let pass = null;
+            if (last && last.type === 'rise') {
+                const set = after.find(e => e.type === 'set');
+                pass = { rise: last, set };
+            } else {
+                const rise = after.find(e => e.type === 'rise');
+                const set = rise && after.find(e => e.type === 'set' && e.jd > rise.jd);
+                pass = rise ? { rise, set } : null;
+            }
+            if (pass) {
+                const transit = events.find(e => e.type === 'transit' && e.jd > pass.rise.jd
+                                                 && (!pass.set || e.jd < pass.set.jd));
+                pass.transit = transit || null;
+                const rises = events.filter(e => e.type === 'rise' && e.jd < pass.rise.jd);
+                pass.previousRise = rises[rises.length - 1] || null;
+            }
+            const markerPoint = e => {
+                const p = moonPoint(e.jd, loc), r = Math.hypot(p[0], p[1]) || 1;
+                return [p[0] / r, p[1] / r, 0];
+            };
+            const horizonEvents = events
+                .filter(e => e.type !== 'transit' && Math.abs(e.jd - jd) <= state.span)
+                .map(e => ({ ...e, point: markerPoint(e) }));
+
+            // Volle Stunden und Tagesgrenzen auf der Bahn
+            const hours = [];
+            const firstHour = Math.ceil((jd - state.span) * 24 - 1e-9);
+            if (state.span <= 3) {
+                for (let h = firstHour; h / 24 <= jd + state.span; h++) {
+                    const t = h / 24, p = partsOf(t + 1 / 2880);    // halbe Minute Rundungsreserve
+                    hours.push({ jd: t, hour: p.hours, date: p, point: moonPoint(t, loc) });
+                }
+            }
+
+            // Spanne der Deklination ±14 Tage um den Zeitpunkt
+            let decMin = Infinity, decMax = -Infinity;
+            for (let t = jd - 14; t <= jd + 14; t += 1 / 8) {
+                const d = moonEquatorial(t).dec;
+                decMin = Math.min(decMin, d);
+                decMax = Math.max(decMax, d);
+            }
+
+            return {
+                loc, phi, jd, path, moon, moonEqu, moonHz, moonEcl, sun, sunEqu, illuminated, waxing,
+                events, pass, horizonEvents, hours, decMin, decMax,
+                decRate: (moonEquatorial(jd + 0.5).dec - moonEquatorial(jd - 0.5).dec) * RAD2DEG,
+            };
+        }
+
+        /** Höhe [°] bei der Kulmination für die Deklination dec [rad] (geozentrisch, ohne Lichtbrechung) */
+        function culmination(dec) {
+            return 90 - Math.abs(state.lat - dec * RAD2DEG);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zeichnen                               //
+    /////////////////////////////////////////////////////////////////
+
+        let scene = null, tour = null, colors = {};
+        const COLOR_NAMES = ['surface', 'surface-2', 'text', 'text-2', 'muted', 'ground', 'ground-line', 'sun', 'day-fill',
+                             'night', 'moon', 'moon-below', 'moon-day', 'moon-night', 'major', 'minor', 'axis', 'north'];
+
+        function circleInPlane(radius, z = 0, steps = 120) {
+            const pts = [];
+            for (let i = 0; i <= steps; i++) {
+                const a = 2 * Math.PI * i / steps;
+                pts.push([radius * Math.sin(a), radius * Math.cos(a), z]);
+            }
+            return pts;
+        }
+
+        // Beschriftungen werden gesammelt und am Ende nach Rang gezeichnet; eine, die eine wichtigere überdecken
+        // würde, entfällt (rank: 5 Haupthimmelsrichtungen, 4 Auf-/Untergang des aktuellen Bogens, 3 Höhe, 2 Datum,
+        // 1 Stunden und weitere Auf-/Untergänge, 0 Zwischenrichtungen)
+        let labelQueue = [];
+        const label = (p, text, color, opts = {}) => labelQueue.push({ p, text, color, opts });
+
+        function flushLabels() {
+            const placed = [];
+            const sorted = labelQueue.map((l, i) => ({ ...l, i })).sort((a, b) => (b.opts.rank ?? 1) - (a.opts.rank ?? 1) || a.i - b.i);
+            for (const l of sorted) {
+                const s = scene.project(l.p), size = l.opts.size ?? 12;
+                const w = l.text.length * size * 0.56 + 4, h = size + 2;
+                const x = s[0] + (l.opts.dx ?? 0), y = s[1] + (l.opts.dy ?? 0);
+                const left = l.opts.align === 'left' ? x : x - w / 2;
+                const box = { l: left, r: left + w, t: y - h / 2, b: y + h / 2 };
+                if (placed.some(q => box.l < q.r && box.r > q.l && box.t < q.b && box.b > q.t)) continue;
+                placed.push(box);
+                scene.label(l.p, l.text, l.color, { halo: colors['surface-2'], ...l.opts });
+            }
+            labelQueue = [];
+        }
+
+        /** Horizontscheibe mit Kompassrose */
+        function drawDisc() {
+            const c = colors;
+            scene.fill(circleInPlane(1), c.ground);
+            scene.stroke(circleInPlane(1), { color: c['ground-line'], width: 1.5 });
+            scene.stroke(circleInPlane(0.5), { color: c['ground-line'], width: 0.8, alpha: 0.35 });
+            for (let a = 0; a < 360; a += 10) {
+                const r0 = a % 90 === 0 ? 0.88 : a % 30 === 0 ? 0.92 : 0.96;
+                const s = Math.sin(a * DEG2RAD), co = Math.cos(a * DEG2RAD);
+                scene.stroke([[r0 * s, r0 * co, 0], [s, co, 0]], { color: c['ground-line'], width: a % 30 === 0 ? 1.3 : 0.8 });
+            }
+            const spike = (az, len, color) => {
+                const a = az * DEG2RAD, w = 0.05;
+                const tip = [len * Math.sin(a), len * Math.cos(a), 0];
+                const l = [w * Math.sin(a - Math.PI / 2), w * Math.cos(a - Math.PI / 2), 0];
+                const r = [w * Math.sin(a + Math.PI / 2), w * Math.cos(a + Math.PI / 2), 0];
+                scene.fill([l, tip, r, [0, 0, 0]], color);
+            };
+            for (const az of [45, 135, 225, 315]) spike(az, 0.16, c.muted);
+            for (const az of [90, 180, 270]) spike(az, 0.3, c['text-2']);
+            spike(0, 0.3, c.north);
+            ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'].forEach((n, i) => {
+                const a = i * 45 * DEG2RAD, main = i % 2 === 0;
+                label([1.12 * Math.sin(a), 1.12 * Math.cos(a), 0], n, i === 0 ? c.north : (main ? c.text : c['text-2']),
+                      { bold: main, size: main ? 14 : 11, rank: main ? 5 : 0 });
+            });
+        }
+
+        /** Teil einer Polylinie über oder unter dem Horizont zeichnen */
+        function strokeHalf(points, half, styleAbove, styleBelow) {
+            const st = half === 'above' ? styleAbove : styleBelow;
+            if (!st) return;
+            for (const run of splitAtHorizon(points)[half]) scene.stroke(run, st);
+        }
+
+        /**
+         * Mond als Scheibe mit Phase, wie der Beobachter sie sieht: beleuchteter Anteil aus dem Winkel zwischen
+         * Sonne und Mond, die helle Seite im Bild zur Sonne hin
+         */
+        function drawMoonDisc(p, sunDir, rho) {
+            const ctx = scene.ctx, c = scene.project(p), b = scene.basis, col = colors;
+            const m = V.norm(p);
+            const perp = V.sub(sunDir, V.scale(m, V.dot(sunDir, m)));   // Lichtrichtung quer zur Sichtlinie
+            const sx = V.dot(perp, b.r), sy = -V.dot(perp, b.u);
+            const sz = -V.dot(sunDir, m);                              // > 0: helle Seite zum Beobachter
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(c[0], c[1], rho, 0, 2 * Math.PI);
+            ctx.fillStyle = col['moon-day'];
+            ctx.fill();
+            ctx.translate(c[0], c[1]);
+            ctx.rotate(Math.atan2(sy, sx));
+            ctx.beginPath();
+            ctx.arc(0, 0, rho, Math.PI / 2, 3 * Math.PI / 2);
+            ctx.ellipse(0, 0, Math.max(rho * Math.abs(sz), 0.01), rho, 0, 3 * Math.PI / 2, Math.PI / 2, sz > 0);
+            ctx.fillStyle = col['moon-night'];
+            ctx.fill();
+            ctx.restore();
+            ctx.beginPath();
+            ctx.arc(c[0], c[1], rho, 0, 2 * Math.PI);
+            ctx.strokeStyle = col.moon;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+
+        /** Die Teile einer Hälfte ('above' oder 'below' des Horizonts) */
+        function drawHalf(S, half) {
+            const c = colors, up = half === 'above';
+
+            // Kreise der größten Deklination bei großer und kleiner Mondwende, dazu der Himmelsäquator
+            if (visible('limits')) {
+                const refs = [[MAJOR_DEC, c.major], [-MAJOR_DEC, c.major], [MINOR_DEC, c.minor], [-MINOR_DEC, c.minor],
+                              [0, c.muted]];
+                for (const [d, color] of refs) {
+                    strokeHalf(circlePoints(d * DEG2RAD, S.phi, -Math.PI), half,
+                               { color, width: 1.2, alpha: 0.6, dash: d === 0 ? [] : [6, 4] },
+                               { color, width: 1, alpha: 0.3, dash: [3, 4] });
+                }
+            }
+
+            // Himmelshalbkugel: Meridian und erster Vertikal, nur angedeutet
+            if (up && visible('dome')) {
+                for (const az of [0, 90]) {
+                    const arc = [];
+                    for (let i = 0; i <= 60; i++) {
+                        const a = Math.PI * i / 60;
+                        arc.push([Math.cos(a) * Math.sin(az * DEG2RAD), Math.cos(a) * Math.cos(az * DEG2RAD), Math.sin(a)]);
+                    }
+                    scene.stroke(arc, { color: c.muted, width: 0.8, dash: [2, 4], alpha: 0.7 });
+                }
+            }
+            if (up && visible('zenith')) {
+                scene.stroke([[0, 0, 0.1], [0, 0, 1]], { color: c.muted, width: 0.8, dash: [1, 4], alpha: 0.6 });
+                scene.dot([0, 0, 1], 2.5, c.muted);
+                label([0, 0, 1], 'Zenit', c['text-2'], { size: 11, dy: -10 });
+            }
+            if (visible('axis')) {
+                const p = [0, Math.cos(S.phi), Math.sin(S.phi)];
+                const axis = [];
+                for (let i = -10; i <= 10; i++) axis.push(V.scale(p, 1.3 * i / 10));
+                strokeHalf(axis, half, { color: c.axis, width: 1.3, dash: [6, 4] }, { color: c.axis, width: 1, dash: [6, 4], alpha: 0.5 });
+                for (const [pt, name] of [[V.scale(p, 1.38), 'Himmelsnordpol'], [V.scale(p, -1.38), 'Himmelssüdpol']]) {
+                    if ((pt[2] >= 0) === up) label(pt, name, c.axis, { size: 11, alpha: up ? 1 : 0.6 });
+                }
+            }
+
+            // Tagkreis der Sonne am selben Tag (geschlossen) und die Sonne
+            if (visible('sun')) {
+                const circle = circlePoints(S.sunEqu.dec, S.phi, -Math.PI);
+                if (up) for (const run of splitAtHorizon(circle).above) scene.fill(run, c['day-fill']);
+                strokeHalf(circle, half, { color: c.sun, width: 2 }, { color: c.sun, width: 1, dash: [4, 4], alpha: 0.45 });
+                if ((S.sun[2] >= 0) === up) {
+                    if (up) scene.dot(S.sun, 7, c.sun);
+                    else scene.dot(S.sun, 6, c.sun, { filled: false });
+                }
+            }
+
+            // Bahn des Mondes: Spirale über den eingestellten Zeitraum
+            if (visible('path')) {
+                strokeHalf(S.path, half, { color: c.moon, width: 3 }, { color: c['moon-below'], width: 1.5, dash: [5, 4], alpha: 0.8 });
+            }
+
+            // Volle Stunden und Tagesgrenzen auf der Bahn
+            if (visible('path') && visible('hours')) {
+                const labels = state.span <= 1.5;
+                for (const h of S.hours) {
+                    if ((h.point[2] >= 0) !== up) continue;
+                    if (h.hour === 0) {
+                        scene.dot(h.point, 3.5, up ? c.moon : c['moon-below'], { filled: false });
+                        label(V.scale(h.point, 1.1), `${h.date.day}.${h.date.month + 1}.`, up ? c.text : c.muted,
+                              { size: 11, bold: up, rank: 2 });
+                    } else {
+                        scene.dot(h.point, up ? 2 : 1.5, up ? c.moon : c['moon-below']);
+                        if (labels && up && h.hour % 2 === 0) label(V.scale(h.point, 1.08), String(h.hour), c['text-2'], { size: 10 });
+                    }
+                }
+            }
+
+            // Höchster Stand im aktuellen Bogen mit Höhenwinkel
+            if (up && visible('noon') && S.pass && S.pass.transit) {
+                const cu = moonPoint(S.pass.transit.jd, S.loc);
+                if (cu[2] > 0) {
+                    const h = [0, Math.sign(cu[1]) || 1, 0], arc = [];
+                    for (let i = 0; i <= 30; i++) arc.push(V.norm(V.lerp(h, cu, i / 30)));
+                    scene.stroke(arc, { color: c['text-2'], width: 1.2, dash: [1, 3] });
+                    label(arc[20], formatDeg(Math.asin(cu[2]) * RAD2DEG, 0), c.text, { bold: true, size: 12, align: 'left', dx: 8, rank: 3 });
+                }
+            }
+
+            // Beobachter
+            if (up) {
+                scene.stroke([[0, 0, 0], [0, 0, 0.07]], { color: c.text, width: 2 });
+                scene.dot([0, 0, 0.085], 3, c.text);
+            }
+
+            // Mond zum eingestellten Zeitpunkt
+            if (visible('moon') && (S.moon[2] >= 0) === up) {
+                scene.stroke([[0, 0, 0.04], S.moon], { color: up ? c.moon : c['moon-below'], width: 1, dash: [2, 3], alpha: 0.8 });
+                const sunDir = V.norm(S.sun);
+                drawMoonDisc(S.moon, sunDir, up ? 8 : 6);
+            }
+        }
+
+        /** Auf- und Untergangspunkte am Horizont (in der Ebene, deshalb nach der Scheibe) */
+        function drawHorizonPoints(S) {
+            if (!visible('riseSet')) return;
+            const c = colors, today = partsOf(S.jd);
+            for (const e of S.horizonEvents) {
+                const p = minuteParts(e.jd);
+                const sameDay = p.year === today.year && p.month === today.month && p.day === today.day;
+                const main = !!S.pass && (e.jd === S.pass.rise.jd || (!!S.pass.set && e.jd === S.pass.set.jd));
+                scene.stroke([[0, 0, 0], e.point], { color: c.moon, width: 1, dash: [4, 3], alpha: main ? 0.7 : 0.35 });
+                scene.dot(e.point, main ? 4.5 : 3, c.moon);
+                const text = `${e.type === 'rise' ? '↑' : '↓'} ${sameDay ? '' : `${p.day}.${p.month + 1}. `}${clock(p.hours + p.minutes / 60)}`;
+                label(e.point, text, main ? c.text : c['text-2'],
+                      { size: main ? 12 : 11, bold: main, dy: e.type === 'rise' ? 16 : -14, rank: main ? 4 : 1 });
+            }
+        }
+
+        function draw() {
+            if (!scene) return;
+            colors = canvas3d.readColors(COLOR_NAMES);
+            labelQueue = [];
+            scene.begin();
+            const S = computeScene();
+            const cameraAbove = scene.basis.eye[2] >= 0;
+            drawHalf(S, cameraAbove ? 'below' : 'above');
+            drawDisc();
+            drawHorizonPoints(S);
+            drawHalf(S, cameraAbove ? 'above' : 'below');
+            flushLabels();
+            updateInfo(S);
+            tour.render(tourValues(S));
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Anzeige                                //
+    /////////////////////////////////////////////////////////////////
+
+        function formatNumber(x, digits) {
+            return x.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits }).replace('-', '−');
+        }
+
+        function formatDeg(x, digits = 1) {
+            return formatNumber(x, digits) + '°';
+        }
+
+        function clock(hours) {
+            const m = Math.round(hours * 60);
+            const hh = Math.floor(m / 60) % 24, mm = ((m % 60) + 60) % 60;
+            return `${hh}:${String(mm).padStart(2, '0')}`;
+        }
+
+        function duration(days) {
+            const m = Math.round(days * 1440);
+            return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+        }
+
+        function compassName(az) {
+            return COMPASS[Math.round(normalizeDegrees(az) / 22.5) % 16];
+        }
+
+        function directionName(az) {
+            return DIRECTION_NAMES[Math.round(normalizeDegrees(az) / 22.5) % 16];
+        }
+
+        /** Name der Zeitzone (MEZ, MESZ) zum Zeitpunkt jd, sonst UTC±h */
+        function zoneName(jd) {
+            const d = julianDayToDate(jd);
+            try {
+                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short', ...zoneOption() })
+                    .formatToParts(d).find(p => p.type === 'timeZoneName');
+                if (part) return part.value;
+            } catch (e) { /* ältere Browser */ }
+            const offset = zoneOffsetHours(d, displayZone);
+            return 'UTC' + (offset >= 0 ? '+' : '−') + Math.abs(offset);
+        }
+
+        /** Datum mit Jahr, z. B. „24. Dezember 2026“ */
+        function fullDate(jd) {
+            return julianDayToDate(jd).toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long', year: 'numeric' });
+        }
+
+        function timeOf(jd) {
+            const p = minuteParts(jd);
+            return clock(p.hours + p.minutes / 60);
+        }
+
+        /** Uhrzeit, mit Datum, wenn der Tag nicht der von ref ist */
+        function timeWithDay(jd, ref) {
+            const p = minuteParts(jd), q = partsOf(ref);
+            const same = p.year === q.year && p.month === q.month && p.day === q.day;
+            return (same ? '' : `${p.day}.${p.month + 1}. `) + clock(p.hours + p.minutes / 60);
+        }
+
+        function riseSetAzimuth(e, S) {
+            return azimuthOf(moonPoint(e.jd, S.loc));
+        }
+
+        function phaseName(S) {
+            const k = S.illuminated;
+            if (k < 0.03) return 'Neumond';
+            if (k > 0.97) return 'Vollmond';
+            if (Math.abs(k - 0.5) < 0.06) return S.waxing ? 'erstes Viertel' : 'letztes Viertel';
+            return S.waxing ? 'zunehmend' : 'abnehmend';
+        }
+
+        function updateInfo(S) {
+            const rows = [];
+            const add = (k, v) => rows.push(`<tr><td>${k}</td><td>${v}</td></tr>`);
+            const tz = zoneName(S.jd);
+            add('Zeitpunkt', julianDayToDate(S.jd).toLocaleDateString('de-DE', { ...zoneOption(), weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+                + `, ${timeOf(S.jd)} ${tz}`);
+            const alt = S.moonHz.altitude * RAD2DEG, az = normalizeDegrees(S.moonHz.azimuth * RAD2DEG + 180);
+            add('Mond', `Höhe ${formatDeg(alt)}, Richtung ${formatDeg(az, 0)} (${compassName(az)})`
+                + (alt < 0 ? ' – unter dem Horizont' : ''));
+            add('Deklination δ', `${formatDeg(S.moonEqu.dec * RAD2DEG)}, in 24 Stunden ${S.decRate >= 0 ? '+' : '−'}${formatDeg(Math.abs(S.decRate))}`);
+            add('Phase', `${phaseName(S)}, ${formatNumber(S.illuminated * 100, 0)} % beleuchtet`);
+            const P = S.pass;
+            if (P) {
+                const ref = S.jd;
+                add(alt >= 0 ? 'Aufgegangen' : 'Nächster Aufgang',
+                    `${timeWithDay(P.rise.jd, ref)} ${tz}, Richtung ${formatDeg(riseSetAzimuth(P.rise, S), 0)} (${compassName(riseSetAzimuth(P.rise, S))})`);
+                if (P.transit) {
+                    const cu = moonPoint(P.transit.jd, S.loc);
+                    add('Höchster Stand', `${timeWithDay(P.transit.jd, ref)} ${tz}, Höhe ${formatDeg(Math.asin(cu[2]) * RAD2DEG)}`);
+                }
+                if (P.set) {
+                    add('Untergang', `${timeWithDay(P.set.jd, ref)} ${tz}, Richtung ${formatDeg(riseSetAzimuth(P.set, S), 0)} (${compassName(riseSetAzimuth(P.set, S))})`);
+                    add('Über dem Horizont', duration(P.set.jd - P.rise.jd));
+                }
+                if (P.previousRise) {
+                    const late = Math.round((P.rise.jd - P.previousRise.jd - 1) * 1440);
+                    const q = minuteParts(P.previousRise.jd);
+                    add('Später als am Vortag', `${late} min (vorheriger Aufgang ${q.day}.${q.month + 1}. ${timeOf(P.previousRise.jd)} ${tz})`);
+                }
+            } else {
+                add('Aufgang', 'keiner in den nächsten Tagen');
+            }
+            add('In diesem Monat', `Deklination ${formatDeg(S.decMin * RAD2DEG)} bis ${formatDeg(S.decMax * RAD2DEG)}, `
+                + `höchster Stand ${formatDeg(culmination(S.decMin), 0)} bis ${formatDeg(culmination(S.decMax), 0)}`);
+            add('Sonne', `Deklination ${formatDeg(S.sunEqu.dec * RAD2DEG)}, mittags ${formatDeg(culmination(S.sunEqu.dec), 0)} hoch`);
+            document.getElementById('info').innerHTML = `<table>${rows.join('')}</table>`;
+
+            const p = partsOf(S.jd);
+            document.getElementById('dayValue').textContent = julianDayToDate(S.jd).toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long' });
+            document.getElementById('timeValue').textContent = `${clock(p.hours + p.minutes / 60)} ${tz}`;
+            document.getElementById('spanValue').textContent = `± ${formatNumber(state.span, state.span % 1 ? 1 : 0)} ${state.span === 1 ? 'Tag' : 'Tage'}`;
+            for (const [name, b] of Object.entries(viewButtons)) b.classList.toggle('active', currentView === name);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Rundgang                               //
+    /////////////////////////////////////////////////////////////////
+
+        /** Verspätung der Aufgänge [min] von Tag zu Tag um jd (±days), kleinste und größte */
+        function riseDelays(jd, days = 2.5) {
+            const rises = eventsBetween(jd - days - 1.2, jd + days).filter(e => e.type === 'rise');
+            const delays = [];
+            for (let i = 1; i < rises.length; i++) {
+                if (rises[i].jd < jd - days) continue;
+                delays.push(Math.round((rises[i].jd - rises[i - 1].jd - 1) * 1440));
+            }
+            return { min: Math.min(...delays), max: Math.max(...delays) };
+        }
+
+        /** Werte des eingestellten Zeitpunkts für die Texte */
+        function tourValues(S) {
+            const P = S.pass, ref = S.jd;
+            const v = {
+                date: fullDate(S.jd),
+                time: timeOf(S.jd),
+                dec: formatDeg(S.moonEqu.dec * RAD2DEG),
+                decAbs: formatDeg(Math.abs(S.moonEqu.dec * RAD2DEG)),
+                decRate: formatNumber(Math.abs(S.decRate), 1),
+                culm: formatNumber(culmination(S.moonEqu.dec), 0),
+                sunDec: formatNumber(S.sunEqu.dec * RAD2DEG, 1),
+                sunCulm: formatNumber(culmination(S.sunEqu.dec), 0),
+                decMin: formatDeg(S.decMin * RAD2DEG, 0), decMax: formatDeg(S.decMax * RAD2DEG, 0),
+                culmMin: formatNumber(culmination(S.decMin), 0), culmMax: formatNumber(culmination(S.decMax), 0),
+                maxDec: formatNumber(S.decMax * RAD2DEG, 1), maxCulm: formatNumber(culmination(S.decMax), 0),
+            };
+            if (P) {
+                const riseAz = riseSetAzimuth(P.rise, S);
+                v.rise = `am ${fullDate(P.rise.jd).replace(/ \d+$/, '')} um ${timeOf(P.rise.jd)} Uhr`;
+                v.riseTime = timeOf(P.rise.jd);
+                v.riseDate = fullDate(P.rise.jd);
+                v.riseAz = formatNumber(riseAz, 0);
+                v.mirrorAz = formatNumber(normalizeDegrees(360 - riseAz), 0);
+                v.riseDir = directionName(riseAz);
+                if (P.set) {
+                    const setAz = riseSetAzimuth(P.set, S);
+                    v.set = `am ${fullDate(P.set.jd).replace(/ \d+$/, '')} um ${timeOf(P.set.jd)} Uhr`;
+                    v.setTime = timeOf(P.set.jd);
+                    v.setAz = formatNumber(setAz, 0);
+                    v.setDir = directionName(setAz);
+                    v.setShift = formatNumber(Math.abs(setAz - (360 - riseAz)), 0);
+                    v.setShiftDir = setAz > 360 - riseAz ? 'weiter nördlich' : 'weiter südlich';
+                    v.above = duration(P.set.jd - P.rise.jd);
+                }
+                if (P.transit) v.transitAlt = formatNumber(Math.asin(moonPoint(P.transit.jd, S.loc)[2]) * RAD2DEG, 0);
+                if (P.previousRise) v.late = Math.round((P.rise.jd - P.previousRise.jd - 1) * 1440);
+            }
+            // Aufgänge um den Zeitpunkt (Tag ohne Aufgang)
+            const rises = S.events.filter(e => e.type === 'rise');
+            const prev = rises.filter(e => e.jd <= ref).pop(), next = rises.find(e => e.jd > ref);
+            if (prev && next) {
+                v.prevRise = `${fullDate(prev.jd).replace(/ \d+$/, '')} um ${timeOf(prev.jd)} Uhr`;
+                v.nextRise = `${fullDate(next.jd).replace(/ \d+$/, '')} um ${timeOf(next.jd)} Uhr`;
+                v.riseGap = duration(next.jd - prev.jd);
+            }
+            return v;
+        }
+
+        /** Verspätung der Aufgänge um den Vollmond nach dem Datum (Jahr, Monat ab 0, Tag) in deutscher Zeit */
+        function fullMoonDelays(year, month, day) {
+            const fm = nextMoonPhase(julianDayFromDate(zonedDate(year, month, day, 0, 0, TOUR_ZONE)), Math.PI);
+            return { jd: fm, ...riseDelays(fm) };
+        }
+
+        // Schritte: layers = sichtbare Ebenen (null = wie eingestellt), date = Zeitpunkt in deutscher Zeit
+        // („JJJJ-MM-TT hh:mm“), full/north = danach zum nächsten Vollmond bzw. nördlichsten Stand, span = Zeitraum
+        // der Bahn ± Tage, play = 'day'/'month', view = Ansicht; text bekommt die Werte des Zeitpunkts
+        const BASE = ['dome', 'zenith', 'axis'];
+        const TOUR_STEPS = [
+            {
+                title: 'Rückblick: der Tagbogen der Sonne',
+                layers: [...BASE, 'sun'], date: '2026-12-21 12:00', view: 'oblique', play: 'day',
+                text: v => `<p>Die Sonne zieht an einem Tag einen Kreis um die <b>Himmelsachse</b> (lila). Am ${v.date},
+                    zum Winteranfang, ragt nur ein kleines Stück davon über den Horizont, mittags steht sie gerade
+                    ${v.sunCulm}° hoch.</p>
+                    <p>Nach 24 Stunden schließt sich der Kreis: Die Deklination der Sonne, ihr Abstand vom
+                    Himmelsäquator, ändert sich an einem Tag kaum. Beim Mond ist das anders.</p>`,
+            },
+            {
+                title: 'Der Mond an einem Tag',
+                layers: [...BASE, 'sun', 'path', 'moon', 'riseSet', 'hours'], date: '2026-12-17 18:35', span: 1,
+                view: 'oblique',
+                text: v => `<p>Auch der Mond zieht einmal am Tag um die Himmelsachse, gezeigt ist sein Weg vom Vortag bis
+                    zum nächsten Tag (unter dem Horizont gestrichelt). Seine Deklination ändert sich aber schnell, hier
+                    um ${v.decRate}° in 24 Stunden. Aus dem Kreis wird eine <b>Spirale</b>.</p>
+                    <p>Am ${v.date} geht der Mond um ${v.riseTime} Uhr im ${v.riseDir} auf${v.set ? ` und ${v.set}
+                    im ${v.setDir} unter. Zum Aufgang hätte ein Untergang bei ${v.mirrorAz}° gepasst, er liegt aber ${v.setShift}° ${v.setShiftDir}` : ''}. Der Bogen schließt sich nicht.</p>`,
+            },
+            {
+                title: 'Jeden Tag später',
+                layers: [...BASE, 'path', 'moon', 'riseSet', 'hours'], date: '2026-12-30 12:00', span: 1.5,
+                view: 'oblique',
+                text: v => `<p>Während sich die Erde einmal dreht, wandert der Mond auf seiner Bahn gut 12° nach Osten
+                    weiter. Bis er wieder aufgeht, vergehen deshalb im Mittel 24 Stunden und 50 Minuten.</p>
+                    <p>So rutscht der Aufgang jeden Tag später, bis er einmal ganz über Mitternacht springt: Der Mond
+                    geht am ${v.prevRise} auf, der nächste Aufgang folgt erst am ${v.nextRise}. Der ${v.date} hat
+                    <b>keinen Mondaufgang</b>. Ebenso fehlt etwa einmal im Monat ein Untergang.</p>`,
+            },
+            {
+                title: 'Vollmond im Winter hoch …',
+                layers: [...BASE, 'sun', 'path', 'moon', 'riseSet', 'noon'], date: '2026-12-20 00:00', full: true, span: 1,
+                view: 'oblique',
+                text: v => `<p>Der Vollmond steht der Sonne gegenüber. Im Dezember steht die Sonne tief im Süden, ihr
+                    Tagkreis (orange) bleibt klein. Der Vollmond am ${v.date} steht deshalb hoch im Norden: Deklination
+                    ${v.dec}, höchster Stand ${v.transitAlt ?? v.culm}°.</p>
+                    <p>Er geht ${v.rise} im ${v.riseDir} auf und ${v.set} im ${v.setDir} unter, ist also
+                    ${v.above} über dem Horizont – fast die ganze lange Winternacht, so wie die Sonne im Sommer.</p>`,
+            },
+            {
+                title: '… und im Sommer tief',
+                layers: [...BASE, 'sun', 'path', 'moon', 'riseSet', 'noon'], date: '2026-06-25 00:00', full: true, span: 1,
+                view: 'oblique',
+                text: v => `<p>Im Sommer ist es umgekehrt: Die Sonne läuft hoch im Norden, der Vollmond am ${v.date}
+                    tief im Süden. Deklination ${v.dec}, höchster Stand nur ${v.transitAlt ?? v.culm}°.</p>
+                    <p>Er geht ${v.rise} im ${v.riseDir} auf und ${v.set} im ${v.setDir} unter: nur ${v.above}
+                    über dem Horizont, in der kurzen Sommernacht.</p>`,
+            },
+            {
+                title: 'Ein Monat im Zeitraffer',
+                layers: [...BASE, 'sun', 'path', 'moon', 'riseSet'], date: '2026-12-10 00:00', span: 1, play: 'month',
+                view: 'oblique',
+                text: v => `<p>Ein Tag pro Sekunde: Was die Sonne in einem Jahr schafft, schafft der Mond in einem Monat. In
+                    27,3 Tagen wandert seine Spirale einmal ganz nach oben und wieder zurück. In diesem Monat reicht
+                    seine Deklination von ${v.decMin} bis ${v.decMax}; am höchsten Punkt steht er dann zwischen
+                    ${v.culmMin}° und ${v.culmMax}° hoch.</p>
+                    <p>Die Phase hängt daran, wo die Sonne steht. Neben der Sonne, als Neumond, ist der Mond im Dezember
+                    so tief wie sie; ihr gegenüber, als Vollmond, steht er hoch. Jetzt: ${v.date}, ${v.time} Uhr.</p>`,
+            },
+            {
+                title: 'Große Mondwende: bis ±28,6°',
+                layers: [...BASE, 'path', 'moon', 'riseSet', 'noon', 'limits'], date: '2025-03-01 00:00', north: true,
+                span: 1, view: 'oblique',
+                text: v => `<p>Wie weit der Mond nach Norden und Süden ausschlägt, ändert sich mit der Knotenlinie in
+                    18,6 Jahren. Liegt seine Bahn günstig, kommen die 23,4° der Erdachse und die 5,1° der Mondbahn
+                    zusammen: <b>große Mondwende</b>, bis zu 28,6° Deklination (rote Kreise).</p>
+                    <p>Am ${v.date} erreichte der Mond ${v.dec}. Er stieg bis ${v.transitAlt ?? v.culm}° hoch und
+                    stand ${v.above ?? '–'} über dem Horizont. So hoch kommt die Sonne nie: Sie bleibt bei 23,4°.</p>`,
+            },
+            {
+                title: 'Kleine Mondwende: nur ±18,3°',
+                layers: [...BASE, 'path', 'moon', 'riseSet', 'noon', 'limits'], date: '2034-03-20 00:00', north: true,
+                span: 1, view: 'oblique',
+                text: v => `<p>Gut neun Jahre später ist die Mondbahn zur anderen Seite gekippt, und die Neigungen ziehen
+                    sich ab: 23,4° − 5,1° = 18,3° (graue Kreise). Das ist die <b>kleine Mondwende</b>.</p>
+                    <p>Am ${v.date} kam der Mond höchstens auf ${v.dec}, ${v.transitAlt ?? v.culm}° hoch, und war
+                    ${v.above ?? '–'} über dem Horizont. Ein Vollmond im Winter steht dann weniger hoch als die
+                    Sommersonne.</p>`,
+            },
+            {
+                title: 'Der Erntemond',
+                layers: [...BASE, 'path', 'moon', 'riseSet'], date: '2026-09-20 00:00', full: true, span: 2.5,
+                view: 'oblique',
+                text: v => {
+                    const sep = riseDelays(state.jd), mar = fullMoonDelays(2026, 1, 25);
+                    return `<p>Im Mittel geht der Mond jeden Tag 50 Minuten später auf. Um den Vollmond im September,
+                    am ${v.date}, sind es nur ${sep.min} bis ${sep.max} Minuten: Abend für Abend steht er kurz nach
+                    Sonnenuntergang im Osten. Früher half dieses Licht bei der Ernte, daher der Name <b>Erntemond</b>.</p>
+                    <p>Der Vollmond steht dann dort, wo die Mondbahn am schnellsten nach Norden steigt (die
+                    Aufgangspunkte wandern nach links). Jeder neue Tagkreis liegt weiter oben und geht früher auf; das
+                    gleicht den größten Teil der Verspätung aus. Um den Vollmond am ${fullDate(mar.jd)} war es umgekehrt:
+                    ${mar.min} bis ${mar.max} Minuten später an jedem Abend.</p>`;
+                },
+            },
+            {
+                title: 'Selbst ausprobieren',
+                layers: null, view: 'oblique',
+                text: v => `<p>Damit ist der Rundgang zu Ende. Mit den Reglern „Tag“ und „Uhrzeit“ und den Sprüngen zu
+                    Vollmond, Neumond und dem nördlichsten oder südlichsten Stand lässt sich jeder Tag ansehen; der
+                    Regler „Zeitraum“ verlängert die Spirale. Ziehen dreht die Ansicht, das Mausrad zoomt.</p>
+                    <p>Mit „Fertig“ gilt wieder der eigene Ort. Weiter im Norden werden die Unterschiede extrem: Jenseits
+                    von etwa 61° Breite geht der Mond bei der großen Mondwende zeitweise gar nicht unter.</p>`,
+            },
+        ];
+
+        let fixedLayers = null;     // Ebenen aus der Adresse (layers)
+
+        // Rundgang: fester Ort und deutsche Uhrzeit; danach Ort, Zeitpunkt und Zeitraum des Lesers zurück
+        const TOUR_PLACE = { lat: 50, lon: 10 };
+        let saved = null;
+        function fixPlace(on) {
+            if (on) {
+                saved = { lat: document.getElementById('lat').value, lon: document.getElementById('lon').value,
+                          jd: state.jd, span: state.span };
+                setPlaceInputs(TOUR_PLACE.lat, TOUR_PLACE.lon);
+                displayZone = TOUR_ZONE;
+                for (const id of ['lat', 'lon', 'latSlider']) document.getElementById(id).disabled = true;
+            } else {
+                displayZone = null;
+                setPlay(null);
+                for (const id of ['lat', 'lon', 'latSlider']) document.getElementById(id).disabled = false;
+                if (saved) {
+                    setPlaceInputs(saved.lat, saved.lon);
+                    setSpan(saved.span);
+                    setJd(saved.jd);
+                }
+                saved = null;
+            }
+            for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = on || !!fixedLayers;
+        }
+
+        function applyTourStep(step) {
+            setPlay(null);
+            if (step.date) {
+                const [d, t] = step.date.split(' ');
+                const [y, m, day] = d.split('-').map(Number), [h, min] = t.split(':').map(Number);
+                setJd(julianDayFromDate(zonedDate(y, m - 1, day, h, min, TOUR_ZONE)));
+            }
+            if (step.full) setJd(nextMoonPhase(state.jd, Math.PI));
+            if (step.north) setJd(extremeDeclination(state.jd, 1, true));
+            if (step.span) setSpan(step.span);
+            if (step.view) setView(step.view);
+            if (step.play) setPlay(step.play);
+            requestDraw();
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Bedienung                              //
+    /////////////////////////////////////////////////////////////////
+
+        let frameRequested = false;
+        function requestDraw() {
+            if (frameRequested) return;
+            frameRequested = true;
+            requestAnimationFrame(() => { frameRequested = false; draw(); });
+        }
+
+        function daysInYear(year) {
+            return (new Date(year, 1, 29).getMonth() === 1) ? 366 : 365;
+        }
+
+        /** Zeitpunkt setzen und die Regler nachführen */
+        function setJd(jd) {
+            state.jd = jd;
+            const p = partsOf(jd);
+            const slider = document.getElementById('daySlider');
+            slider.max = daysInYear(p.year) - 1;
+            slider.value = Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(p.year, 0, 1)) / 86400000);
+            document.getElementById('timeSlider').value = p.hours * 60 + p.minutes;
+            document.getElementById('year').value = p.year;
+            requestDraw();
+        }
+
+        /** Tag im Jahr (ab 0) und Uhrzeit [min] in der Zeitzone der Anzeige */
+        function setDayAndTime(year, dayOfYear, minutes) {
+            setJd(julianDayFromDate(zonedDate(year, 0, 1 + dayOfYear, 0, minutes, displayZone)));
+        }
+
+        function currentDayAndTime() {
+            const p = partsOf(state.jd);
+            return { year: p.year, day: Math.round((Date.UTC(p.year, p.month, p.day) - Date.UTC(p.year, 0, 1)) / 86400000),
+                     minutes: p.hours * 60 + p.minutes };
+        }
+
+        function setSpan(days) {
+            state.span = Math.min(Math.max(days, SPAN_LIMITS[0]), SPAN_LIMITS[1]);
+            document.getElementById('spanSlider').value = state.span;
+            requestDraw();
+        }
+
+        function showNow() {
+            setJd(julianDayFromDate(new Date()));
+        }
+
+        function jumpPhase(phase, dir) {
+            setJd(nextMoonPhase(state.jd + dir * 0.01, phase, dir < 0));
+        }
+
+        function jumpExtreme(sign, dir) {
+            setJd(extremeDeclination(state.jd + dir * 0.05, sign, dir > 0));
+        }
+
+        /** Breite/Länge: Dezimalgrad oder 48°51'22"N (dmsToDecimal aus ui.js) */
+        function parseCoordinate(text) {
+            const s = text.trim().replace(',', '.');
+            if (/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+            try { return dmsToDecimal(s); } catch (e) { return NaN; }
+        }
+
+        function setPlaceInputs(lat, lon) {
+            document.getElementById('lat').value = String(lat);
+            document.getElementById('lon').value = String(lon);
+            readLocationInputs();
+        }
+
+        function readLocationInputs() {
+            const latInput = document.getElementById('lat'), lonInput = document.getElementById('lon');
+            const lat = parseCoordinate(latInput.value), lon = parseCoordinate(lonInput.value);
+            const latOk = Number.isFinite(lat) && Math.abs(lat) <= 90;
+            const lonOk = Number.isFinite(lon) && Math.abs(lon) <= 180;
+            latInput.classList.toggle('invalid', !latOk);
+            lonInput.classList.toggle('invalid', !lonOk);
+            if (latOk) { state.lat = lat; document.getElementById('latSlider').value = lat; }
+            if (lonOk) state.lon = lon;
+            requestDraw();
+        }
+
+        function saveLocation() {
+            localStorage.setItem('latitude', document.getElementById('lat').value.trim());
+            localStorage.setItem('longitude', document.getElementById('lon').value.trim());
+            document.getElementById('locationFeedback').textContent = 'Ort gespeichert';
+        }
+
+        let currentView = 'oblique';
+        const viewButtons = {};
+
+        function setView(name, instant = false) {
+            if (!VIEWS[name]) return;
+            currentView = name;
+            scene.animateTo({ cam: { ...VIEWS[name] } }, instant ? 1 : 600);
+            if (instant) scene.finish();
+            startLoop();
+        }
+
+        // Abspielen und Kamerafahrt in einer gemeinsamen Schleife
+        let loopRunning = false, lastTime = 0;
+        function startLoop() {
+            if (loopRunning || !kmEmbed.visible) return;
+            loopRunning = true;
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function loop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+            if (state.play === 'day') setJd(state.jd + dt / 12);          // 2 Stunden pro Sekunde
+            else if (state.play === 'month') setJd(state.jd + dt);        // 1 Tag pro Sekunde
+            scene.step(now);
+            draw();
+            if (!kmEmbed.visible) {
+                loopRunning = false;        // außerhalb des Bildes: anhalten, onVisibility setzt fort
+            } else if (state.play || scene.tween) {
+                requestAnimationFrame(loop);
+            } else {
+                loopRunning = false;
+            }
+        }
+
+        function setPlay(which) {
+            state.play = which;
+            document.getElementById('playDay').textContent = which === 'day' ? '❚❚ Tag' : '▶ Tag';
+            document.getElementById('playMonth').textContent = which === 'month' ? '❚❚ Monat' : '▶ Monat';
+            if (which) startLoop(); else requestDraw();
+        }
+
+        function togglePlay(which) {
+            setPlay(state.play === which ? null : which);
+        }
+
+        /**
+         * Startzustand aus der Adresse (embed.js): Rundgang mondbogen, Zeitpunkt t, Ansicht view (oblique, south,
+         * east, top), Ebenen layers (dome, zenith, axis, sun, path, moon, riseSet, hours, noon, limits) und
+         * Abspielen play (day = 2 Stunden pro Sekunde, month = 1 Tag pro Sekunde)
+         */
+        function applyEmbedState(s) {
+            if (s.layers) {
+                fixedLayers = s.layers;
+                for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
+            }
+            tour.fromEmbedState(s, kmEmbed.active);
+            if (s.t) setJd(julianDayFromDate(s.t));
+            if (s.view && VIEWS[s.view]) setView(s.view, true);
+            if (s.play) setPlay(s.play === 'month' || s.play === 'year' ? 'month' : 'day');
+            scene.finish();
+            requestDraw();
+        }
+
+        window.onload = function () {
+            scene = new canvas3d.Scene(document.getElementById('view'),
+                { cam: { ...VIEWS.oblique }, target: [0, 0, 0.15], aspect: 0.62, minHeight: 340, maxHeight: 640,
+                  minDist: 2.2, maxDist: 8, minEl: -30, maxEl: 89 });
+            scene.enableInteraction(() => { currentView = null; requestDraw(); });
+            tour = new canvas3d.Tour({
+                tours: { mondbogen: { title: 'Warum steht der Vollmond im Winter hoch?', steps: TOUR_STEPS } },
+                apply: applyTourStep, fixPlace, placeLabel: 'Mitte Deutschlands (50° N, 10° O), deutsche Uhrzeit',
+                onChange: requestDraw,
+            });
+            for (const name of Object.keys(VIEWS)) viewButtons[name] = document.getElementById('view-' + name);
+
+            // Ort wie auf den anderen Seiten aus localStorage, sonst aus der Adresse, sonst Mitte Deutschlands
+            kmEmbed.usePlace({ lat: 50, lon: 10 }, (lat, lon) => {
+                // während eines Rundgangs erst danach übernehmen
+                if (saved) { saved.lat = String(lat); saved.lon = String(lon); return; }
+                setPlaceInputs(lat, lon);
+            });
+            document.getElementById('lat').addEventListener('input', readLocationInputs);
+            document.getElementById('lon').addEventListener('input', readLocationInputs);
+            document.getElementById('latSlider').addEventListener('input', ev => {
+                document.getElementById('lat').value = Number(ev.target.value).toFixed(1);
+                readLocationInputs();
+            });
+            document.getElementById('year').addEventListener('change', ev => {
+                const y = parseInt(ev.target.value, 10);
+                const c = currentDayAndTime();
+                if (Number.isFinite(y) && y >= 1000 && y <= 3000) setDayAndTime(y, Math.min(c.day, daysInYear(y) - 1), c.minutes);
+            });
+            document.getElementById('daySlider').addEventListener('input', ev => {
+                const c = currentDayAndTime();
+                setDayAndTime(c.year, Number(ev.target.value), c.minutes);
+            });
+            document.getElementById('timeSlider').addEventListener('input', ev => {
+                const c = currentDayAndTime();
+                setDayAndTime(c.year, c.day, Number(ev.target.value));
+            });
+            document.getElementById('spanSlider').addEventListener('input', ev => setSpan(Number(ev.target.value)));
+            for (const key of Object.keys(state.show)) {
+                const box = document.getElementById('show-' + key);
+                box.checked = state.show[key];
+                box.addEventListener('change', () => { state.show[key] = box.checked; requestDraw(); });
+            }
+
+            scene.resize();
+            setSpan(state.span);
+            showNow();
+            setView('oblique', true);
+            applyEmbedState(kmEmbed.state);
+            new ResizeObserver(() => { scene.resize(); draw(); }).observe(document.getElementById('view'));
+            kmEmbed.onVisibility(isVisible => {
+                if (isVisible && (state.play || scene.tween)) startLoop();
+            });
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
+            kmEmbed.ready();
+        };
+    </script>
+</head>
+<body>
+    <h1 data-embed="hide">Der Mondbogen</h1>
+    <p data-embed="hide">Der Mond zieht wie die Sonne jeden Tag einmal über den Himmel. Sein Bogen ändert sich aber
+    nicht in einem Jahr, sondern in einem Monat: Mal steht er hoch und lange am Himmel, zwei Wochen später tief und
+    nur kurz. Weil sich seine Deklination so schnell ändert, schließt sich sein Tagkreis nicht – er wird zur
+    Spirale.</p>
+    <p class="start-tour" id="tourStart" hidden>
+        <button data-tour="mondbogen" onclick="tour.start('mondbogen')">▶ Rundgang: Warum steht der Vollmond im Winter hoch?</button>
+    </p>
+
+    <div id="kmPlace" data-control="place" hidden></div>
+    <div class="controls" data-embed="hide">
+        <label>Breite <input type="text" id="lat"></label>
+        <input type="range" id="latSlider" min="-90" max="90" step="0.5" aria-label="Breite">
+        <label>Länge (Ost +) <input type="text" id="lon"></label>
+        <button onclick="saveLocation()">Ort merken</button>
+        <span class="feedback" id="locationFeedback"></span>
+    </div>
+    <div class="controls" data-control="basic">
+        <div class="wide">
+            <label for="daySlider">Tag</label>
+            <input type="range" id="daySlider" min="0" max="364" step="1">
+            <span class="value" id="dayValue"></span>
+        </div>
+        <div class="group">
+            <button id="playMonth" onclick="togglePlay('month')" title="1 Tag pro Sekunde">▶ Monat</button>
+            <label data-control="extra">Jahr <input type="number" id="year" min="1000" max="3000" step="1"></label>
+        </div>
+    </div>
+    <div class="controls" data-control="basic">
+        <div class="wide">
+            <label for="timeSlider">Uhrzeit</label>
+            <input type="range" id="timeSlider" min="0" max="1439" step="1">
+            <span class="value" id="timeValue"></span>
+        </div>
+        <div class="group">
+            <button id="playDay" onclick="togglePlay('day')" title="2 Stunden pro Sekunde">▶ Tag</button>
+            <button onclick="showNow()">Jetzt</button>
+        </div>
+    </div>
+    <div class="controls" data-control="extra">
+        <span class="jump"><span>Vollmond</span><button onclick="jumpPhase(Math.PI, -1)" title="voriger Vollmond">◀</button><button onclick="jumpPhase(Math.PI, 1)" title="nächster Vollmond">▶</button></span>
+        <span class="jump"><span>Neumond</span><button onclick="jumpPhase(0, -1)" title="voriger Neumond">◀</button><button onclick="jumpPhase(0, 1)" title="nächster Neumond">▶</button></span>
+        <span class="jump"><span>Nördlichster Stand</span><button onclick="jumpExtreme(1, -1)" title="voriger">◀</button><button onclick="jumpExtreme(1, 1)" title="nächster">▶</button></span>
+        <span class="jump"><span>Südlichster Stand</span><button onclick="jumpExtreme(-1, -1)" title="voriger">◀</button><button onclick="jumpExtreme(-1, 1)" title="nächster">▶</button></span>
+    </div>
+
+    <div class="tour" id="tour" hidden>
+        <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
+        <div id="tourText"></div>
+        <div class="tour-nav">
+            <button id="tourBack">← Zurück</button>
+            <button id="tourNext">Weiter →</button>
+            <button class="end" onclick="tour.end()">Rundgang beenden</button>
+        </div>
+    </div>
+
+    <canvas id="view" role="img" aria-label="3D-Modell: Horizont des Beobachters mit dem Weg des Mondes über einen oder mehrere Tage als Spirale und dem Tagkreis der Sonne; die Werte stehen in der Tabelle unter dem Bild"></canvas>
+    <div class="legend">
+        <span style="--c: var(--moon)">Weg des Mondes über dem Horizont</span>
+        <span class="dashed" style="--c: var(--moon-below)">unter dem Horizont</span>
+        <span style="--c: var(--sun)">Tagkreis der Sonne</span>
+        <span class="dashed" style="--c: var(--axis)">Himmelsachse</span>
+        <span class="dashed" style="--c: var(--major)">große Mondwende ±28,6°</span>
+        <span class="dashed" style="--c: var(--minor)">kleine Mondwende ±18,3°</span>
+    </div>
+
+    <div class="controls" data-control="extra">
+        <div class="wide">
+            <label for="spanSlider">Zeitraum</label>
+            <input type="range" id="spanSlider" min="0.5" max="7" step="0.5">
+            <span class="value" id="spanValue"></span>
+        </div>
+    </div>
+    <div class="controls" data-control="extra">
+        <span>Ansicht:</span>
+        <div class="group">
+            <button id="view-oblique" onclick="setView('oblique')">Schräg</button>
+            <button id="view-south" onclick="setView('south')">Blick nach Süden</button>
+            <button id="view-east" onclick="setView('east')">Von Osten</button>
+            <button id="view-top" onclick="setView('top')">Von oben</button>
+        </div>
+        <label><input type="checkbox" id="show-sun"> Tagkreis der Sonne</label>
+        <label><input type="checkbox" id="show-limits"> Mondwenden</label>
+        <label><input type="checkbox" id="show-axis"> Himmelsachse und Zenit</label>
+        <label><input type="checkbox" id="show-hours"> Stunden</label>
+    </div>
+
+    <div id="info"></div>
+
+    <h2 data-embed="hide">Wie lese ich das?</h2>
+    <ul class="hint" data-embed="hide">
+        <li>Die Scheibe ist der Horizont um einen Beobachter in der Mitte. Die <b>blaugrüne Linie</b> ist der Weg des
+        Mondes am Himmel über den eingestellten Zeitraum (Standard: ein Tag davor bis ein Tag danach), über dem Horizont
+        durchgezogen, darunter gestrichelt. Punkte markieren die vollen Stunden, Kreise Mitternacht mit dem Datum.</li>
+        <li>An einem Tag dreht sich der Himmel einmal um die <b>Himmelsachse</b>. Die Sonne läuft dabei auf einem fast
+        geschlossenen Kreis (orange). Die Deklination des Mondes ändert sich dagegen um bis zu etwa 6–7° pro Tag; sein
+        Weg wird zur Spirale, und er geht an einer anderen Stelle unter, als es zum Aufgang passt.</li>
+        <li>Am Horizont stehen Auf- (↑) und Untergänge (↓) mit Uhrzeit; die Tabelle nennt Richtung, höchsten Stand,
+        Zeit über dem Horizont und wie viel später der Mond aufgeht als am Vortag (im Mittel 50 min).</li>
+        <li><b>Mondwenden:</b> Die größte Deklination des Mondes schwankt in 18,6 Jahren zwischen 28,6° (große
+        Mondwende, zuletzt 2025, rote Kreise) und 18,3° (kleine Mondwende, um 2034, graue Kreise); der durchgezogene
+        Kreis ist der Himmelsäquator.</li>
+        <li><b>Ziehen</b> dreht die Ansicht, das <b>Mausrad</b> zoomt. „Von Osten“ blickt entlang der Tagkreise.</li>
+        <li>Gezeichnet ist der Weg des Mondmittelpunkts, wie ihn ein Beobachter im Erdmittelpunkt sähe. Vom
+        Erdboden aus steht der Mond knapp 1° tiefer (Parallaxe); Lichtbrechung und Mondradius heben das am Horizont
+        fast auf. Die Uhrzeiten von Auf- und Untergang rechnet <code>astro.js</code> mit allem
+        (<code>calculateMoonRiseSet</code>), Positionen nach Meeus.</li>
+    </ul>
+</body>
+</html>

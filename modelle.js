@@ -18,7 +18,7 @@
  *   data-schritt   Tourschritt ab 1 als Startzustand (Ebenen, Zeit, Ansicht wie in der Tour der Modellseite)
  *   data-tour      „ja“: Startknopf des Rundgangs im Modell zeigen; bei Modellen mit mehreren Rundgängen deren Name
  *                  (nur dieser Knopf; erdemond: „height“, „nodes“, „apsides“; tageslaenge: „tageslaenge“, „mittag“;
- *                  mondbahn3d: „knoten“).
+ *                  mondbahn3d: „knoten“; mondbogen: „mondbogen“).
  *                  Mit data-schritt startet der Rundgang sofort bei diesem Schritt; data-schritt ohne data-tour
  *                  stellt nur den Zustand des Schritts ein
  *   data-ebenen    sichtbare Ebenen, Namen der Modellseite, z. B. „dome,zenith,axis,circle,sun“
@@ -51,6 +51,7 @@
         erdbahn: { page: 'erdbahn3d.html', title: '3D-Modell: Die Bahn der Erde um die Sonne', ratio: '660/1250' },
         mondbahn: { page: 'mondbahn.html', title: 'Diagramm: Bahnen von Erde und Mond um die Sonne', ratio: '660/3200' },
         mondbahn3d: { page: 'mondbahn3d.html', title: '3D-Modell: Die geneigte Mondbahn', ratio: '660/1250' },
+        mondbogen: { page: 'mondbogen3d.html', title: '3D-Modell: Der Mondbogen', ratio: '660/1150' },
         // WebGL mit 3,6 MB Texturen: erst nach Klick laden, auf schmalen Bildschirmen und mit „Daten sparen“ die
         // kleinen Texturen (Parameter klein, 1,7 MB)
         erdemond: { page: 'erdemond3d.html', title: '3D-Modell: Erde und Mond', ratio: '660/2300',
