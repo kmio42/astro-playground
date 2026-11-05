@@ -13,8 +13,12 @@
             --fg: #222;
             --muted: #666;
             --card: #fff;
+            --card-2: #f4f6f9;
             --border: #ddd;
             --link: #0b5cad;
+            --accent: #0b5cad;
+            --done: #2e7d32;
+            --draft: #9a6700;
         }
         @media (prefers-color-scheme: dark) {
             :root {
@@ -22,8 +26,12 @@
                 --fg: #e4e4e4;
                 --muted: #9a9a9a;
                 --card: #1f2227;
+                --card-2: #262a30;
                 --border: #343840;
                 --link: #7db4f0;
+                --accent: #7db4f0;
+                --done: #7cc47f;
+                --draft: #e0b85a;
             }
         }
         body {
@@ -37,24 +45,48 @@
         }
         h1 { margin-bottom: 0.2em; }
         .hint { color: var(--muted); font-size: 0.92em; }
-        h2 { margin-top: 1.6em; font-size: 1.15em; }
+        h2 { margin-top: 1.8em; font-size: 1.25em; }
+        h3 { margin: 1.4em 0 0.5em; font-size: 1em; color: var(--muted); font-weight: 600; }
         ul.pages { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-        ul.pages li {
+        ul.pages > li {
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 10px 14px;
         }
+        ul.series > li { border-left: 4px solid var(--accent); }
         a { color: var(--link); }
         ul.pages a.main { font-weight: 600; text-decoration: none; }
         ul.pages a.main:hover { text-decoration: underline; }
         .file { color: var(--muted); font-family: monospace; font-size: 0.85em; margin-left: 0.4em; }
         .desc { margin: 4px 0 0; }
         .extra { margin: 4px 0 0; font-size: 0.9em; }
-        table.topics { border-collapse: collapse; width: 100%; font-size: 0.92em; }
-        table.topics th, table.topics td { text-align: left; vertical-align: top; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); }
-        table.topics th { color: var(--muted); font-weight: 600; }
-        .table-wrap { overflow-x: auto; }
+
+        /* Beiträge der Reihe innerhalb eines Modells */
+        .post {
+            background: var(--card-2);
+            border-radius: 5px;
+            padding: 8px 12px;
+            margin-top: 8px;
+        }
+        .post-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+        .part { font-weight: 700; white-space: nowrap; }
+        .post-title { font-weight: 600; }
+        .status { font-size: 0.78em; border: 1px solid currentColor; border-radius: 10px; padding: 0 7px; white-space: nowrap; }
+        .status.done { color: var(--done); }
+        .status.draft { color: var(--draft); }
+        .question { margin: 3px 0 0; font-style: italic; }
+        .tour { font-size: 0.88em; color: var(--muted); margin: 2px 0 0; }
+        .tour code { font-size: 0.95em; }
+        .post ul { margin: 6px 0 2px; padding-left: 1.2em; font-size: 0.93em; }
+        .post li { margin: 2px 0; }
+        dl.harmony { margin: 8px 0 0; font-size: 0.92em; display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; }
+        dl.harmony dt { font-weight: 600; }
+        dl.harmony dd { margin: 0; }
+        @media (max-width: 520px) {
+            dl.harmony { grid-template-columns: 1fr; }
+            dl.harmony dd { margin-bottom: 4px; }
+        }
     </style>
 </head>
 <body>
@@ -63,105 +95,237 @@
         Koordinatentransformationen, nach Jean Meeus, <i>Astronomische Algorithmen</i>.
         Unfertig und ohne Gewähr.</p>
 
-    <h2>Sonne und Erde</h2>
-    <ul class="pages">
+    <h2>Modelle der Beitragsreihe</h2>
+    <p>Diese sieben Modelle gehören zur Beitragsreihe „Sonne, Erde, Mond“ und folgen denselben Regeln:</p>
+    <dl class="harmony">
+        <dt>Rundgang</dt><dd>trägt den Inhalt eines Beitrags, startet per Knopf und lässt sich wiederholen</dd>
+        <dt>Ort und Zeit</dt><dd>Rundgänge rechnen für 50° N, 10° O (Mitte Deutschlands) und deutsche Uhrzeit;
+            danach gilt wieder der eigene Ort</dd>
+        <dt>Einbettung</dt><dd>im Beitrag als Platzhalter über <code>modelle.js</code>, mit Startzustand, Ortszeile,
+            hellen und dunklen Farben</dd>
+    </dl>
+    <p class="hint">Jedes Modell steht hier einmal, darunter seine Rundgänge mit den zentralen Punkten des
+        zugehörigen Beitrags. Teil 4 nutzt zwei Modelle und taucht deshalb mit je einem Rundgang bei beiden auf.</p>
+
+    <h3>Sonne und Erde · Teil 1–5</h3>
+    <ul class="pages series">
         <li>
             <a class="main" href="tageslaenge.html">Tageslänge im Jahr</a><span class="file">tageslaenge.html</span>
-            <p class="desc">Zunahme der Tageslänge am Morgen und Abend, Auf-, Untergangs- und Mittagszeiten über ein Jahr,
-                Dämmerung, Zeitgleichung mit den Anteilen von Ellipse und Achsneigung; drei Rundgänge.</p>
+            <p class="desc">Jahresdiagramme: tägliche Zunahme am Morgen und Abend, Auf-, Untergangs- und Mittagszeiten
+                mit Dämmerungsbändern, Zeitgleichung mit den Anteilen von Ellipse und Achsneigung, Kennzahlen.</p>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 1a</span><span class="post-title">Tageslänge im Jahreslauf</span><span class="status done">veröffentlicht</span></div>
+                <p class="question">Warum werden die Tage im Herbst so schnell kürzer?</p>
+                <p class="tour">Rundgang <code>tageslaenge</code> · <a href="tageslaenge.html?tour=tageslaenge&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Im Juni ist der Tag 16 h 22 min lang, im Dezember nur 8 h 04 min.</li>
+                    <li>Ende September wird er um bis zu 3 min 43 s pro Tag kürzer, vor allem die Abende verlieren.</li>
+                    <li>Um die Sonnenwenden steht die Tageslänge fast still.</li>
+                    <li>Die Sommerzeit schiebt eine Stunde zwischen Morgen und Abend.</li>
+                    <li>Dämmerung: bürgerlich bis 6°, nautisch bis 12°, astronomisch bis 18° unter dem Horizont.</li>
+                </ul>
+            </div>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 1b</span><span class="post-title">Mittag im Jahreslauf</span><span class="status done">veröffentlicht</span></div>
+                <p class="question">Warum geht die Sonne am 12. Dezember am frühesten unter?</p>
+                <p class="tour">Rundgang <code>mittag</code> · <a href="tageslaenge.html?tour=mittag&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Kürzester Tag am 21. Dezember, frühester Untergang am 12., spätester Aufgang am 31. Dezember.</li>
+                    <li>Mittag ist, wenn die Sonne genau im Süden steht; bei 10° O im Mittel erst um 12:20 Uhr MEZ.</li>
+                    <li>Der Mittag wandert durchs Jahr (Zeitgleichung): am spätesten am 11. Februar, am frühesten am 3. November.</li>
+                    <li>Im Dezember rückt der Mittag schneller nach hinten, als der halbe Tag schrumpft.</li>
+                </ul>
+            </div>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 4</span><span class="post-title">Erdbahn und Jahreszeiten</span><span class="status done">veröffentlicht</span></div>
+                <p class="question">Ursachen der Zeitgleichung (zweites Modell des Beitrags)</p>
+                <p class="tour">Rundgang <code>zeitgleichung</code> · <a href="tageslaenge.html?tour=zeitgleichung&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Die Ellipse: In Sonnennähe muss sich die Erde täglich etwas weiter drehen – eine Welle im Jahr, bis zu 8 Minuten.</li>
+                    <li>Die Neigung: Die Sonne kommt in Ost-West-Richtung unterschiedlich schnell voran – zwei Wellen im Jahr, bis zu 10 Minuten.</li>
+                    <li>Um Weihnachten steigen beide gleichzeitig an; daher der früheste Sonnenuntergang am 12. Dezember.</li>
+                </ul>
+            </div>
         </li>
+
         <li>
             <a class="main" href="tagbogen3d.html">Tagbogen der Sonne</a><span class="file">tagbogen3d.html</span>
-            <p class="desc">Didaktische Einführung: die Bahn der Sonne am Himmel, interaktiv im horizontalen
-                Koordinatensystem des Beobachters dargestellt – Horizont mit Kompassrose, Tagkreis durch das Jahr,
-                Schatten eines Stabs, mit geführter Tour.</p>
+            <p class="desc">3D-Modell im Horizontsystem des Beobachters: Horizont mit Kompassrose, Tagkreis mit Stunden,
+                Auf- und Untergangsrichtung, Mittagshöhe, Vergleichskreise der Sonnenwenden, Schatten eines Stabs.</p>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 2</span><span class="post-title">Tagbogen der Sonne</span><span class="status done">veröffentlicht</span></div>
+                <p class="question">Läuft die Sonne im Winter auf einer kleineren Bahn?</p>
+                <p class="tour">Rundgang, 10 Schritte · <a href="tagbogen3d.html?tour&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Die Sonne läuft am Tag auf einem Kreis um die Himmelsachse; das Stück über dem Horizont ist der Tagbogen.</li>
+                    <li>Juni: Aufgang im Nordosten, mittags 63° hoch. Dezember: Aufgang im Südosten, 17° hoch.</li>
+                    <li>Die Kreise der Sonnenwenden sind gleich groß und nur 8 % kleiner als zur Tagundnachtgleiche –
+                        im Winter liegt nur ein kürzeres Stück über dem Horizont.</li>
+                    <li>Von der Seite: parallele Striche, die Bahn verschiebt sich nur, sie kippt nicht.</li>
+                    <li>Untergang der Sonnenscheibe in drei bis gut vier Minuten; Schatten des Stabs als Prinzip der Sonnenuhr.</li>
+                </ul>
+            </div>
         </li>
+
         <li>
             <a class="main" href="himmelsachse3d.html">Erdachse und Himmelsachse</a><span class="file">himmelsachse3d.html</span>
-            <p class="desc">Didaktische Brücke vom Horizontsystem zum Äquatorsystem: die Erde von außen mit Beobachter,
-                Horizont und Himmelskugel – Himmelsachse parallel zur Erdachse, Polhöhe gleich Breite, Deklination und
-                Höhe der Sonne, Wechsel zum Blick des Beobachters, mit geführter Tour.</p>
+            <p class="desc">3D-Modell vom Horizontsystem zum Äquatorsystem: Erde von außen mit Beobachter, Horizont und
+                Himmelskugel, Wechsel in den Blick des Beobachters.</p>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 3</span><span class="post-title">Himmelsachse und Himmelskoordinaten</span><span class="status done">veröffentlicht</span></div>
+                <p class="question">Warum steht der Polarstern immer an derselben Stelle?</p>
+                <p class="tour">Rundgang, 11 Schritte · <a href="himmelsachse3d.html?tour&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Die verlängerte Erdachse trifft die Himmelskugel im Himmelsnordpol, dicht daneben der Polarstern.</li>
+                    <li>Die Himmelsachse des Beobachters ist parallel zur Erdachse; Polhöhe = geografische Breite.</li>
+                    <li>Beide Achsen liegen ein paar tausend Kilometer auseinander – am Himmel zeigen sie auf denselben Punkt.</li>
+                    <li>Deklination: wie weit die Sonne nördlich oder südlich des Himmelsäquators steht.</li>
+                    <li>Mittagshöhe = 90° − Breite + Deklination: 63° im Juni, 40° zur Tagundnachtgleiche, 17° im Dezember.</li>
+                </ul>
+            </div>
         </li>
+
         <li>
             <a class="main" href="erdbahn3d.html">Die Bahn der Erde um die Sonne</a><span class="file">erdbahn3d.html</span>
             <p class="desc">Schematisches 3D-Modell: Erde mit geneigter Achse auf ihrer elliptischen Bahn, Jahrespunkte,
-                Perihel und Aphel, beide Brennpunkte; Zeitraffer über Jahrtausende mit Präzession und wanderndem
-                Himmelsnordpol; zwei Rundgänge (Jahreszeiten, Änderungen über Jahrhunderte).</p>
-        </li>
-        <li>
-            <a class="main" href="erdposition.html">Sternzeit und Erdposition</a><span class="file">erdposition.html</span>
-            <p class="desc">Erdbahn um die Sonne mit Tagundnachtgleichen, Sonnenwenden, Perihel und Aphel;
-                Erde mit geneigter Achse; Sternzeit, Zeitgleichung, Sonnen- und Mondposition.</p>
-        </li>
-        <li>
-            <a class="main" href="sichtbarkeit.html">Sichtbarkeitsrechner für Sonne und Mond</a><span class="file">sichtbarkeit.html</span>
-            <p class="desc">Wann sind Sonne und Mond von einem bestimmten Punkt aus zu sehen, etwa aus einem Fenster
-                oder von einem Balkon? Berücksichtigt Ort und Umgebung: Die Horizontlinie wird automatisch aus
-                Gebäuden und Gelände erstellt; dazu Raum mit Fenstern und Jahresübersicht.</p>
+                Perihel und Aphel, beide Brennpunkte, Tag- und Nachtseite; Zeitraffer über Jahrtausende mit dem
+                wandernden Himmelsnordpol.</p>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 4</span><span class="post-title">Erdbahn und Jahreszeiten</span><span class="status done">veröffentlicht</span></div>
+                <p class="question">Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist?</p>
+                <p class="tour">Rundgang <code>erdbahn</code> · <a href="erdbahn3d.html?tour=erdbahn&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Die Erdachse steht 23,44° schräg zur Bahnebene und zeigt das ganze Jahr in dieselbe Richtung.</li>
+                    <li>Im Juni neigt sich der Nordpol zur Sonne, im Dezember weg; zu den Tagundnachtgleichen läuft die
+                        Tag-Nacht-Grenze durch beide Pole.</li>
+                    <li>Perihel am 3. Januar: rund 7 % mehr Strahlung – die Neigung wiegt viel schwerer.</li>
+                    <li>In Sonnennähe läuft die Erde schneller: Sommerhalbjahr 186,4 Tage, Winterhalbjahr 178,9.</li>
+                </ul>
+            </div>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 5</span><span class="post-title">Änderungen über Jahrtausende</span><span class="status done">veröffentlicht</span></div>
+                <p class="question">Zeigt die Erdachse immer zum Polarstern?</p>
+                <p class="tour">Rundgang <code>jahrhunderte</code> · <a href="erdbahn3d.html?tour=jahrhunderte&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Präzession: Die Erdachse beschreibt in rund 25 800 Jahren einen Kegel; Thuban, Polarstern, Alderamin.</li>
+                    <li>Der Frühlingspunkt wandert rückwärts durch die Sternbilder, das Perihel durch das Jahr.</li>
+                    <li>Achsneigung und Exzentrizität schwanken langsam (24,2° → 23,44° → 22,6°; die Bahn wird runder).</li>
+                    <li>Der gregorianische Kalender hält den Frühlingsanfang fest; die Gezeiten bremsen die Erde (ΔT).</li>
+                </ul>
+            </div>
         </li>
     </ul>
 
-    <h2>Welche Seite zeigt was?</h2>
-    <div class="table-wrap">
-    <table class="topics">
-        <tr><th>Thema</th><th>Seite</th><th>Was man dort sieht</th></tr>
-        <tr><td>Tageslänge, Auf- und Untergang, Dämmerung</td><td><a href="tageslaenge.html">tageslaenge.html</a></td>
-            <td>Jahresdiagramme der Zeiten und der täglichen Zunahme am Morgen und Abend, Farbbänder für die Dämmerung, Kennzahlen</td></tr>
-        <tr><td>Mittag und Zeitgleichung</td><td><a href="tageslaenge.html">tageslaenge.html</a>, <a href="erdposition.html">erdposition.html</a></td>
-            <td>Mittagslinie über das Jahr, Zeitgleichung mit den Anteilen von Ellipse und Neigung; Zeitgleichung für einen Tag</td></tr>
-        <tr><td>Tagkreis der Sonne im Jahreslauf</td><td><a href="tagbogen3d.html">tagbogen3d.html</a></td>
-            <td>Horizont, Tagkreis mit Stunden, Auf- und Untergangsrichtung, Mittagshöhe, Vergleichskreise, Winkel und Dauer des Untergangs, Schatten eines Stabs</td></tr>
-        <tr><td>Tagbögen am eigenen Horizont</td><td><a href="sichtbarkeit.html">sichtbarkeit.html</a></td>
-            <td>Rundumblick mit Sonnenbahnen am 21. jedes Monats und Stundenlinien (Analemma); Auf- und Untergangsrichtungen auf der Karte</td></tr>
-        <tr><td>Horizontsystem und Äquatorsystem</td><td><a href="himmelsachse3d.html">himmelsachse3d.html</a></td>
-            <td>Erde mit Beobachter, Himmelsachse parallel zur Erdachse, Polhöhe gleich Breite, Deklination, Höhe und Richtung, Mittagshöhe</td></tr>
-        <tr><td>Erdbahn, Achsneigung, Jahreszeiten</td><td><a href="erdbahn3d.html">erdbahn3d.html</a>, <a href="erdposition.html">erdposition.html</a></td>
-            <td>Bahn mit Jahrespunkten, Perihel und Aphel, Tag- und Nachtseite der Erde, Länge der Halbjahre</td></tr>
-        <tr><td>Änderungen über Jahrhunderte</td><td><a href="erdbahn3d.html">erdbahn3d.html</a></td>
-            <td>Zeitraffer 8001 v. Chr. bis 12 000: Präzession und Polarsterne, wanderndes Perihel, Achsneigung, Exzentrizität</td></tr>
-        <tr><td>Entfernung zur Sonne im Jahr</td><td><a href="mondbahn.html">mondbahn.html</a></td>
-            <td>Bahn von Erde und Mond um die Sonne, Diagramm der Entfernung zur Sonne</td></tr>
-        <tr><td>Ekliptik und Äquator räumlich</td><td><a href="erdemond3d.html">erdemond3d.html</a></td>
-            <td>Ekliptik- und Äquatorebene, Sonnenrichtung, Ansicht von der Sonne</td></tr>
-        <tr><td>Werte auf der Konsole</td><td><code>cpp/beispiele/</code></td>
-            <td>Sonnenstand, Zeitgleichung, Auf- und Untergang, Jahrespunkte, Perihel, ΔT (C++)</td></tr>
-    </table>
-    </div>
-    <p class="hint">Grundlage der Berechnungen: Jean Meeus, <i>Astronomische Algorithmen</i> (unter anderem Kapitel 7
-        Kalender, 15 Auf- und Untergang, 21 Präzession und Schiefe der Ekliptik, 24 Sonnenposition, 26 Äquinoktien und
-        Solstitien, 27 Zeitgleichung, 31 Bahnelemente, 37 Perihel und Aphel).</p>
+    <h3>Mond · Teil 6, 7 und 9</h3>
+    <p class="hint">Teil 8 (Finsternisse) nutzt „Erde und Mond in 3D“, siehe Weitere Seiten.</p>
+    <ul class="pages series">
+        <li>
+            <a class="main" href="mondbahn.html">Mondbahn um die Sonne</a><span class="file">mondbahn.html</span>
+            <p class="desc">Bahnen von Erde und Mond um die Sonne über ein Jahr mit einstellbarer Überhöhung, Neu- und
+                Vollmonde, Diagramme der Entfernung zur Sonne und der Krümmung; Ansicht „Mond um die Erde“ mit fester Erde.</p>
 
-    <h2>Mond</h2>
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 6</span><span class="post-title">Die Bahn des Mondes um die Sonne</span><span class="status draft">Entwurf</span></div>
+                <p class="question">Umkreist der Mond die Erde oder die Sonne?</p>
+                <p class="tour">Rundgang <code>schleifen</code> · <a href="mondbahn.html?tour=schleifen&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Umlauf 27,3 Tage, bis zur gleichen Phase 29,5 Tage, weil die Richtung zur Sonne mitwandert.</li>
+                    <li>Überhöhung ×100: Schleifen; ×30: Spitzen; ×10: Dellen; unter ×2 überall zur Sonne gekrümmt.</li>
+                    <li>Maßstäblich liegt die Mondbahn dicht an der Erdbahn und ist immer zur Sonne gekrümmt.</li>
+                    <li>Erde und Mond kreisen um ihren Schwerpunkt, 4700 km vom Erdmittelpunkt, noch in der Erde.</li>
+                </ul>
+            </div>
+        </li>
+
+        <li>
+            <a class="main" href="mondbahn3d.html">Die geneigte Mondbahn</a><span class="file">mondbahn3d.html</span>
+            <p class="desc">Schematisches 3D-Modell: die Bahn des Mondes über ein Jahr mit überhöhter Höhe über der
+                Ekliptik, Knoten und Knotenlinie, Neu- und Vollmonde, Finsternis-Saisons und Finsternisse.</p>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 7</span><span class="post-title">Die geneigte Bahn des Mondes</span><span class="status draft">Entwurf</span></div>
+                <p class="question">Warum gibt es nicht bei jedem Vollmond eine Finsternis?</p>
+                <p class="tour">Rundgang <code>knoten</code> · <a href="mondbahn3d.html?tour=knoten&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Zwei Takte: Phasen alle 29,5 Tage, einmal über die Ebene der Erdbahn und zurück in 27,2 Tagen.</li>
+                    <li>Bis zu 37 000 km darüber oder darunter – der Kernschatten der Erde ist dort nur rund 9300 km breit.</li>
+                    <li>Die Knotenlinie behält ihre Richtung; zeigt sie zur Sonne, ist Finsternis-Saison (2026: März, August).</li>
+                    <li>Sie dreht sich in 18,6 Jahren rückwärts; die Saisons kommen jedes Jahr knapp 19 Tage früher.</li>
+                </ul>
+            </div>
+        </li>
+
+
+        <li>
+            <a class="main" href="mondbogen3d.html">Der Mondbogen</a><span class="file">mondbogen3d.html</span>
+            <p class="desc">Schematisches 3D-Modell im Horizontsystem: der Weg des Mondes über einen oder mehrere Tage
+                als Spirale, Auf- und Untergänge, Tagkreis der Sonne, Grenzen der großen und kleinen Mondwende.</p>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 9</span><span class="post-title">Der Bogen des Mondes</span><span class="status draft">Entwurf</span></div>
+                <p class="question">Warum steht der Vollmond im Winter hoch?</p>
+                <p class="tour">Rundgang <code>mondbogen</code> · <a href="mondbogen3d.html?tour=mondbogen&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Der Mond ändert seine Deklination um bis zu 7° am Tag: aus dem Kreis wird eine Spirale.</li>
+                    <li>Im Mittel geht er jeden Tag 50 Minuten später auf; manche Tage haben keinen Mondaufgang.</li>
+                    <li>Der Vollmond steht der Sonne gegenüber: im Dezember 67° hoch, im Juni nur 13°.</li>
+                    <li>Große Mondwende 2025 (28,7°), kleine 2034 (18,1°); Erntemond im September.</li>
+                </ul>
+            </div>
+        </li>
+    </ul>
+
+    <h2>Weitere Seiten</h2>
+    <p class="hint">Zum Ausprobieren, nicht im Stil der Beitragsreihe gebaut.</p>
     <ul class="pages">
+        <li>
+            <a class="main" href="erdposition.html">Sternzeit und Erdposition</a><span class="file">erdposition.html</span>
+            <p class="desc">Erdbahn um die Sonne mit Tagundnachtgleichen, Sonnenwenden, Perihel und Aphel;
+                Erde mit geneigter Achse; Sternzeit, Zeitgleichung für einen Tag, Sonnen- und Mondposition.</p>
+        </li>
         <li>
             <a class="main" href="mond.html">Mond</a><span class="file">mond.html</span>
             <p class="desc">Mondbahn um die Erde, Mondphase mit Libration und parallaktischem Winkel,
                 Bahn am Himmel; Auf-/Untergang, Perigäum/Apogäum.</p>
         </li>
         <li>
-            <a class="main" href="mondbahn.html">Mondbahn um die Sonne</a><span class="file">mondbahn.html</span>
-            <p class="desc">Bahnen von Erde und Mond um die Sonne über ein Jahr, mit einstellbarer Überhöhung; Ansicht mit fester Erde. Rundgang: Umkreist der Mond die Erde oder die Sonne?</p>
-        </li>
-        <li>
-            <a class="main" href="mondbahn3d.html">Die geneigte Mondbahn</a><span class="file">mondbahn3d.html</span>
-            <p class="desc">Schematisches 3D-Modell: die Bahn des Mondes über ein Jahr mit überhöhter Höhe über der
-                Ekliptik, Knoten und Knotenlinie, Neu- und Vollmonde, Finsternis-Saisons und Finsternisse.
-                Rundgang: Warum gibt es nicht bei jedem Vollmond eine Finsternis?</p>
-        </li>
-        <li>
-            <a class="main" href="mondbogen3d.html">Der Mondbogen</a><span class="file">mondbogen3d.html</span>
-            <p class="desc">Schematisches 3D-Modell: der Weg des Mondes am Himmel über einen oder mehrere Tage als
-                Spirale, mit Auf- und Untergängen, dem Tagkreis der Sonne und den Grenzen der großen und kleinen
-                Mondwende. Rundgang: Warum steht der Vollmond im Winter hoch?</p>
+            <a class="main" href="sichtbarkeit.html">Sichtbarkeitsrechner für Sonne und Mond</a><span class="file">sichtbarkeit.html</span>
+            <p class="desc">Wann sind Sonne und Mond von einem bestimmten Punkt aus zu sehen, etwa aus einem Fenster
+                oder von einem Balkon? Die Horizontlinie entsteht automatisch aus Gebäuden und Gelände; dazu Raum mit
+                Fenstern, Sonnenbahnen am eigenen Horizont und Jahresübersicht.</p>
         </li>
         <li>
             <a class="main" href="erdemond3d.html">Erde und Mond in 3D</a><span class="file">erdemond3d.html</span>
-            <p class="desc">Interaktives 3D-Modell (WebGL2): Ekliptik, Mondbahn, Knoten, Apsiden, Schatten
-                und Finsternisse, geführte Rundgänge.</p>
+            <p class="desc">Interaktives 3D-Modell (WebGL2): Ekliptik- und Äquatorebene, Mondbahn, Knoten, Apsiden,
+                Sonnenrichtung, Schatten und Finsternisse.</p>
             <p class="extra">Etwa 3,6&nbsp;MB Texturen –
-                <a href="erdemond3d.html?klein">datensparende Version</a> mit 1,7&nbsp;MB.</p>
+                <a href="erdemond3d.html?klein">datensparende Version</a> mit 1,7&nbsp;MB. Weitere
+                Rundgänge: „Wie hoch steht der Mond?“, „Apsiden: erdnah und erdfern“.</p>
+
+            <div class="post">
+                <div class="post-head"><span class="part">Teil 8</span><span class="post-title">Finsternisse vorhersagen</span><span class="status draft">Entwurf</span></div>
+                <p class="question">Wie lassen sich Finsternisse vorhersagen?</p>
+                <p class="tour">Rundgang <code>nodes</code> · <a href="erdemond3d.html?tour=nodes&amp;step=1">starten</a></p>
+                <ul>
+                    <li>Die Mondbahn ist 5,1° gegen die Ekliptik geneigt; drakonitischer Monat 27,21 Tage.</li>
+                    <li>Kernschatten und Halbschatten: totale Mondfinsternis am 3. März 2026, nur 7 Stunden vom Knoten.</li>
+                    <li>Total oder ringförmig je nach Entfernung; totale Sonnenfinsternis am 12. August 2026.</li>
+                    <li>Saros: Nach 18 Jahren, 11 Tagen und 8 Stunden wiederholt sich eine Finsternis, ein Drittel der Erde weiter westlich.</li>
+                </ul>
+            </div>
         </li>
     </ul>
+
+    <p class="hint">Grundlage der Berechnungen: Jean Meeus, <i>Astronomische Algorithmen</i> (unter anderem Kapitel 7
+        Kalender, 15 Auf- und Untergang, 21 Präzession und Schiefe der Ekliptik, 24 Sonnenposition, 26 Äquinoktien und
+        Solstitien, 27 Zeitgleichung, 31 Bahnelemente, 37 Perihel und Aphel).</p>
 
 </body>
 </html>
