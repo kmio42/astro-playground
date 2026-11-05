@@ -14,8 +14,8 @@ Mondphase und Sichel bekommen keinen eigenen Teil.
 |---:|---|---|---|
 | 6 | Bahn um die Sonne ([Entwurf](06-mondbahn.md)) | Umkreist der Mond die Erde oder die Sonne? | `mondbahn`, Ansicht `geo`, Rundgang `schleifen` (umgesetzt) |
 | 7 | Neigung und Knoten ([Entwurf](07-knoten.md)) | Warum gibt es nicht bei jedem Vollmond eine Finsternis? | `mondbahn3d`, Rundgang `knoten` (umgesetzt) |
-| 8 | Finsternisse | Wie lassen sich Finsternisse vorhersagen? | `erdemond`, Rundgang `nodes`; evtl. zweiter Platzhalter `apsides` |
-| 9 | Mondbahn im Horizontsystem | Warum steht der Vollmond im Winter hoch? | `mondbogen`, Rundgang `mondbogen` (umgesetzt) |
+| 8 | Finsternisse ([Entwurf](08-finsternisse.md)) | Wie lassen sich Finsternisse vorhersagen? | `erdemond`, Rundgang `nodes`; evtl. zweiter Platzhalter `apsides` |
+| 9 | Mondbahn im Horizontsystem ([Entwurf](09-mondbogen.md)) | Warum steht der Vollmond im Winter hoch? | `mondbogen`, Rundgang `mondbogen` (umgesetzt) |
 
 Bausteine wie in der Reihe: Rundgänge für 50° N, 10° O, Bezugsjahr 2026, deutsche Zeit; einzelne
 Schritte dürfen in andere Jahre springen. Neue Seiten werden einbettbar (`embed.js`, `MODELS` in
@@ -140,7 +140,9 @@ Newton-Schritt Δm nach Meeus. `cpp/Plan-Mondaufgang.md` entsprechend anpassen.
 2. `mondbahn3d.html` mit Rundgang (erledigt), Textentwurf Teil 7 (`07-knoten.md`).
 3. Texte der Rundgänge in `erdemond3d.html` (erledigt: `nodes` überarbeitet, in `apsides` und `height` Daten und Begriffe).
 4. Umbau Mondaufgang in `astro.js`/`astro.cpp` (erledigt, Halbierung bis 0,1 s statt 1 s; Ergebnis in `cpp/Plan-Mondaufgang.md`).
-5. `mondbogen3d.html` mit Rundgang (erledigt am 2026-11-05; Ablauf in `CLAUDE.md`), danach Textentwurf Teil 9.
+5. `mondbogen3d.html` mit Rundgang (erledigt am 2026-11-05; Ablauf in `CLAUDE.md`), Textentwurf Teil 9
+   (`09-mondbogen.md`, erledigt).
+6. Textentwurf Teil 8 (`08-finsternisse.md`, erledigt; nur ein Platzhalter `nodes`, total/ringförmig im Text).
 
 ## Notizen
 
