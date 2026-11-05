@@ -27,7 +27,7 @@ danach der Mond.
 | 4 | [Erdbahn](04-erdbahn.md) | Erdbahn und Jahreszeiten | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `erdbahn` (erdbahn3d.html), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | veröffentlicht |
 | 5 | [Jahrhunderte](05-jahrhunderte.md) | Änderungen über Jahrtausende | Zeigt die Erdachse immer zum Polarstern? | `erdbahn`, Rundgang `jahrhunderte` | veröffentlicht |
 | 6–9 | [Mond](06-mond.md) | – | Umkreist der Mond die Erde oder die Sonne? · Warum gibt es nicht bei jedem Vollmond eine Finsternis? · Wie lassen sich Finsternisse vorhersagen? · Warum steht der Vollmond im Winter hoch? | `mondbahn`, `mondbahn3d`, `erdemond`, `mondbogen` | Gliederung abgestimmt; Teil 6 ([Entwurf](06-mondbahn.md), Wegweiser „Teil 7“), Teil 7 ([Entwurf](07-knoten.md), Wegweiser „Teil 8“), Teil 8 ([Entwurf](08-finsternisse.md), Wegweiser „Teil 9“) und Teil 9 ([Entwurf](09-mondbogen.md), Wegweiser „Teil 10“) im Entwurf |
-| – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Erfahrungen mit Claude Code | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Entwurf vollständig, vom Autor zu prüfen |
+| – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Erfahrungen mit Claude Code | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | veröffentlicht |
 
 - Teil 1 bleibt bei Alltagsbeobachtungen. 1b löst das Rätsel vom 12. Dezember mit dem wandernden
   Mittag; die Ursachen der Zeitgleichung kommen in Teil 4.
@@ -100,7 +100,20 @@ geschrieben, dazu der Link zur eigenen Seite.
 > KI-Werkzeug zum Programmieren. Wie diese Zusammenarbeit lief, was gut klappte und wo es hakte,
 > beschreibt ein eigener Beitrag.*
 
-Sobald der Erfahrungsbericht erschienen ist, wird „ein eigener Beitrag“ zum Link.
+Seit der Erfahrungsbericht erschienen ist, ist „ein eigener Beitrag“ in WordPress ein Link auf ihn (wie die
+Wegweiser nur dort, nicht in den Entwürfen; beim Übertragen ergänzen).
+
+**Beschreibung der Kategorie** „Reihe: Sonne, Erde, Mond“ (in WordPress, erscheint über der Liste der
+Beiträge):
+
+> Wie lang ist der Tag, welchen Weg nimmt die Sonne über den Himmel, und warum steht der Vollmond im
+> Winter hoch? Die Reihe führt in zehn Teilen von der Tageslänge über Tagbogen, Himmelsachse und
+> Erdbahn bis zur Bahn des Mondes und den Finsternissen. Jeder Teil beginnt mit einer Beobachtung und
+> erklärt sie an einem Modell zum Ausprobieren, mit einem Rundgang Schritt für Schritt. Rechnen muss
+> man nichts. Die Liste zeigt den neuesten Teil zuerst; der Anfang ist Teil 1: „Tageslänge im
+> Jahreslauf“.
+
+In WordPress ist „Tageslänge im Jahreslauf“ ein Link auf Teil 1.
 
 ## Arbeitsplan
 

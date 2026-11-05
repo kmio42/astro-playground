@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="600" viewBox="0 0 1500 600">
+  <defs>
+    <pattern id="dotsWarm" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <circle cx="9" cy="9" r="3.2" fill="#e9a23b"/>
+    </pattern>
+    <pattern id="dotsCool" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <circle cx="9" cy="9" r="3.2" fill="#2f8fa6"/>
+    </pattern>
+    <radialGradient id="fadeL" cx="0.25" cy="0.55" r="0.7">
+      <stop offset="0" stop-color="#f7cf55" stop-opacity="1"/>
+      <stop offset="0.55" stop-color="#f7cf55" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#f7cf55" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="fadeR" cx="0.75" cy="0.55" r="0.7">
+      <stop offset="0" stop-color="#5cc0d3" stop-opacity="1"/>
+      <stop offset="0.55" stop-color="#5cc0d3" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#5cc0d3" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6b0" stop-opacity="1"/>
+      <stop offset="1" stop-color="#fff6b0" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="left"><polygon points="0,0 790,0 700,600 0,600"/></clipPath>
+    <clipPath id="right"><polygon points="790,0 1500,0 1500,600 700,600"/></clipPath>
+  </defs>
+
+  <!-- Hintergrund: zwei Hälften mit Rasterpunkten -->
+  <g clip-path="url(#left)">
+    <rect width="1500" height="600" fill="#f7cf55"/>
+    <rect width="1500" height="600" fill="url(#dotsWarm)"/>
+    <rect width="1500" height="600" fill="url(#fadeL)"/>
+  </g>
+  <g clip-path="url(#right)">
+    <rect width="1500" height="600" fill="#5cc0d3"/>
+    <rect width="1500" height="600" fill="url(#dotsCool)"/>
+    <rect width="1500" height="600" fill="url(#fadeR)"/>
+  </g>
+  <line x1="790" y1="0" x2="700" y2="600" stroke="#1d1d1d" stroke-width="8"/>
+
+  <g stroke="#1d1d1d" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+
+    <!-- ===== Mensch (Profil nach rechts) ===== -->
+    <!-- Oberkörper -->
+    <path d="M 215 600 C 225 540, 285 515, 360 508 L 520 508 C 590 515, 640 545, 655 600 Z" fill="#3d6fb6"/>
+    <path d="M 430 508 L 452 560 L 474 508" fill="#ffffff"/>
+    <!-- Hals -->
+    <path d="M 395 450 L 392 512 L 500 512 L 498 455 Z" fill="#f2c4a0"/>
+    <!-- Kopf -->
+    <path d="M 360 470
+             C 330 440, 312 405, 312 355
+             C 312 262, 375 205, 462 205
+             C 540 205, 588 255, 594 318
+             L 596 336
+             C 600 350, 620 368, 625 382
+             C 627 391, 614 396, 601 396
+             C 603 405, 607 413, 602 419
+             C 608 424, 606 432, 598 436
+             C 600 452, 590 466, 568 472
+             C 540 478, 515 476, 500 478
+             L 470 478
+             C 430 478, 385 490, 360 470 Z" fill="#f6cfae"/>
+    <!-- Haare -->
+    <path d="M 316 372
+             C 300 300, 330 215, 425 200
+             C 500 188, 570 215, 588 280
+             C 560 262, 530 262, 505 250
+             C 500 280, 470 300, 440 300
+             C 455 285, 455 268, 448 258
+             C 420 290, 400 320, 398 365
+             C 380 360, 350 362, 316 372 Z" fill="#6b4a32"/>
+    <!-- Ohr -->
+    <path d="M 420 352 C 400 330, 372 345, 380 375 C 386 398, 410 405, 426 392" fill="#f2c4a0"/>
+    <path d="M 404 362 C 396 368, 398 382, 408 385" fill="none" stroke-width="4"/>
+    <!-- Auge, Braue, Mund -->
+    <path d="M 538 312 C 552 302, 570 304, 580 312" fill="none" stroke-width="7"/>
+    <ellipse cx="561" cy="336" rx="7" ry="9" fill="#1d1d1d" stroke="none"/>
+    <path d="M 572 418 C 580 422, 590 422, 597 418" fill="none" stroke-width="4"/>
+
+    <!-- Arm mit Zeigefinger -->
+    <path d="M 560 520 C 600 470, 640 420, 672 372 L 700 392 C 668 445, 630 500, 595 548 Z" fill="#3d6fb6"/>
+    <g transform="translate(690 368) rotate(-66)">
+      <rect x="-30" y="-26" width="58" height="50" rx="20" fill="#f6cfae"/>
+      <rect x="18" y="-24" width="62" height="20" rx="10" fill="#f6cfae"/>
+      <path d="M -6 24 C 4 30, 16 28, 22 20" fill="none" stroke-width="4"/>
+    </g>
+
+    <!-- ===== KI-Roboter (nach links gewandt) ===== -->
+    <!-- Körper -->
+    <path d="M 1035 600 L 1050 470 C 1052 455, 1065 448, 1080 448 L 1230 448 C 1245 448, 1258 455, 1260 470 L 1275 600 Z" fill="#d9e1e6"/>
+    <rect x="1110" y="490" width="90" height="60" rx="10" fill="#9fb0bb"/>
+    <circle cx="1132" cy="520" r="9" fill="#f05a4f"/>
+    <circle cx="1160" cy="520" r="9" fill="#f7cf55"/>
+    <circle cx="1188" cy="520" r="9" fill="#7ad37a"/>
+    <!-- Hals -->
+    <rect x="1125" y="415" width="60" height="40" fill="#9fb0bb"/>
+    <!-- Arm, eifrig erhoben -->
+    <path d="M 1255 470 C 1300 440, 1320 380, 1318 320" fill="none" stroke-width="30" stroke="#1d1d1d"/>
+    <path d="M 1255 470 C 1300 440, 1320 380, 1318 320" fill="none" stroke-width="18" stroke="#d9e1e6"/>
+    <circle cx="1318" cy="300" r="28" fill="#d9e1e6"/>
+    <path d="M 1300 282 L 1294 258 M 1318 274 L 1318 248 M 1336 282 L 1344 260" fill="none" stroke-width="7"/>
+    <!-- Kopf -->
+    <rect x="1015" y="185" width="290" height="235" rx="46" fill="#d9e1e6"/>
+    <rect x="1000" y="268" width="20" height="62" rx="8" fill="#9fb0bb"/>
+    <rect x="1300" y="268" width="20" height="62" rx="8" fill="#9fb0bb"/>
+    <!-- Bildschirm-Gesicht -->
+    <rect x="1042" y="215" width="236" height="170" rx="30" fill="#24344a"/>
+    <ellipse cx="1110" cy="285" rx="34" ry="40" fill="#ffffff"/>
+    <ellipse cx="1205" cy="285" rx="34" ry="40" fill="#ffffff"/>
+    <circle cx="1096" cy="290" r="15" fill="#24344a" stroke="none"/>
+    <circle cx="1191" cy="290" r="15" fill="#24344a" stroke="none"/>
+    <circle cx="1090" cy="283" r="5" fill="#ffffff" stroke="none"/>
+    <circle cx="1185" cy="283" r="5" fill="#ffffff" stroke="none"/>
+    <path d="M 1100 340 C 1125 368, 1180 368, 1210 340" fill="none" stroke="#7ad37a" stroke-width="7"/>
+    <!-- Antenne mit Glühbirne -->
+    <line x1="1160" y1="185" x2="1160" y2="140"/>
+    <circle cx="1160" cy="118" r="60" fill="url(#glow)" stroke="none"/>
+    <circle cx="1160" cy="118" r="24" fill="#fff07a"/>
+    <path d="M 1150 120 C 1155 110, 1165 110, 1170 120" fill="none" stroke-width="3"/>
+
+    <!-- ===== Ideen, die aus der Antenne sprudeln ===== -->
+    <g stroke-width="5">
+      <!-- Zahnrad -->
+      <g transform="translate(1040 92)">
+        <circle r="34" fill="#ffffff"/>
+        <path d="M 0 -20 L 5 -14 L 13 -16 L 14 -8 L 21 -3 L 16 4 L 19 12 L 11 14 L 8 21 L 0 17 L -8 21 L -11 14 L -19 12 L -16 4 L -21 -3 L -14 -8 L -13 -16 L -5 -14 Z" fill="#9fb0bb" stroke-width="3"/>
+        <circle r="6" fill="#ffffff" stroke-width="3"/>
+      </g>
+      <!-- Programmcode -->
+      <g transform="translate(948 160)">
+        <circle r="34" fill="#ffffff"/>
+        <text x="0" y="11" font-family="DejaVu Sans Mono" font-weight="bold" font-size="30" text-anchor="middle" fill="#1d1d1d" stroke="none">{ }</text>
+      </g>
+      <!-- Würfel (3D) -->
+      <g transform="translate(1280 70)">
+        <circle r="34" fill="#ffffff"/>
+        <path d="M -14 -6 L 2 -14 L 18 -6 L 18 12 L 2 20 L -14 12 Z M -14 -6 L 2 2 L 18 -6 M 2 2 L 2 20" fill="#f7cf55" stroke-width="3"/>
+      </g>
+      <!-- Diagramm -->
+      <g transform="translate(1390 160)">
+        <circle r="34" fill="#ffffff"/>
+        <path d="M -18 -16 L -18 16 L 18 16" fill="none" stroke-width="3"/>
+        <path d="M -16 6 C -8 -18, 2 -18, 6 0 C 10 14, 16 6, 18 -6" fill="none" stroke="#f05a4f" stroke-width="4"/>
+      </g>
+      <!-- Erde mit geneigter Achse -->
+      <g transform="translate(880 250)">
+        <circle r="34" fill="#ffffff"/>
+        <circle r="17" fill="#3d6fb6" stroke-width="3"/>
+        <path d="M -5 -26 L 5 26" stroke-width="3"/>
+        <path d="M -9 -6 C -3 -10, 3 -2, 8 -8 M -12 6 C -4 4, 0 10, 10 6" fill="none" stroke="#7ad37a" stroke-width="3"/>
+      </g>
+      <!-- Die ausgewählte Idee: Mond auf seiner Bahn -->
+      <circle cx="770" cy="160" r="72" fill="url(#glow)" stroke="none"/>
+      <g transform="translate(770 160)">
+        <circle r="46" fill="#ffffff" stroke-width="6"/>
+        <ellipse rx="32" ry="12" fill="none" stroke-width="3" stroke-dasharray="6 5" transform="rotate(-15)"/>
+        <circle cx="0" cy="0" r="8" fill="#3d6fb6" stroke-width="3"/>
+        <circle cx="-29" cy="10" r="9" fill="#f7cf55" stroke-width="3"/><path d="M -29 1 A 9 9 0 0 0 -29 19 Z" fill="#24344a" stroke="none"/>
+      </g>
+      <!-- Spur der Ideen -->
+      <path d="M 1130 130 C 1100 112, 1080 100, 1076 98" fill="none" stroke-width="3" stroke-dasharray="2 9"/>
+      <path d="M 1190 108 C 1220 92, 1240 80, 1248 76" fill="none" stroke-width="3" stroke-dasharray="2 9"/>
+    </g>
+    <!-- Bewegungsstriche am Roboterarm -->
+    <path d="M 1362 300 L 1392 296 M 1358 330 L 1386 336 M 1356 270 L 1380 254" fill="none" stroke-width="5"/>
+  </g>
+
+  <!-- ===== Sprechblasen ===== -->
+  <g font-family="Comic Neue" font-weight="bold" fill="#1d1d1d">
+    <!-- Mensch -->
+    <path d="M 85 40 L 520 40 Q 545 40 545 65 L 545 140 Q 545 165 520 165 L 470 165 L 500 205 L 420 165 L 85 165 Q 60 165 60 140 L 60 65 Q 60 40 85 40 Z"
+          fill="#ffffff" stroke="#1d1d1d" stroke-width="6" stroke-linejoin="round"/>
+    <text x="302" y="94" font-size="40" text-anchor="middle">Die da nehmen wir.</text>
+    <text x="302" y="141" font-size="32" text-anchor="middle">Der Rest kommt später.</text>
+  </g>
+  <g font-family="Comic Neue" font-weight="bold" fill="#1d1d1d">
+    <path d="M 830 420 L 990 420 Q 1010 420 1010 440 L 1010 470 L 1040 480 L 1010 492 L 1010 520 Q 1010 540 990 540 L 830 540 Q 810 540 810 520 L 810 440 Q 810 420 830 420 Z"
+          fill="#ffffff" stroke="#1d1d1d" stroke-width="6" stroke-linejoin="round"/>
+    <text x="910" y="470" font-size="34" text-anchor="middle">Ich hätte da</text>
+    <text x="910" y="515" font-size="34" text-anchor="middle">noch was …</text>
+  </g>
+</svg>
