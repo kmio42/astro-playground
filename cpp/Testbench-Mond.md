@@ -145,8 +145,9 @@ Verhältnis dürfte ähnlich bleiben, da beide vor allem Winkelfunktionen berech
   Rechnung, 92 % weniger Aufrufe und schneller als simple bei 20-facher Genauigkeit. 24 h reicht, wenn 1′
   genügt.
 - **Mondauf-/-untergang:** RA/Dec interpolieren statt der Höhe. Normal mit 6 h ist praktisch so genau wie die
-  direkte Rechnung, 12 h ebenfalls sehr gut. Die stündliche Höhenparabel in `calculateMoonRiseSet` braucht 26
-  Aufrufe pro Tag und ist trotzdem ungenauer (bis 9′).
+  direkte Rechnung, 12 h ebenfalls sehr gut. Die stündliche Höhenparabel in `calculateMoonRiseSet` brauchte 26
+  Aufrufe pro Tag und war trotzdem ungenauer (bis 9′). Umgesetzt am 5.11.2026 mit kubisch 12 h
+  (`Plan-Mondaufgang.md`).
 - **simple** lohnt sich nur für eine einzelne Position ohne Tabelle, wenn Speicher oder Code-Größe knapp sind.
   Für Tabellen bietet simple keinen Vorteil; außerdem verfälscht die konstante Entfernung h0 um bis zu 6′.
 - **ΔT:** Der größte einzelne Fehler von normal war TD = UT (≈ 0,6′). astro.cpp berücksichtigt ΔT inzwischen

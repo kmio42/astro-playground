@@ -132,7 +132,7 @@ Newton-Schritt Δm nach Meeus. `cpp/Plan-Mondaufgang.md` entsprechend anpassen.
    Freigabe durch den User.
 2. `mondbahn3d.html` mit Rundgang (erledigt), Textentwurf Teil 7 (`07-knoten.md`).
 3. Texte der Rundgänge in `erdemond3d.html` (erledigt: `nodes` überarbeitet, in `apsides` und `height` Daten und Begriffe).
-4. Umbau Mondaufgang in `astro.js`/`astro.cpp`.
+4. Umbau Mondaufgang in `astro.js`/`astro.cpp` (erledigt, Halbierung bis 0,1 s statt 1 s; Ergebnis in `cpp/Plan-Mondaufgang.md`).
 5. `mondbogen3d.html` mit Rundgang.
 
 ## Notizen

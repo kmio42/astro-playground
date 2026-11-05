@@ -36,7 +36,7 @@ const hor = calculateHorizontal(calculateEquatorial(sun, calculateObliquity(jd))
 | `beispiele/` | Kleine, vollständige Programme zu Sonne, Mond und Ereignissen (siehe unten) |
 | `moon_testbench.cpp`, `Testbench-Mond.md` | Genauigkeit der Mondberechnung gegen NASA-Ephemeriden (`mooninfo_2025.txt`, `mooninfo_2026.txt`) |
 | `Aenderungen-astro-cpp.md` | Änderungen bei der Umstellung auf die Typen `Angle`, `JulianDay` usw. |
-| `Plan-Mondaufgang.md` | Geplanter Umbau von `calculateMoonRiseSet` |
+| `Plan-Mondaufgang.md`, `moon_riseset_check.cpp` | Verfahren von `calculateMoonRiseSet` und Vergleich mit direkter Rechnung |
 
 ## Übersetzen
 
@@ -301,7 +301,7 @@ von `ASTRO_EXACT_DELTA_T` auf 0 setzen oder mit `-DASTRO_EXACT_DELTA_T=0` übers
 | Mondposition (`calculateMoonPositionSimple`) | etwa 1′ RMS, max. 4′ |
 | Sonnenposition | etwa 0,01° (Kapitel 24, niedrige Genauigkeit) |
 | Sonnenauf-/-untergang | genähert ohne die Korrekturen Δm: bis 1,6 min bei 50° Breite, 2,3 min bei 60° |
-| Mondauf-/-untergang | etwa 1 min (`Plan-Mondaufgang.md`) |
+| Mondauf-/-untergang | Verfahren unter 1 s (`Plan-Mondaufgang.md`); dazu Mondposition und Refraktion |
 | Jahreszeiten | etwa 1 min |
 | Perihel/Aphel der Erde | mittlerer Fehler 3 h (Kapitel 37) |
 | Perigäum/Apogäum des Mondes | bis 31 min bzw. 3 min (Kapitel 48) |

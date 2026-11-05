@@ -42,7 +42,8 @@
  *     des Mondes (Libration, Positionswinkel der Achse)
  *
  * Nicht aus dem Buch: Mondauf-/-untergang, Meridiandurchgang und höchster Stand
- * (eigene stündliche Abtastung mit Parabel), calculateMoonRiseSet.
+ * (RA, Dec und Entfernung kubisch aus 12-h-Stützstellen, stündliche Grobsuche, Intervallhalbierung),
+ * calculateMoonRiseSet.
  * ΔT ab 1961 aus der Tabelle TAI − UTC (Schaltsekunden, IERS), davor nach den Polynomen von
  * Espenak und Meeus (NASA/TP-2006-214141) statt Tabelle 9.a.
  * Mondposition niedriger Genauigkeit nach MINI_MOON aus Montenbruck/Pfleger,

@@ -1353,61 +1353,72 @@
         return horner(u, p.C, p.B, p.A);
     }
 
-    // Reelle Nullstellen r1 ≤ r2 der Parabel (A ≠ 0); null, wenn es keine gibt
-    function parabolaRoots(p) {
-        const discriminant = p.B * p.B - 4 * p.A * p.C;
-        if (discriminant < 0) return null;
-        // Auslöschungsfreie Form der Lösungsformel
-        const q = -0.5 * (p.B + (p.B >= 0 ? 1 : -1) * Math.sqrt(discriminant));
-        let r1 = q / p.A;
-        let r2 = (q !== 0) ? p.C / q : r1;
-        if (r1 > r2) [r1, r2] = [r2, r1];
-        return { r1: r1, r2: r2 };
+    // Stützstellen des Mondes für einen Tag: α (stetig fortgesetzt), δ und Entfernung alle 12 h von
+    // Tagesbeginn −12 h bis +36 h. Die Höhe selbst wird nicht interpoliert, denn sie ändert sich mit der
+    // Erddrehung schnell; die Sternzeit wird zu jedem Zeitpunkt exakt berechnet.
+    const MOON_NODE_COUNT = 5;
+    const MOON_NODE_STEP = 12;          // [h]
+
+    function moonNodesForDay(midnight) {
+        const nodes = { midnight, ra: [], dec: [], distance: [] };
+        for (let i = 0; i < MOON_NODE_COUNT; i++) {
+            const t = midnight + (i - 1) * MOON_NODE_STEP / 24;
+            const moon = calculateMoonPosition(t);
+            const equ = calculateEquatorial(moon, calculateObliquity(t));
+            nodes.ra.push(i === 0 ? equ.ra : nodes.ra[i - 1] + normalizeAngleSigned(equ.ra - nodes.ra[i - 1]));
+            nodes.dec.push(equ.dec);
+            nodes.distance.push(moon.distance);
+        }
+        return nodes;
     }
 
-    // Nullstelle der Parabel im Intervall [0, 1]; Voraussetzung: p(0) und p(1) haben unterschiedliche Vorzeichen
-    function parabolaRootInUnitInterval(p) {
-        // Rückfall: lineare Interpolation zwischen den Intervallgrenzen
-        const p1 = parabolaValue(p, 1);
-        const linear = p.C / (p.C - p1);
-
-        if (Math.abs(p.A) < 1e-12) {
-            return (Math.abs(p.B) < 1e-12) ? linear : -p.C / p.B;
-        }
-        const roots = parabolaRoots(p);
-        if (!roots) return linear;
-        for (const r of [roots.r1, roots.r2]) {
-            if (r >= -1e-9 && r <= 1 + 1e-9) return r;
-        }
-        return linear;
+    // Polynom dritten Grades (Lagrange) durch vier aufeinanderfolgende Stützstellen; x zählt in
+    // Stützstellenabständen ab der ersten. Genommen wird das Fenster, in dessen mittlerem Intervall x liegt.
+    function cubicThroughNodes(y, x) {
+        const i = (x < 2) ? 0 : 1;          // Fenster i … i+3, mittleres Intervall [i+1, i+2]
+        const u = x - (i + 1);              // Stützstellen bei u = −1, 0, 1, 2
+        return y[i]     * (-u * (u - 1) * (u - 2) / 6)
+             + y[i + 1] * ((u + 1) * (u - 1) * (u - 2) / 2)
+             + y[i + 2] * (-(u + 1) * u * (u - 2) / 2)
+             + y[i + 3] * ((u + 1) * u * (u - 1) / 6);
     }
 
-    // Höhe über der Aufgangshöhe h0 und Stundenwinkel (−π, π] des Mondes zum Zeitpunkt jd [rad]
-    function sampleMoon(jd, location) {
-        const moon = calculateMoonPosition(jd);
-        const equ = calculateEquatorial(moon, calculateObliquity(jd));
-        const theta = calculateLocalSiderealTime(jd, location);
+    // Höhe über der Aufgangshöhe h0 und Stundenwinkel (−π, π] des Mondes zum Zeitpunkt hours [h seit
+    // Tagesbeginn] [rad]: α, δ und Entfernung interpoliert, Sternzeit exakt
+    function moonSampleAt(nodes, hours, location) {
+        const x = (hours + MOON_NODE_STEP) / MOON_NODE_STEP;
+        const equ = { ra: cubicThroughNodes(nodes.ra, x), dec: cubicThroughNodes(nodes.dec, x) };
+        const distance = cubicThroughNodes(nodes.distance, x);
+        const theta = calculateLocalSiderealTime(nodes.midnight + hours / 24, location);
         const hor = calculateHorizontal(equ, theta, location);
 
         // Standardhöhe des Mondes h0 = 0.7275·π − 0°34′ (Kapitel 14) für die geozentrische Position;
         // berücksichtigt Horizontalparallaxe π, Halbmesser und Refraktion.
-        const parallax = Math.asin(EARTH_RADIUS / moon.distance);
+        const parallax = Math.asin(EARTH_RADIUS / distance);
         const h0 = 0.7275 * parallax - 0.5667 * DEG2RAD;
 
         return { altitude: hor.altitude - h0, hourAngle: normalizeAngleSigned(theta - equ.ra) };
     }
 
-    // Stetige Fortsetzung eines Stundenwinkels relativ zu einem Bezugswert [rad]
-    function continueHourAngle(reference, hourAngle) {
-        return reference + normalizeAngleSigned(hourAngle - reference);
+    // Vorzeichenwechsel einer Größe des Mondes ('altitude' oder 'hourAngle') in [a, b] durch
+    // Intervallhalbierung auf 0,1 s genau bestimmen; negativeAtA: Vorzeichen bei a
+    function bisectMoonSample(nodes, a, b, location, key, negativeAtA) {
+        while (b - a > 0.1 / 3600) {
+            const m = 0.5 * (a + b);
+            if ((moonSampleAt(nodes, m, location)[key] < 0) === negativeAtA) a = m;
+            else b = m;
+        }
+        return 0.5 * (a + b);
     }
 
     /**
      * Mondauf- und -untergang, Meridiandurchgang und höchster Stand für den Tag (UT oder Zeitzone utcOffset),
      * der jd enthält.
-     * Die Mondhöhe wird stündlich berechnet. Für jedes Stundenintervall [k, k+1] wird eine Parabel durch
-     * die Stützstellen k, k+1, k+2 gelegt, mit der Horizont- und Meridiandurchgänge sowie der Scheitel
-     * innerhalb des Intervalls bestimmt werden.
+     * Die Position des Mondes wird nur an fünf Stützstellen berechnet (alle 12 h von Tagesbeginn −12 h bis
+     * +36 h); dazwischen werden α, δ und Entfernung kubisch interpoliert, die Sternzeit ist exakt. Eine
+     * Grobsuche tastet die Höhe stündlich ab und legt für jedes Stundenintervall [k, k+1] eine Parabel durch
+     * k, k+1, k+2; sie erkennt Durchgänge, auch wenn der Mond den Horizont nur streift. Die Zeiten werden
+     * dann durch Intervallhalbierung auf 0,1 s genau bestimmt.
      * @param jd Julianischer Tag
      * @param location Beobachtungsort
      * @param utcOffset Zeitzone des Tages [h], ohne Angabe 0 (UT-Tag)
@@ -1415,8 +1426,9 @@
      *           maxAltitudeTime [h seit Tagesbeginn] }
      */
     function calculateMoonRiseSet(jd, location, utcOffset = 0) {
-        const midnight = localMidnight(jd, utcOffset);
-        const sampleAt = (hour) => sampleMoon(midnight + hour / 24, location);
+        const nodes = moonNodesForDay(localMidnight(jd, utcOffset));
+        const sampleAt = (hours) => moonSampleAt(nodes, hours, location);
+        const bisect = (a, b, key, negativeAtA) => bisectMoonSample(nodes, a, b, location, key, negativeAtA);
 
         // Gleitendes Fenster aus drei aufeinanderfolgenden Stunden k, k+1, k+2
         let s0 = sampleAt(0);
@@ -1437,7 +1449,7 @@
             const belowAtStart = s0.altitude < 0;
             if (belowAtStart !== (s1.altitude < 0)) {
                 // Vorzeichenwechsel: genau ein Durchgang
-                const hours = k + parabolaRootInUnitInterval(altitude);
+                const hours = bisect(k, k + 1, 'altitude', belowAtStart);
                 if (belowAtStart && !result.hasRise) {
                     result.hasRise = true;
                     result.rise = hours;
@@ -1449,20 +1461,17 @@
                 // Gleiches Vorzeichen an beiden Enden: zwei Durchgänge, wenn der Scheitel im Intervall
                 // auf der anderen Seite des Horizonts liegt (Mond streift den Horizont)
                 const u = -altitude.B / (2 * altitude.A);
-                const vertex = parabolaValue(altitude, u);
-                if (u > 0 && u < 1 && (vertex < 0) !== belowAtStart) {
-                    const roots = parabolaRoots(altitude);
-                    if (roots) {
-                        const riseHours = k + (belowAtStart ? roots.r1 : roots.r2);
-                        const setHours = k + (belowAtStart ? roots.r2 : roots.r1);
-                        if (!result.hasRise) {
-                            result.hasRise = true;
-                            result.rise = riseHours;
-                        }
-                        if (!result.hasSet) {
-                            result.hasSet = true;
-                            result.set = setHours;
-                        }
+                if (u > 0 && u < 1 && (parabolaValue(altitude, u) < 0) !== belowAtStart
+                    && (sampleAt(k + u).altitude < 0) !== belowAtStart) {
+                    const first = bisect(k, k + u, 'altitude', belowAtStart);
+                    const second = bisect(k + u, k + 1, 'altitude', !belowAtStart);
+                    if (!result.hasRise) {
+                        result.hasRise = true;
+                        result.rise = belowAtStart ? first : second;
+                    }
+                    if (!result.hasSet) {
+                        result.hasSet = true;
+                        result.set = belowAtStart ? second : first;
                     }
                 }
             }
@@ -1470,11 +1479,8 @@
             // Meridian: Stundenwinkel wechselt von negativ nach positiv (nicht der Sprung bei ±π)
             if (!result.hasTransit && s0.hourAngle < 0 && s1.hourAngle >= 0
                 && Math.abs(s0.hourAngle) < Math.PI / 2 && Math.abs(s1.hourAngle) < Math.PI / 2) {
-                // Stundenwinkel relativ zur mittleren Stützstelle stetig fortsetzen
-                const w0 = continueHourAngle(s1.hourAngle, s0.hourAngle);
-                const w2 = continueHourAngle(s1.hourAngle, s2.hourAngle);
                 result.hasTransit = true;
-                result.transit = k + parabolaRootInUnitInterval(parabolaThrough(w0, s1.hourAngle, w2));
+                result.transit = bisect(k, k + 1, 'hourAngle', true);
             }
 
             // Höchster Stand: Stützstelle k+1 und Parabelscheitel innerhalb des Fensters (und des Tages)

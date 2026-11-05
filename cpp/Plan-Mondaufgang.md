@@ -1,17 +1,19 @@
-# Plan: Mondauf-/-untergang mit interpolierten RA/Dec
+# Mondauf-/-untergang mit interpolierten RA/Dec
 
-Stand: 11.10.2026, noch nicht umgesetzt. Grundlage sind die Messungen in `Testbench-Mond.md`
-(`moon_testbench.cpp`).
+Umgesetzt am 5.11.2026 in `astro.cpp` und `astro.js` (gleiche API, Ergebnisse gleich bis etwa 1e-13 h).
+Geplant am 11.10.2026 auf Grundlage der Messungen in `Testbench-Mond.md` (`moon_testbench.cpp`).
 
 ## Ausgangslage
 
-`calculateMoonRiseSet` (astro.cpp) ruft stündlich `calculateMoonPosition` auf (26 Aufrufe pro Tag) und legt eine
-Parabel durch die **Höhe**. Die Höhe ändert sich durch die Erddrehung schnell und nicht parabelförmig; der Fehler
-in h−h0 beträgt bis zu 8,9′, das ist etwa 1 min in der Aufgangszeit.
+`calculateMoonRiseSet` rief bisher stündlich `calculateMoonPosition` auf (26 Aufrufe pro Tag) und legte eine
+Parabel durch die **Höhe**. Die Höhe ändert sich durch die Erddrehung schnell und nicht parabelförmig. Im
+Vergleich mit der direkten Rechnung (siehe unten) lagen Auf- und Untergang bei 50° Breite bis 12 s daneben,
+bei 69° bis 38 s. Der Plan hatte aus dem Höhenfehler von bis zu 8,9′ etwa 1 min geschätzt; gemessen ist es
+weniger, weil der größte Höhenfehler selten genau am Horizont auftritt.
 
-## Idee
+## Verfahren
 
-Die Höhe wird weiterhin berechnet, nur nicht mehr interpoliert. Interpoliert werden nur die langsam und
+Die Höhe wird weiterhin berechnet, aber nicht mehr interpoliert. Interpoliert werden nur die langsam und
 gleichmäßig veränderlichen Größen RA, Dec und Entfernung; die Erddrehung steckt in der Sternzeit, die zu jedem
 Zeitpunkt exakt und billig berechnet wird:
 
@@ -20,78 +22,49 @@ h(t) = asin( sin φ · sin δ(t) + cos φ · cos δ(t) · cos(θ(t) − α(t)) )
               └ interpoliert ┘                    └ exakt ┘└ interp. ┘     └ interp. ┘
 ```
 
-h(t) lässt sich damit zu jedem Zeitpunkt auswerten, ohne `calculateMoonPosition` aufzurufen.
+1. **Stützstellen** (`moonNodesForDay`): `calculateMoonPosition` nur alle 12 h von Tagesbeginn −12 h bis
+   +36 h, also 5 Aufrufe pro Tag statt 26. RA wird stetig fortgesetzt (kein Sprung bei 360°).
+2. **Interpolation** (`cubicThroughNodes`): Polynom dritten Grades durch vier Stützstellen, und zwar das
+   Fenster, in dessen mittlerem Intervall der Zeitpunkt liegt (0–12 h: Stützstellen −12 … 24 h, danach
+   0 … 36 h). `moonSampleAt` liefert daraus Höhe über h0 und Stundenwinkel zu jedem Zeitpunkt.
+3. **Grobsuche wie bisher:** stündlich abtasten, Parabel durch k, k+1, k+2. Sie erkennt Vorzeichenwechsel, den
+   streifenden Mond (zwei Durchgänge in einer Stunde, Scheitel auf der anderen Seite des Horizonts; geprüft auch
+   mit h(t) am Scheitel) und Tage ohne Auf- oder Untergang.
+4. **Verfeinern durch Intervallhalbierung** (`bisectMoonSample`) im gefundenen Stundenintervall bis 0,1 s
+   (16 Schritte). Für den Meridiandurchgang ebenso mit dem Stundenwinkel.
+5. **Höchster Stand** wie bisher aus dem Scheitel der Stundenparabel, jetzt mit Werten aus h(t); ändert sich
+   um höchstens etwa 1″.
 
-## Vorgehen
+Abweichungen vom ursprünglichen Plan:
 
-1. **Stützstellen:** `calculateMoonPosition` nur an den Stützstellen aufrufen. Kubisch mit 12 h: −12, 0, 12, 24,
-   36 h, das sind 5 Aufrufe pro Tag statt 26. RA vor dem Interpolieren stetig fortsetzen (kein Sprung bei 360°).
-2. **Grobsuche wie bisher:** stündlich abtasten, Parabel durch die Werte. Die stündlichen Höhen kommen jetzt aus
-   h(t) mit interpolierten RA/Dec. Die bisherige Logik bleibt: Vorzeichenwechsel, Mond streift den Horizont
-   (zwei Durchgänge in einer Stunde), kein Aufgang an diesem Tag. Ergebnis: Startwert auf etwa 1 min genau.
-3. **Verfeinern** mit der Korrektur Δm aus Meeus Kapitel 14 (Newton-Schritt auf h(t)), 2–3 Schritte bis
-   |Δt| < 1 s:
+- **Halbierung statt Korrektur Δm** (Newton-Schritt nach Meeus Kapitel 14): Die Halbierung bleibt sicher im
+  Intervall der Grobsuche und braucht keinen Sonderfall für den streifenden Mond oder H nahe 0. Sie kostet nur
+  Auswertungen von h(t), keine Mondpositionen.
+- **0,1 s statt 1 s:** Mit 1 s wäre der Meridiandurchgang schlechter geworden als bisher (0,5 s statt 0,01 s,
+  denn der Stundenwinkel lässt sich gut mit einer Parabel interpolieren). Vier Halbierungen mehr sind billig.
 
-   ```
-   Δt = (h(t) − h0) / (15.04°/h · cos δ · cos φ · sin H)        t ← t + Δt
-   ```
+## Genauigkeit
 
-   Vorzeichen: Beim Aufgang ist H < 0 und h − h0 < 0, also Δt > 0. Dass der Mond langsamer läuft (≈ 14,5°/h),
-   stört die Konvergenz nicht.
-4. **Meridiandurchgang** ebenso mit Δt = −H(t) / 15.04°/h. Die größte Höhe liegt praktisch beim Durchgang.
+`moon_riseset_check.cpp` vergleicht mit einer Referenz, die Höhe und Stundenwinkel zu jedem Zeitpunkt direkt
+mit `calculateMoonPosition` berechnet (Raster 5 min, Halbierung bis 0,01 s). Gemessen wird also der Fehler des
+Verfahrens, nicht der Mondtheorie. 730 Tage ab 1.1.2025:
 
-Skizze:
-
-```cpp
-// Höhe über h0 und Stundenwinkel zum Zeitpunkt t [h seit 0h UT];
-// RA/Dec/Entfernung aus den Stützstellen interpoliert, Sternzeit exakt
-MoonSample sampleInterpolated(const MoonNodes& nodes, const JulianDay midnight, const double t,
-                              const GeoLocation& location);
-
-// Nullstelle von h − h0 nahe t verfeinern (Korrektur Δm, Kapitel 14)
-double refineHorizonCrossing(const MoonNodes& nodes, const JulianDay midnight, double t,
-                             const GeoLocation& location) {
-    for (int i = 0; i < 4; i++) {
-        const MoonSample s = sampleInterpolated(nodes, midnight, t, location);
-        const double rate = 15.04 * DEG2RAD * cos(s.dec) * cos(location.latitude) * std::sin(s.hourAngle);  // [rad/h]
-        const double dt = s.altitude / rate;                            // [h]
-        t += dt;
-        if (std::fabs(dt) < 1.0 / 3600.0) break;
-    }
-    return t;
-}
+```bash
+g++ -std=c++11 -O2 -Wall -Wextra moon_riseset_check.cpp astro.cpp -o moon_riseset_check
+./moon_riseset_check 50 10 730 1
 ```
 
-## Warum die Grobsuche bleibt
+| Ort | Verfahren | Aufgang RMS / max | Untergang RMS / max | Durchgang max |
+|---|---|---|---|---|
+| 50° N, 10° O | bisher (Höhenparabel 1 h) | 7,5 s / 11,9 s | 7,5 s / 11,7 s | 0,01 s |
+| 50° N, 10° O | neu | 0,07 s / 0,31 s | 0,06 s / 0,27 s | 0,13 s |
+| 69° N, 19° O | bisher | 9,9 s / 26 s | 10,0 s / 38 s | 0,01 s |
+| 69° N, 19° O | neu | 0,09 s / 0,98 s | 0,07 s / 0,67 s | 0,13 s |
+| 35° S, 150° O | neu | 0,05 s / 0,22 s | 0,05 s / 0,22 s | 0,13 s |
 
-Meeus startet direkt mit m0, m1, m2 aus Formel 14.2 und iteriert nur Δm. Für den Mond ist das heikel: an etwa
-einem Tag pro Monat gibt es keinen Auf- oder Untergang, in hohen Breiten kann der Mond den Horizont streifen,
-und ein schlechter Startwert konvergiert zum Ereignis des Nachbartags. Die Grobsuche erkennt diese Fälle,
-die Verfeinerung liefert die Genauigkeit.
+An keinem Tag gibt es ein Ereignis nur in einer der beiden Rechnungen. Rechenzeit pro Tag (g++ -O2):
+etwa 44 µs statt 83 µs.
 
-## Erwartete Genauigkeit
-
-Aus der Testbench, umgerechnet auf die Aufgangszeit bei 50° Breite (Höhe ändert sich am Horizont um höchstens
-etwa 10′ pro Minute):
-
-| Interpolation | Fehler in h−h0 (max) | Aufgangszeit | Aufrufe/Tag |
-|---|---|---|---|
-| kubisch 12 h | 2,4″ (nur Interpolation) | < 1 s | 5 |
-| Parabel 12 h | 22″ | ≈ 2 s | 4 |
-| Parabel 24 h (zentriert, wie Meeus) | 2,4′ | ≈ 15 s | 3 |
-| heute: Höhenparabel 1 h | 8,9′ | ≈ 1 min | 26 |
-
-Die Refraktion am Horizont schwankt mit dem Wetter um mehrere Bogenminuten (10 s bis etwa 1 min in der Zeit).
-Genauer als etwa 10 s muss die Rechnung daher nicht sein; kubisch 12 h ist die sichere Wahl.
-
-Unabhängig davon: TD = UT kostet etwa 0,6′ in der Position (siehe `Testbench-Mond.md`); ein fester Wert
-ΔT ≈ 69 s würde das beheben.
-
-## Offene Schritte
-
-- `calculateMoonRiseSet` wie oben umbauen (Stützstellen-Struktur, `sampleInterpolated`, Verfeinerung für Auf-,
-  Untergang und Durchgang).
-- Testbench um einen direkten Vergleich der Auf-/Untergangszeiten erweitern: heutige Variante, neue Variante
-  und eine Referenz, die die Nullstelle mit direkter Rechnung sehr genau bestimmt.
-- `astro.js` ist seit dem 26.10.2026 eine Portierung von `astro.cpp` und enthält dasselbe `calculateMoonRiseSet`;
-  ein Umbau muss in beiden Dateien erfolgen.
+Die Refraktion am Horizont schwankt mit dem Wetter um mehrere Bogenminuten (10 s bis etwa 1 min in der Zeit);
+genauer als die Mondtheorie (3″ RMS gegen NASA, `Testbench-Mond.md`) und das Wetter muss das Verfahren nicht
+sein. Es ist jetzt kein nennenswerter Teil des Fehlers mehr.
