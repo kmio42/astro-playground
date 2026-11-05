@@ -130,10 +130,29 @@
         #outputTable td { padding: 1px 8px 1px 0; vertical-align: top; }
         h2 { margin-top: 28px; }
         button { padding: 3px 10px; }
+        [hidden] { display: none !important; }
+        button.active { font-weight: bold; outline: 2px solid var(--axis); outline-offset: -1px; }
+        .tour {
+            border-left: 4px solid var(--moon);
+            background: var(--surface-2);
+            border-radius: 6px;
+            padding: 10px 14px 12px;
+            margin-bottom: 10px;
+        }
+        .tour-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
+        .tour-head b { font-size: 1.1em; }
+        .tour-head span { color: var(--text-2); font-size: 0.9em; }
+        #tourText { min-height: 7.5em; }
+        #tourText p { margin: 8px 0; }
+        .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tour-nav .end { margin-left: auto; }
+        .start-tour { margin: 0 0 14px; }
+        .start-tour button { padding: 6px 14px; font-size: 1em; text-align: left; }
     </style>
     <script src="astro.js"></script>
     <script src="ui.js"></script>
     <script src="embed.js"></script>
+    <script src="canvas3d.js"></script>
     <script>
 
     /////////////////////////////////////////////////////////////////
@@ -143,6 +162,8 @@
         const earthMoonMassRatio = 81.3005678; // Masse Erde / Masse Mond
         const stepDays = 1 / 24;               // Schrittweite der Bahnpunkte (1 Stunde)
         const realSunRadius = 696000 / AU_KM; // Sonnenradius in AE
+        const GEO_RANGE = 435000 / AU_KM;      // halbe Bildgröße der Ansicht „Mond um die Erde“ in AE
+        const GEO_WINDOW = 14 / stepDays;      // Ansicht „Mond um die Erde“: Bahn ±14 Tage um den Zeitpunkt
 
         let orbitData = null;
 
@@ -297,7 +318,17 @@
         let showPhases = true;
         let followEarth = false;
         let playTimer = null;
-        const view = { cx: 0, cy: 0, scale: null }; // scale in Pixel pro AE, null = Gesamtansicht
+        // Ansicht: 'sun' = Bahnen um die Sonne, 'geo' = Mond um die feste Erde
+        let mode = 'sun';
+        // je Ansicht: Mitte in AE und scale in Pixel pro AE, null = Gesamtansicht
+        const views = { sun: { cx: 0, cy: 0, scale: null }, geo: { cx: 0, cy: 0, scale: null } };
+        let showBarycenter = false; // Schwerpunkt Erde–Mond in der Ansicht „Mond um die Erde“
+
+        function activeView() { return views[mode]; }
+
+        function exaggerationLabel(k = exaggeration) {
+            return '×' + k.toLocaleString('de-DE');
+        }
 
         function cssColor(name) {
             return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -332,13 +363,14 @@
     /////////////////////////////////////////////////////////////////
 
         function defaultScale(w, h) {
-            return Math.min(w, h) / 2 / 1.22;
+            return Math.min(w, h) / 2 / (mode === 'geo' ? GEO_RANGE : 1.22);
         }
 
         function currentView(w, h) {
+            const view = activeView();
             const scale = view.scale ?? defaultScale(w, h);
             let cx = view.cx, cy = view.cy;
-            if (followEarth) {
+            if (mode === 'sun' && followEarth) {
                 cx = orbitData.ex[selectedIndex];
                 cy = orbitData.ey[selectedIndex];
             }
@@ -352,7 +384,146 @@
         function moonX(i) { return orbitData.ex[i] + exaggeration * orbitData.dx[i]; }
         function moonY(i) { return orbitData.ey[i] + exaggeration * orbitData.dy[i]; }
 
+        // Orte in der aktuellen Ansicht (AE)
+        function moonPoint(i) { return mode === 'geo' ? [orbitData.dx[i], orbitData.dy[i]] : [moonX(i), moonY(i)]; }
+        function earthPoint(i) { return mode === 'geo' ? [0, 0] : [orbitData.ex[i], orbitData.ey[i]]; }
+
+        /** Bereich der Bahnpunkte, die die Ansicht zeigt (Mond um die Erde: ±14 Tage) */
+        function shownRange() {
+            if (mode === 'sun') return [0, orbitData.N - 1];
+            return [Math.max(0, selectedIndex - GEO_WINDOW), Math.min(orbitData.N - 1, selectedIndex + GEO_WINDOW)];
+        }
+
         function drawOrbit() {
+            if (mode === 'geo') drawGeo(); else drawSunView();
+            const warning = document.getElementById('exaggerationWarning');
+            warning.style.display = (mode === 'sun' && exaggeration > 1) ? '' : 'none';
+            document.getElementById('exaggerationText').textContent = exaggerationLabel();
+            if (tour) tour.render(tourValues());
+        }
+
+        /**
+         * Kugel mit Tag- und Nachtseite; ux, uy = Richtung zur Sonne (Ekliptik, y nach Norden)
+         */
+        function drawBody(ctx, x, y, r, ux, uy, dayColor, c) {
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, 2 * Math.PI);
+            ctx.fillStyle = c.axis;
+            ctx.fill();
+            const a = Math.atan2(-uy, ux);
+            ctx.beginPath();
+            ctx.arc(x, y, r, a - Math.PI / 2, a + Math.PI / 2);
+            ctx.closePath();
+            ctx.fillStyle = dayColor;
+            ctx.fill();
+        }
+
+        /**
+         * Ansicht „Mond um die Erde“: Erde fest in der Mitte, Mondbahn ±14 Tage, Pfeil zur Sonne,
+         * Körper in wahrer Größe (mindestens einige Pixel)
+         */
+        function drawGeo() {
+            const canvas = document.getElementById('orbit');
+            const { ctx, w, h } = prepareCanvas(canvas);
+            const c = colors();
+            const d = orbitData;
+            const v = currentView(w, h);
+            const { X, Y } = v;
+            const i = selectedIndex;
+            const [i0, i1] = shownRange();
+            const sunDist = Math.hypot(d.ex[i], d.ey[i]);
+            const ux = -d.ex[i] / sunDist, uy = -d.ey[i] / sunDist;
+
+            ctx.font = '12px Arial, sans-serif';
+            ctx.lineJoin = 'round';
+
+            // Pfeil zur Sonne
+            const len = Math.min(w, h) * 0.38;
+            const x0 = X(0), y0 = Y(0), x1 = x0 + ux * len, y1 = y0 - uy * len;
+            ctx.strokeStyle = c.sun;
+            ctx.fillStyle = c.sun;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            const a = Math.atan2(-uy, ux);
+            ctx.beginPath();
+            ctx.moveTo(x1 + Math.cos(a) * 10, y1 + Math.sin(a) * 10);
+            ctx.lineTo(x1 + Math.cos(a + 2.5) * 10, y1 + Math.sin(a + 2.5) * 10);
+            ctx.lineTo(x1 + Math.cos(a - 2.5) * 10, y1 + Math.sin(a - 2.5) * 10);
+            ctx.closePath();
+            ctx.fill();
+            // Beschriftung jenseits der Pfeilspitze, vom Pfeil weg ausgerichtet
+            ctx.textAlign = ux > 0.3 ? 'left' : (ux < -0.3 ? 'right' : 'center');
+            ctx.textBaseline = uy > 0.3 ? 'bottom' : (uy < -0.3 ? 'top' : 'middle');
+            ctx.fillText('zur Sonne', x1 + ux * 16, y1 - uy * 16);
+
+            // Mondbahn ±14 Tage
+            ctx.strokeStyle = c.moon;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let k = i0; k <= i1; k++) {
+                if (k === i0) ctx.moveTo(X(d.dx[k]), Y(d.dy[k]));
+                else ctx.lineTo(X(d.dx[k]), Y(d.dy[k]));
+            }
+            ctx.stroke();
+
+            if (showPhases) {
+                for (const p of d.phases) {
+                    if (p.pos < i0 || p.pos > i1) continue;
+                    ctx.beginPath();
+                    ctx.arc(X(valueAt(d.dx, p.pos)), Y(valueAt(d.dy, p.pos)), 4.5, 0, 2 * Math.PI);
+                    ctx.fillStyle = (p.type === 'new') ? c.text : c.surface;
+                    ctx.strokeStyle = (p.type === 'new') ? c.surface : c.moon;
+                    ctx.lineWidth = 2;
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            // Linie Erde–Mond, Erde, Mond
+            ctx.strokeStyle = c.text2;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(X(0), Y(0));
+            ctx.lineTo(X(d.dx[i]), Y(d.dy[i]));
+            ctx.stroke();
+            const earthR = Math.max(6, EARTH_RADIUS / AU_KM * v.scale);
+            drawBody(ctx, X(0), Y(0), earthR, ux, uy, c.earth, c);
+            drawBody(ctx, X(d.dx[i]), Y(d.dy[i]), Math.max(4.5, MOON_RADIUS / AU_KM * v.scale), ux, uy, c.moon, c);
+
+            // Schwerpunkt Erde–Mond: Weg ±14 Tage und Ort (erst sichtbar, wenn die Erde groß genug ist)
+            if (showBarycenter && earthR > 15) {
+                const f = 1 / (1 + earthMoonMassRatio);
+                ctx.strokeStyle = c.text;
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                for (let k = i0; k <= i1; k++) {
+                    if (k === i0) ctx.moveTo(X(f * d.dx[k]), Y(f * d.dy[k]));
+                    else ctx.lineTo(X(f * d.dx[k]), Y(f * d.dy[k]));
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+                const bx = X(f * d.dx[i]), by = Y(f * d.dy[i]);
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(bx - 7, by); ctx.lineTo(bx + 7, by);
+                ctx.moveTo(bx, by - 7); ctx.lineTo(bx, by + 7);
+                ctx.stroke();
+                ctx.fillStyle = c.text;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('Schwerpunkt', bx + 9, by - 4);
+            }
+
+            drawScaleBar(ctx, w, h, v.scale, c);
+        }
+
+        function drawSunView() {
             const canvas = document.getElementById('orbit');
             const { ctx, w, h } = prepareCanvas(canvas);
             const c = colors();
@@ -467,10 +638,6 @@
             }
 
             drawScaleBar(ctx, w, h, v.scale, c);
-
-            const warning = document.getElementById('exaggerationWarning');
-            warning.style.display = (exaggeration > 1) ? '' : 'none';
-            document.getElementById('exaggerationText').textContent = '×' + exaggeration;
         }
 
         /**
@@ -495,7 +662,7 @@
             ctx.textAlign = 'left';
             ctx.textBaseline = 'bottom';
             let label = formatKm(nice);
-            if (exaggeration > 1) label += '  (Abstand Erde–Mond ×' + exaggeration + ')';
+            if (mode === 'sun' && exaggeration > 1) label += '  (Abstand Erde–Mond ' + exaggerationLabel() + ')';
             ctx.fillText(label, x0, y0 - 7);
             ctx.textAlign = 'right';
             ctx.fillText('Zoom ×' + formatNumber(scale / defaultScale(w, h), scale / defaultScale(w, h) < 10 ? 1 : 0), w - 8, h - 8);
@@ -507,8 +674,10 @@
         function findNearestOrbitPoint(canvas, mx, my) {
             const v = currentView(canvas.clientWidth, canvas.clientHeight);
             let best = -1, bestDist = 14 * 14;
-            for (let i = 0; i < orbitData.N; i++) {
-                for (const [x, y] of [[moonX(i), moonY(i)], [orbitData.ex[i], orbitData.ey[i]]]) {
+            const [i0, i1] = shownRange();
+            for (let i = i0; i <= i1; i++) {
+                const points = mode === 'geo' ? [moonPoint(i)] : [moonPoint(i), earthPoint(i)];
+                for (const [x, y] of points) {
                     const ddx = v.X(x) - mx, ddy = v.Y(y) - my;
                     const dist = ddx * ddx + ddy * ddy;
                     if (dist < bestDist) { bestDist = dist; best = i; }
@@ -528,7 +697,8 @@
                 const v = currentView(w, h);
                 const factor = Math.exp(-ev.deltaY * (ev.deltaMode === 1 ? 0.05 : 0.0015));
                 const newScale = Math.min(Math.max(v.scale * factor, defaultScale(w, h) * 0.5), defaultScale(w, h) * 20000);
-                if (followEarth) {
+                const view = activeView();
+                if (mode === 'sun' && followEarth) {
                     view.scale = newScale;
                 } else {
                     // Zoom um die Mausposition
@@ -555,6 +725,7 @@
                     if (Math.abs(ddx) + Math.abs(ddy) > 3) drag.moved = true;
                     if (drag.moved) {
                         const v = currentView(canvas.clientWidth, canvas.clientHeight);
+                        const view = activeView();
                         if (followEarth) setFollowEarth(false);
                         view.scale = v.scale;
                         view.cx = drag.cx - ddx / v.scale;
@@ -603,19 +774,59 @@
             tooltip.style.top = Math.max(0, top) + 'px';
         }
 
+        /** Doppelklick: Gesamtansicht der aktuellen Ansicht */
         function resetView() {
-            setFollowEarth(false);
-            view.cx = 0;
-            view.cy = 0;
-            view.scale = null;
+            if (mode === 'sun') setFollowEarth(false);
+            Object.assign(activeView(), { cx: 0, cy: 0, scale: null });
             drawOrbit();
         }
 
-        function zoomToEarth() {
+        /** Knopf „Gesamtansicht“: Bahnen um die Sonne, ganzes Jahr */
+        function showOverview() {
+            setMode('sun');
+            resetView();
+        }
+
+        /**
+         * Ausschnitt um die Erde, folgt ihr; zoom = Vergrößerung gegenüber der Gesamtansicht
+         * (ohne Angabe ±0,06 AE, entspricht etwa ±3,5 Tagen Erdbewegung)
+         */
+        function zoomToEarth(zoom) {
             const canvas = document.getElementById('orbit');
+            setMode('sun');
             setFollowEarth(true);
-            // Ausschnitt von ca. ±0,06 AE (entspricht etwa ±3,5 Tagen Erdbewegung)
-            view.scale = Math.min(canvas.clientWidth, canvas.clientHeight) / 2 / 0.06;
+            const w = canvas.clientWidth, h = canvas.clientHeight;
+            views.sun.scale = zoom ? defaultScale(w, h) * zoom : Math.min(w, h) / 2 / 0.06;
+            drawOrbit();
+        }
+
+        /** Ansicht „Mond um die Erde“; zoom = Vergrößerung gegenüber ±435 000 km */
+        function showGeo(zoom = 1) {
+            setMode('geo');
+            Object.assign(views.geo, { cx: 0, cy: 0, scale: null });
+            if (zoom !== 1) {
+                const canvas = document.getElementById('orbit');
+                views.geo.scale = defaultScale(canvas.clientWidth, canvas.clientHeight) * zoom;
+            }
+            drawOrbit();
+        }
+
+        function setMode(m) {
+            mode = m;
+            document.getElementById('exaggeration').disabled = (m === 'geo');
+            document.getElementById('followEarth').disabled = (m === 'geo');
+            document.getElementById('showBarycenterLabel').hidden = (m !== 'geo');
+            document.getElementById('viewGeo').classList.toggle('active', m === 'geo');
+            document.getElementById('orbitLegend').hidden = (m === 'geo');
+            document.getElementById('geoLegend').hidden = (m !== 'geo');
+            document.getElementById('orbitHint').hidden = (m === 'geo');
+            document.getElementById('geoHint').hidden = (m !== 'geo');
+            drawOrbit();
+        }
+
+        function setShowBarycenter(on) {
+            showBarycenter = on;
+            document.getElementById('showBarycenter').checked = on;
             drawOrbit();
         }
 
@@ -668,7 +879,7 @@
                         { name: 'Mond (real)', values: orbitData.kappaMoon, color: 'moon', width: 1.5 },
                     ];
                     if (exaggeration > 1) {
-                        list.push({ name: 'Mond (Darstellung ×' + exaggeration + ')', values: kappaShown, color: 'text2', width: 1, dash: [3, 3] });
+                        list.push({ name: 'Mond (Darstellung ' + exaggerationLabel() + ')', values: kappaShown, color: 'text2', width: 1, dash: [3, 3] });
                     }
                     return list;
                 },
@@ -856,7 +1067,7 @@
                 { type: 'row', key: 'Größter Abstand zur Sonne', value: `${formatNumber(d.rMoon[rMax], 5)} AE am ${jdToString(d.jd[rMax])}` },
             ];
             if (exaggeration > 1) {
-                rows.push({ type: 'row', key: `Darstellung ×${exaggeration}`,
+                rows.push({ type: 'row', key: `Darstellung ${exaggerationLabel()}`,
                             value: (kappaShown[sMin] > 0) ? 'überall zur Sonne gekrümmt' : 'Krümmung wechselt das Vorzeichen (Verfälschung durch Überhöhung)' });
             }
             rows.push({ type: 'category', text: `<b>Mondphasen</b> (${newMoons.length} Neumonde, ${fullMoons.length} Vollmonde${blueMoons.length ? ', Blue Moon' : ''})` });
@@ -882,12 +1093,41 @@
             drawCharts();
         }
 
-        function setExaggeration(k) {
+        /** Überhöhung setzen; withTable = false beim Überblenden (Tabelle erst am Ende) */
+        function setExaggeration(k, withTable = true) {
             exaggeration = k;
             kappaShown = computeCurvature(orbitData, exaggeration);
+            document.getElementById('exaggeration').value = exaggerationToSlider(k);
             drawOrbit();
             drawCharts();
-            updateTable();
+            if (withTable) updateTable();
+        }
+
+        /** Überhöhung in etwa einer Sekunde logarithmisch zum Zielwert überblenden */
+        let exaggerationAnimation = null;
+        function animateExaggeration(target, ms = 1200) {
+            if (exaggerationAnimation) cancelAnimationFrame(exaggerationAnimation);
+            exaggerationAnimation = null;
+            const from = exaggeration;
+            if (from === target) return;
+            const start = performance.now();
+            const frame = now => {
+                const f = Math.min((now - start) / ms, 1);
+                const e = f * f * (3 - 2 * f);
+                if (f < 1) {
+                    setExaggeration(roundExaggeration(from * (target / from) ** e), false);
+                    exaggerationAnimation = requestAnimationFrame(frame);
+                } else {
+                    exaggerationAnimation = null;
+                    setExaggeration(target);
+                }
+            };
+            exaggerationAnimation = requestAnimationFrame(frame);
+        }
+
+        function stopExaggerationAnimation() {
+            if (exaggerationAnimation) cancelAnimationFrame(exaggerationAnimation);
+            exaggerationAnimation = null;
         }
 
         function loadYear(year) {
@@ -910,14 +1150,31 @@
             drawCharts();
         }
 
-        function togglePlay() {
+        /** Zeitpunkt wählen, bei Bedarf ein anderes Jahr laden */
+        function showJd(jd) {
+            const year = julianDayToDate(jd).getUTCFullYear();
+            if (!orbitData || orbitData.year !== year) {
+                document.getElementById('year').value = year;
+                loadYear(year);
+            }
+            setSelectedIndex(Math.round((jd - orbitData.jd[0]) / stepDays));
+        }
+
+        /** Zum nächsten Neu- ('new') oder Vollmond ('full') ab dem gewählten Zeitpunkt springen */
+        function jumpToPhase(type) {
+            const p = orbitData.phases.find(q => q.type === type && q.pos >= selectedIndex);
+            if (p) setSelectedIndex(Math.round(p.pos));
+        }
+
+        function setPlay(on) {
             const button = document.getElementById('playButton');
-            if (playTimer) {
-                clearInterval(playTimer);
+            if (!on) {
+                if (playTimer) clearInterval(playTimer);
                 playTimer = null;
                 button.textContent = '▶ Abspielen';
                 return;
             }
+            if (playTimer) return;
             button.textContent = '⏸ Anhalten';
             playTimer = setInterval(() => {
                 if (!kmEmbed.visible) return;       // außerhalb des Bildes pausieren
@@ -925,13 +1182,168 @@
             }, 30);
         }
 
-        // Überhöhung: logarithmischer Schieberegler von ×1 bis ×300
+        function togglePlay() {
+            setPlay(!playTimer);
+        }
+
+        // Überhöhung: logarithmischer Schieberegler von ×1 bis ×300, unter ×10 auf eine Nachkommastelle
+        function roundExaggeration(k) {
+            return k < 10 ? Math.round(k * 10) / 10 : Math.round(k);
+        }
         function sliderToExaggeration(v) {
-            return Math.round(10 ** (v / 100 * Math.log10(300)));
+            return roundExaggeration(10 ** (v / 100 * Math.log10(300)));
         }
         function exaggerationToSlider(k) {
             return Math.log10(k) / Math.log10(300) * 100;
         }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Rundgang                               //
+    /////////////////////////////////////////////////////////////////
+
+        /*
+         * Schritte: mode 'geo' (Mond um die Erde) oder 'sun', k = Überhöhung, zoom = Vergrößerung
+         * (Bahnen um die Sonne: Ausschnitt um die Erde, der ihr folgt; 'all' = Gesamtansicht; 'earth' = ±0,06 AE),
+         * date (UTC), phase = danach zum nächsten Neu-/Vollmond, play, bary = Schwerpunkt zeigen
+         */
+        const TOUR_STEPS = [
+            {
+                title: 'Der Mond um die Erde',
+                mode: 'geo', zoom: 1, date: '2026-01-01', play: true,
+                text: v => `<p>So kennt man den Mond: Er läuft um die Erde, in 27,3 Tagen einmal herum. Das Bild zeigt
+                    seine Bahn von Norden auf die Ebene der Erdbahn gesehen, zwei Wochen vor und nach dem
+                    ${v.date}. Die Erde steht fest in der Mitte, der Pfeil zeigt zur Sonne.</p>
+                    <p>Steht der Mond zwischen Erde und Sonne, ist <b>Neumond</b> (gefüllter Punkt), steht er ihr
+                    gegenüber, <b>Vollmond</b> (offener Punkt). Bis zur nächsten gleichen Phase vergehen 29,5 Tage,
+                    zwei mehr als für einen Umlauf: Der Pfeil zur Sonne dreht sich im Lauf des Jahres mit, und der
+                    Mond muss ihm nachlaufen.</p>`,
+            },
+            {
+                title: 'Beide um die Sonne – mit Schleifen',
+                mode: 'sun', k: 100, zoom: 'all', date: '2026-01-01', play: true,
+                text: v => `<p>Nun läuft die Erde (blau) zusätzlich in einem Jahr um die Sonne. Wie sieht die Bahn des
+                    Mondes (orange) dann aus? So, wie es viele Zeichnungen und das <b>Tellurium</b> nahelegen, ein
+                    Uhrwerkmodell von Sonne, Erde und Mond: als Kette von Schleifen, gut zwölf im Jahr.</p>
+                    <p>Allerdings ist der Abstand Erde–Mond hier ${v.k} vergrößert. Maßstäblich wäre er so klein,
+                    dass Mond- und Erdbahn in diesem Bild auf einer Linie lägen. Was geschieht, wenn man die
+                    Vergrößerung Schritt für Schritt zurücknimmt?</p>`,
+            },
+            {
+                title: 'Spitzen statt Schleifen',
+                mode: 'sun', k: 29, zoom: 3, date: '2026-05-01', phase: 'new',
+                text: v => `<p>Bei ${v.k} sind die Schleifen fast verschwunden. Der Ausschnitt folgt der Erde und
+                    zeigt einen Neumond. In der Darstellung läuft der Mond jetzt ungefähr so schnell um die Erde
+                    (29-mal 1 km/s) wie die Erde um die Sonne (30 km/s). Bei Neumond laufen beide Bewegungen
+                    gegeneinander, der Mond steht für einen Augenblick fast still: Aus der Schleife wird eine Spitze.</p>
+                    <p>Weil sich beide Geschwindigkeiten im Lauf des Jahres etwas ändern, bleibt je nach Monat eine
+                    winzige Schleife, eine Spitze oder ein Knick. Echte Schleifen bräuchte ein Mond, der schneller um
+                    die Erde läuft als die Erde um die Sonne. Unser Mond ist 30-mal langsamer.</p>`,
+            },
+            {
+                title: 'Dellen',
+                mode: 'sun', k: 10, zoom: 3, date: '2026-05-01', phase: 'new',
+                text: v => `<p>Bei ${v.k} gibt es weder Schleifen noch Spitzen, doch die Bahn hat Dellen: Um Neumond
+                    biegt sie von der Sonne weg, nach außen. Unten im Diagramm <b>Krümmung</b> fällt die gestrichelte
+                    Kurve der Darstellung dann unter null.</p>
+                    <p>Zur Sonne gekrümmt heißt: Die Bahn biegt sich überall zur Sonne hin, wie die Erdbahn. Nach
+                    außen gekrümmt ist sie nur, wo die Erde stärker am Mond zieht als die Sonne.</p>`,
+            },
+            {
+                title: 'Knapp ×2: die zweite Grenze',
+                mode: 'sun', k: 1.8, zoom: 8, date: '2026-05-01', phase: 'new',
+                text: v => `<p>Erst unterhalb von etwa ×2 ist die Bahn überall zur Sonne hin gekrümmt, auch bei Neumond.
+                    Im Bild bleibt nur eine sanfte Welle um die Erdbahn; die gestrichelte Kurve im Diagramm
+                    <b>Krümmung</b> bleibt jetzt über null.</p>
+                    <p>Diese Grenze ist kein Zufall. Die Sonne zieht im Mittel etwa 2,2-mal so stark am Mond wie die
+                    Erde. Wer den Abstand Erde–Mond vergrößert, ohne die Umlaufzeit zu ändern, verstärkt im Bild den
+                    Zug der Erde im selben Maß. Ab etwa dem Doppelten überwiegt er bei Neumond den der Sonne. In
+                    Erdnähe zieht die Erde etwas stärker, deshalb liegt die Grenze in manchen Monaten knapp unter ×2.</p>`,
+            },
+            {
+                title: 'Die echte Bahn',
+                mode: 'sun', k: 1, zoom: 'earth', date: '2026-05-01', play: true,
+                text: v => `<p>Maßstäblich (${v.k}) liegt die Mondbahn so dicht an der Erdbahn, dass man in der
+                    Gesamtansicht nur eine Linie sieht. Der Ausschnitt zeigt etwa dreieinhalb Tage vor und nach der
+                    Erde. Der Mond ist mal innen (Neumond), mal außen (Vollmond), doch seine Bahn biegt sich überall
+                    zur Sonne hin: bei Neumond etwas stärker, bei Vollmond etwas schwächer als die Erdbahn (Diagramm
+                    Krümmung, orange Kurve).</p>
+                    <p>Von der Sonne aus gesehen läuft der Mond also selbst um die Sonne, auf einer Bahn, die sich
+                    sanft um die Erdbahn windet. Er bleibt trotzdem bei der Erde, denn beide fallen gemeinsam um die
+                    Sonne. Die Erde lenkt ihn dabei nur ein wenig ab.</p>`,
+            },
+            {
+                title: 'Auch die Erde schwankt',
+                mode: 'geo', zoom: 25, date: '2026-01-01', play: true, bary: true,
+                text: v => `<p>Genau genommen kreisen Erde und Mond um ihren gemeinsamen <b>Schwerpunkt</b> (Kreuz).
+                    Die Erde ist 81-mal so schwer wie der Mond, deshalb liegt er nur rund 4700 km vom Erdmittelpunkt
+                    entfernt, noch innerhalb der Erde. Der Mond liegt weit außerhalb dieses Ausschnitts.</p>
+                    <p>Im Bild steht die Erde fest, und der Schwerpunkt läuft im Monat einmal um ihre Mitte. In
+                    Wirklichkeit ist es umgekehrt: Die Erde schlingert um den Schwerpunkt. Auf der glatten Bahn um die
+                    Sonne läuft genau genommen dieser Schwerpunkt, Erde und Mond pendeln um ihn herum.</p>`,
+            },
+            {
+                title: 'Selbst ausprobieren',
+                mode: 'sun', k: 20, zoom: 'all', date: '2026-01-01',
+                text: v => `<p>Jetzt lässt sich alles selbst ausprobieren: der Regler <b>Überhöhung</b>, das Mausrad zum
+                    Zoomen, Ziehen zum Verschieben, ein Klick auf die Bahn wählt einen Zeitpunkt. Der Knopf
+                    „Mond um die Erde“ wechselt zur Ansicht mit fester Erde.</p>
+                    <p>Ob der Mond die Erde oder die Sonne umkreist, ist also eine Frage des Standpunkts. Von der Erde
+                    aus umkreist er sie, von der Sonne aus läuft er mit der Erde um die Sonne, auf einer Bahn ohne
+                    Schleifen.</p>`,
+            },
+        ];
+
+        function applyTourStep(step) {
+            stopExaggerationAnimation();
+            setPlay(false);
+            if (step.date) showJd(julianDayFromDate(new Date(step.date + 'T00:00:00Z')));
+            if (step.phase) jumpToPhase(step.phase);
+            setShowBarycenter(!!step.bary);
+            if (step.mode === 'geo') {
+                showGeo(step.zoom || 1);
+            } else {
+                if (step.zoom === 'all') showOverview();
+                else if (step.zoom === 'earth') zoomToEarth();
+                else zoomToEarth(step.zoom);
+                if (step.k !== undefined) animateExaggeration(step.k);
+            }
+            if (step.play) setPlay(true);
+        }
+
+        function tourValues() {
+            const date = julianDayToDate(orbitData.jd[selectedIndex]);
+            return {
+                date: date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }),
+                k: exaggerationLabel(),
+            };
+        }
+
+        // Während des Rundgangs: Zustand merken und danach wiederherstellen
+        let savedState = null;
+        function holdState(on) {
+            if (on) {
+                savedState = {
+                    mode, exaggeration, showPhases, showBarycenter, followEarth, playing: !!playTimer,
+                    jd: orbitData.jd[selectedIndex], views: JSON.parse(JSON.stringify(views)),
+                };
+                return;
+            }
+            if (!savedState) return;
+            const s = savedState;
+            savedState = null;
+            stopExaggerationAnimation();
+            setPlay(false);
+            showJd(s.jd);
+            Object.assign(views.sun, s.views.sun);
+            Object.assign(views.geo, s.views.geo);
+            setFollowEarth(s.followEarth);
+            setShowBarycenter(s.showBarycenter);
+            setExaggeration(s.exaggeration);
+            setMode(s.mode);
+            if (s.playing) setPlay(true);
+        }
+
+        let tour = null;
 
         window.onload = function () {
             const yearInput = document.getElementById('year');
@@ -943,13 +1355,22 @@
 
             const exSlider = document.getElementById('exaggeration');
             exSlider.value = exaggerationToSlider(exaggeration);
-            exSlider.addEventListener('input', () => setExaggeration(sliderToExaggeration(Number(exSlider.value))));
+            exSlider.addEventListener('input', () => {
+                stopExaggerationAnimation();
+                setExaggeration(sliderToExaggeration(Number(exSlider.value)));
+            });
 
             document.getElementById('dateSlider').addEventListener('input', ev => setSelectedIndex(Number(ev.target.value)));
             document.getElementById('showPhases').addEventListener('change', ev => { showPhases = ev.target.checked; drawOrbit(); });
+            document.getElementById('showBarycenter').addEventListener('change', ev => setShowBarycenter(ev.target.checked));
             document.getElementById('followEarth').addEventListener('change', ev => {
                 followEarth = ev.target.checked;
                 drawOrbit();
+            });
+
+            tour = new canvas3d.Tour({
+                tours: { schleifen: { title: 'Umkreist der Mond die Erde oder die Sonne?', steps: TOUR_STEPS } },
+                apply: applyTourStep, fixPlace: holdState, placeLabel: 'Zeiten in UTC',
             });
 
             setupOrbitInteraction();
@@ -960,10 +1381,14 @@
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawOrbit(); drawCharts(); });
 
             loadYear(Number(yearInput.value));
+            setMode('sun');
 
-            // Startzustand aus der Adresse: view=earth (Ausschnitt um die Erde, folgt ihr), play (Abspielen)
+            // Startzustand aus der Adresse: view=earth (Ausschnitt um die Erde, folgt ihr), view=geo (Mond um die
+            // feste Erde), Rundgang (tour, step), play (Abspielen)
             if (kmEmbed.state.view === 'earth') zoomToEarth();
-            if (kmEmbed.state.play) togglePlay();
+            if (kmEmbed.state.view === 'geo') showGeo();
+            tour.fromEmbedState(kmEmbed.state, kmEmbed.active);
+            if (kmEmbed.state.play) setPlay(true);
             kmEmbed.ready();
         };
     </script>
@@ -972,6 +1397,9 @@
     <h1 data-embed="hide">Mondbahn um die Sonne</h1>
     <p data-embed="hide">Der Mond umkreist die Erde in rund 29,5 Tagen, während die Erde in einem Jahr um die Sonne läuft. Von der Sonne aus betrachtet beschreibt der Mond deshalb keine Schleifen, sondern eine leicht gewellte Bahn entlang der Erdbahn: Bei Vollmond ist er etwas weiter außen, bei Neumond etwas weiter innen. Da der Abstand Erde–Mond (≈ 384 400 km) nur etwa 1/400 des Abstands zur Sonne beträgt, ist diese Welle in einer maßstäblichen Gesamtansicht nicht zu erkennen. Mit der Überhöhung wird der Abstand Erde–Mond künstlich vergrößert, mit dem Mausrad lässt sich in die maßstäbliche Bahn hineinzoomen.</p>
     <p data-embed="hide">Alle Zeiten in Weltzeit (UTC). Die Bahn wird stundenweise mit <code>calculateMoonPosition()</code> (Meeus, Kap. 45) und der Sonnenposition aus <code>astro.js</code> berechnet und in die Ebene der Ekliptik projiziert.</p>
+    <p class="start-tour" id="tourStart">
+        <button data-tour="schleifen" onclick="tour.start('schleifen')">▶ Rundgang: Umkreist der Mond die Erde oder die Sonne?</button>
+    </p>
 
     <div class="controls" data-control="extra">
         <label>Überhöhung Erde–Mond
@@ -979,6 +1407,7 @@
             <span class="value" id="exaggerationText"></span>
         </label>
         <label><input type="checkbox" id="showPhases" checked> Neu-/Vollmond</label>
+        <label id="showBarycenterLabel" hidden><input type="checkbox" id="showBarycenter"> Schwerpunkt Erde–Mond</label>
     </div>
     <div class="controls" data-control="basic">
         <label>Jahr <input type="number" id="year" step="1"></label>
@@ -987,12 +1416,29 @@
         <button id="playButton" onclick="togglePlay()">▶ Abspielen</button>
     </div>
     <div class="controls" data-control="extra">
-        <button onclick="resetView()">Gesamtansicht</button>
+        <button onclick="showOverview()">Gesamtansicht</button>
         <button onclick="zoomToEarth()">Ausschnitt um die Erde</button>
+        <button id="viewGeo" onclick="showGeo()">Mond um die Erde</button>
         <label><input type="checkbox" id="followEarth"> Ansicht folgt der Erde</label>
     </div>
 
-    <div class="legend">
+    <div class="tour" id="tour" hidden>
+        <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
+        <div id="tourText"></div>
+        <div class="tour-nav">
+            <button id="tourBack">← Zurück</button>
+            <button id="tourNext">Weiter →</button>
+            <button class="end" onclick="tour.end()">Rundgang beenden</button>
+        </div>
+    </div>
+
+    <div class="legend" id="geoLegend" hidden>
+        <span style="--c: var(--moon)">Mondbahn ±14 Tage</span>
+        <span style="--c: var(--sun)">Richtung zur Sonne</span>
+        <span class="dot" style="--c: var(--surface); --fill: var(--text)">Neumond</span>
+        <span class="dot" style="--c: var(--moon); --fill: var(--surface)">Vollmond</span>
+    </div>
+    <div class="legend" id="orbitLegend">
         <span style="--c: var(--earth)">Erdbahn</span>
         <span style="--c: var(--moon)">Mondbahn</span>
         <span class="dot" style="--c: var(--surface); --fill: var(--text)">Neumond</span>
@@ -1002,8 +1448,9 @@
         <canvas id="orbit" role="img" aria-label="Bahnen von Erde und Mond um die Sonne im eingestellten Jahr, mit Neu- und Vollmonden"></canvas>
         <div class="tooltip" id="orbitTooltip"></div>
     </div>
-    <p class="hint">Mausrad: zoomen · Ziehen: verschieben · Doppelklick: Gesamtansicht · Klick auf die Bahn: Zeitpunkt wählen. Blick von Norden auf die Ekliptik, Umlauf gegen den Uhrzeigersinn.
-        <span id="exaggerationWarning" class="warning"><br>Achtung: Die Überhöhung verfälscht die Form. Schon ab etwa ×2 erscheinen Dellen nach außen, ab etwa ×30 sogar Schleifen – die reale Mondbahn (×1) ist dagegen überall zur Sonne hin gekrümmt.</span>
+    <p class="hint" id="geoHint" hidden>Die Erde steht fest, Erde und Mond in wahrer Größe (mindestens einige Pixel), die helle Seite zeigt zur Sonne. Mausrad: zoomen · Ziehen: verschieben · Doppelklick: ganze Bahn · Klick auf die Bahn: Zeitpunkt wählen. Blick von Norden auf die Ekliptik, Umlauf gegen den Uhrzeigersinn.</p>
+    <p class="hint" id="orbitHint">Mausrad: zoomen · Ziehen: verschieben · Doppelklick: Gesamtansicht · Klick auf die Bahn: Zeitpunkt wählen. Blick von Norden auf die Ekliptik, Umlauf gegen den Uhrzeigersinn.
+        <span id="exaggerationWarning" class="warning"><br>Achtung: Die Überhöhung verfälscht die Form. Schon ab knapp ×2 erscheinen Dellen nach außen, ab etwa ×30 sogar Schleifen – die reale Mondbahn (×1) ist dagegen überall zur Sonne hin gekrümmt.</span>
     </p>
 
     <h2>Abstand zur Sonne</h2>
