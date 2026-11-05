@@ -26,7 +26,7 @@ danach der Mond.
 | 3 | [Himmelsachse](03-himmelsachse.md) | Himmelsachse und Himmelskoordinaten | Warum steht der Polarstern immer an derselben Stelle? | `himmelsachse`, Rundgang (11 Schritte) | veröffentlicht |
 | 4 | [Erdbahn](04-erdbahn.md) | Erdbahn und Jahreszeiten | Warum ist es im Winter kalt, obwohl die Erde der Sonne näher ist? | `erdbahn` (erdbahn3d.html), Rundgang `erdbahn`; `tageslaenge`, Rundgang `zeitgleichung` | veröffentlicht |
 | 5 | [Jahrhunderte](05-jahrhunderte.md) | Änderungen über Jahrtausende | Zeigt die Erdachse immer zum Polarstern? | `erdbahn`, Rundgang `jahrhunderte` | veröffentlicht |
-| 6–9 | [Mond](06-mond.md) | – | Umkreist der Mond die Erde oder die Sonne? · Warum gibt es nicht bei jedem Vollmond eine Finsternis? · Wie lassen sich Finsternisse vorhersagen? · Warum steht der Vollmond im Winter hoch? | `mondbahn`, `mondbahn3d` (neu), `erdemond`, `mondbogen3d` (neu) | Gliederung abgestimmt; Teil 6 ([Entwurf](06-mondbahn.md), Wegweiser „Teil 7“) im Entwurf |
+| 6–9 | [Mond](06-mond.md) | – | Umkreist der Mond die Erde oder die Sonne? · Warum gibt es nicht bei jedem Vollmond eine Finsternis? · Wie lassen sich Finsternisse vorhersagen? · Warum steht der Vollmond im Winter hoch? | `mondbahn`, `mondbahn3d`, `erdemond`, `mondbogen3d` (neu) | Gliederung abgestimmt; Teil 6 ([Entwurf](06-mondbahn.md), Wegweiser „Teil 7“) und Teil 7 ([Entwurf](07-knoten.md), Wegweiser „Teil 8“) im Entwurf |
 | – | [Erfahrungen mit Claude Code](ki-erfahrung.md) | Erfahrungen mit Claude Code | Wie entsteht so eine Reihe mit einem KI-Werkzeug? | – | Vorgeschichte im Entwurf, sonst Stoff |
 
 - Teil 1 bleibt bei Alltagsbeobachtungen. 1b löst das Rätsel vom 12. Dezember mit dem wandernden

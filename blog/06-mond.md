@@ -13,7 +13,7 @@ Mondphase und Sichel bekommen keinen eigenen Teil.
 | Teil | Thema | Leitfrage | Modell, Rundgang |
 |---:|---|---|---|
 | 6 | Bahn um die Sonne ([Entwurf](06-mondbahn.md)) | Umkreist der Mond die Erde oder die Sonne? | `mondbahn`, Ansicht `geo`, Rundgang `schleifen` (umgesetzt) |
-| 7 | Neigung und Knoten | Warum gibt es nicht bei jedem Vollmond eine Finsternis? | neu: `mondbahn3d` mit Rundgang |
+| 7 | Neigung und Knoten ([Entwurf](07-knoten.md)) | Warum gibt es nicht bei jedem Vollmond eine Finsternis? | `mondbahn3d`, Rundgang `knoten` (umgesetzt) |
 | 8 | Finsternisse | Wie lassen sich Finsternisse vorhersagen? | `erdemond`, Rundgang `nodes`; evtl. zweiter Platzhalter `apsides` |
 | 9 | Mondbahn im Horizontsystem | Warum steht der Vollmond im Winter hoch? | neu: `mondbogen3d` mit Rundgang |
 
@@ -62,17 +62,23 @@ Monat).
 - **Knotenlinie fest im Raum:** zeigt zweimal im Jahr zur Sonne (2026: Februar/März und August); sie
   wandert in 18,6 Jahren rückwärts, die Saisons kommen jedes Jahr etwa 19 Tage früher.
 
-Modell `mondbahn3d.html` (Canvas 2D auf `canvas3d.js`, läuft von `file://`):
-- Sonne, Erdbahn, wahre Mondbahn über ein Jahr; Mondbahnebene als Scheibe um die Erde mit Knotenlinie;
-  Marken für Neu- und Vollmond und für Finsternisse (`orbit3d.findEclipse()`); keine Schatten (die
-  zeigt `erdemond3d.html`).
-- Zwei Regler: Überhöhung der Höhe über der Ekliptik (Standard etwa ×20) und des Abstands in der Ebene
-  (Standard ×1, also keine Schleifen).
-- Ansichten schräg, von oben, von der Kante; Zeitraffer.
-- Rundgang: (1) Welle in der Ebene wie Teil 6, (2) Höhe überhöht: Welle senkrecht zur Ebene, (3) Knoten
-  und Knotenlinie, (4) Neu- und Vollmond liegen nur selten auf der Ebene, (5) Knotenlinie zeigt zur
-  Sonne: Finsternis-Saison, (6) ein halbes Jahr später die zweite, (7) die Saisons wandern im Jahr nach
-  vorn (18,6 Jahre), (8) frei.
+Modell `mondbahn3d.html` (Canvas 2D auf `canvas3d.js`, läuft von `file://`), umgesetzt am 2026-11-05:
+- Sonne, Erdbahn, wahre Mondbahn über ein Jahr (über der Ekliptik durchgezogen, darunter gestrichelt, wahlweise
+  als Fläche bis zur Ebene); Marken für Neu- und Vollmond, Knoten und Finsternisse (`orbit3d.findEclipse()`);
+  Finsternis-Saisons als Bögen auf der Erdbahn (Sonne weniger als 18° neben der Knotenlinie); Knotenlinie durch
+  die Erde. Keine Schatten (die zeigt `erdemond3d.html`).
+- Mondbahnebene als Scheibe um die Erde: Ebene „Mondbahn um die Erde“ (±14 Tage, Erde festgehalten); sichtbar
+  erst mit vergrößertem Abstand, im Rundgang ×50.
+- Zwei Regler: Überhöhung der Höhe über der Ekliptik und Vergrößerung des Abstands in der Ebene (Standard ×1,
+  also keine Schleifen). Abweichung von der Planung: Standard der Höhe ×300 statt ×20; bei ×20 wäre die Welle
+  in der Übersicht nur 1–2 Pixel hoch.
+- Ansichten schräg, von oben, von der Kante, „Zur Erde“ (folgt der Erde, von außen Richtung Sonne) und „Zur Erde
+  von oben“; Abspielen Monat und Jahr; Sprünge zu Vollmond, Neumond, Knoten, Finsternis.
+- Rundgang `knoten` (9 Schritte): (1) Rückblick Welle in der Ebene (×10, von oben), (2) auf und ab (Höhe ×300),
+  (3) Knoten, drakonitischer Monat, (4) zwei Takte: Vollmond 31. Mai 2026 rund 35 100 km unter der Ebene,
+  Kernschatten nur rund 9300 km breit, (5) Knotenlinie mit Mondbahnebene (×50), fest im Raum, zeigt Ende
+  Februar und im August zur Sonne, (6) Finsternis-Saison am 3. März 2026, (7) ein halbes Jahr später,
+  12. August, beide Saisons des Jahres, (8) die Saisons wandern (2026–2045 im Zeitraffer), (9) frei.
 
 ## Teil 8: Finsternisse
 
@@ -124,7 +130,7 @@ Newton-Schritt Δm nach Meeus. `cpp/Plan-Mondaufgang.md` entsprechend anpassen.
 
 1. Ansicht `geo` und Rundgang „Schleifen“ in `mondbahn.html`, dann Textentwurf Teil 6 als Stilprobe;
    Freigabe durch den User.
-2. `mondbahn3d.html` mit Rundgang.
+2. `mondbahn3d.html` mit Rundgang (erledigt), Textentwurf Teil 7 (`07-knoten.md`).
 3. Texte der Rundgänge in `erdemond3d.html`.
 4. Umbau Mondaufgang in `astro.js`/`astro.cpp`.
 5. `mondbogen3d.html` mit Rundgang.

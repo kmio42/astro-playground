@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Die geneigte Mondbahn</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --surface: #fcfcfb;
+            --surface-2: #f1f0ed;
+            --text: #0b0b0b;
+            --text-2: #52514e;
+            --muted: #8a8984;
+            --sun: #e39a00;
+            --sun-glow: rgba(240, 170, 20, 0.28);
+            --plane: rgba(227, 154, 0, 0.07);
+            --plane-line: rgba(160, 120, 40, 0.45);
+            --earth: #2a78d6;
+            --earth-day: #9cc8ec;
+            --earth-night: #2d3b5e;
+            --moon: #eb6834;
+            --moon-day: #e8e4da;
+            --moon-night: #5a5852;
+            --curtain: rgba(235, 104, 52, 0.16);
+            --curtain-below: rgba(235, 104, 52, 0.08);
+            --moon-plane: rgba(235, 104, 52, 0.14);
+            --node: #7a59c9;
+            --season: rgba(208, 54, 43, 0.35);
+            --eclipse: #d0362b;
+            --new-moon: #1f1f1d;
+            --new-ring: #fcfcfb;
+            --full-moon: #fffdf5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --surface: #1a1a19;
+                --surface-2: #262624;
+                --text: #ffffff;
+                --text-2: #c3c2b7;
+                --muted: #8f8e86;
+                --sun: #f2b01e;
+                --sun-glow: rgba(242, 176, 30, 0.25);
+                --plane: rgba(242, 176, 30, 0.07);
+                --plane-line: rgba(242, 190, 90, 0.4);
+                --earth: #3987e5;
+                --earth-day: #5b93cc;
+                --earth-night: #141d33;
+                --moon: #f07a48;
+                --moon-day: #d8d4ca;
+                --moon-night: #3a3936;
+                --curtain: rgba(240, 122, 72, 0.2);
+                --curtain-below: rgba(240, 122, 72, 0.1);
+                --moon-plane: rgba(240, 122, 72, 0.16);
+                --node: #a68cf0;
+                --season: rgba(240, 86, 74, 0.4);
+                --eclipse: #f0564a;
+                --new-moon: #1f1f1d;
+                --new-ring: #c3c2b7;
+                --full-moon: #fffdf5;
+            }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --surface: #1a1a19;
+            --surface-2: #262624;
+            --text: #ffffff;
+            --text-2: #c3c2b7;
+            --muted: #8f8e86;
+            --sun: #f2b01e;
+            --sun-glow: rgba(242, 176, 30, 0.25);
+            --plane: rgba(242, 176, 30, 0.07);
+            --plane-line: rgba(242, 190, 90, 0.4);
+            --earth: #3987e5;
+            --earth-day: #5b93cc;
+            --earth-night: #141d33;
+            --moon: #f07a48;
+            --moon-day: #d8d4ca;
+            --moon-night: #3a3936;
+            --curtain: rgba(240, 122, 72, 0.2);
+            --curtain-below: rgba(240, 122, 72, 0.1);
+            --moon-plane: rgba(240, 122, 72, 0.16);
+            --node: #a68cf0;
+            --season: rgba(240, 86, 74, 0.4);
+            --eclipse: #f0564a;
+            --new-moon: #1f1f1d;
+            --new-ring: #c3c2b7;
+            --full-moon: #fffdf5;
+        }
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+            box-sizing: border-box;
+            background: var(--surface);
+            color: var(--text);
+            font-family: Arial, sans-serif;
+            line-height: 1.45;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            touch-action: none;
+            cursor: grab;
+            border-radius: 6px;
+            background: var(--surface-2);
+        }
+        canvas.dragging { cursor: grabbing; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 20px;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .controls label { white-space: nowrap; }
+        .controls input[type="number"] { width: 5.5em; }
+        .controls .wide { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .controls .wide input[type="range"] { flex: 1; min-width: 80px; }
+        .controls .value { font-variant-numeric: tabular-nums; min-width: 4em; font-weight: 600; white-space: nowrap; }
+        .controls .date { min-width: 12em; }
+        .controls .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .controls .jump { display: inline-flex; gap: 2px; align-items: center; }
+        .controls .jump span { margin-right: 4px; }
+        .warning { color: var(--eclipse); font-size: 0.9em; }
+        button { padding: 3px 10px; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            font-size: 0.9em;
+            color: var(--text-2);
+            margin: 6px 0 10px;
+        }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background: var(--c);
+        }
+        .legend .dashed::before {
+            background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px);
+        }
+        .legend .area::before { height: 10px; }
+        .legend .dot::before { width: 8px; height: 8px; border-radius: 50%; background: var(--fill); border: 1.5px solid var(--c); }
+        .hint { color: var(--text-2); font-size: 0.9em; margin: 4px 0 16px; }
+        #info table { border-collapse: collapse; }
+        #info td { padding: 2px 14px 2px 0; vertical-align: top; font-variant-numeric: tabular-nums; }
+        #info td:first-child { color: var(--text-2); }
+        h2 { margin-top: 28px; }
+        .tour {
+            border-left: 4px solid var(--moon);
+            background: var(--surface-2);
+            border-radius: 6px;
+            padding: 10px 14px 12px;
+            margin-bottom: 10px;
+        }
+        .tour-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
+        .tour-head b { font-size: 1.1em; }
+        .tour-head span { color: var(--text-2); font-size: 0.9em; }
+        #tourText { min-height: 7.5em; }
+        #tourText p { margin: 8px 0; }
+        .tour-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tour-nav .end { margin-left: auto; }
+        .start-tour { margin: 0 0 14px; }
+        .start-tour button { padding: 6px 14px; font-size: 1em; text-align: left; }
+        button.active { font-weight: bold; outline: 2px solid var(--node); outline-offset: -1px; }
+    </style>
+    <script src="astro.js"></script>
+    <script src="ui.js"></script>
+    <script src="embed.js"></script>
+    <script src="canvas3d.js"></script>
+    <script src="orbit3d.js"></script>
+    <script>
+        const { V } = canvas3d;
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zustand                                //
+    /////////////////////////////////////////////////////////////////
+
+        // Maßstab: 1 Einheit = 1 AE, Sonne im Ursprung, x zum Frühlingspunkt, z zum Nordpol der Ekliptik.
+        // Sonne, Erde und Mond sind als Körper stark vergrößert.
+        const SUN_R = 0.06;
+        const EARTH_R = 0.02;
+        const MOON_R = 0.011;
+        const PLANE_R = 1.3;                    // Radius der Ekliptik-Scheibe
+        const MASS_RATIO = 81.3005678;          // Masse Erde / Masse Mond
+        const STEP = 1 / 12;                    // Schrittweite der Bahnpunkte [d] (2 Stunden)
+        const PAD = 16;                         // Bahnpunkte über das Jahr hinaus [d], für den Ring ±14 Tage
+        const RING_DAYS = 14;                   // Mondbahn um die Erde: ±14 Tage um den Zeitpunkt
+        // Finsternis-Saison: Die Sonne steht weniger als etwa 18° von der Knotenlinie entfernt (gut 34 Tage). Dann sind
+        // Sonnenfinsternisse möglich (Grenze 15–18,5°), Mondfinsternisse bis etwa 17° (mit Halbschatten).
+        const SEASON_LIMIT = 18 * DEG2RAD;
+        const SCALE_LIMITS = { k: [1, 60], h: [1, 1000] };
+
+        const state = {
+            jd: julianDayFromDate(new Date()),
+            year: new Date().getFullYear(),
+            k: 1,                // Vergrößerung des Abstands Erde–Mond in der Ebene
+            h: 300,              // Überhöhung der Höhe über der Ekliptik
+            play: null,          // 'month' (2 Tage/s), 'year' (20 Tage/s), 'years' (ein Jahr alle 1,5 s)
+            years: null,         // Bereich beim Abspielen über Jahre [von, bis]
+            scaleTween: null,
+            follow: null,        // { relAz } solange die Kamera der Erde folgt
+            show: { ecliptic: true, path: true, curtain: true, phases: true, nodes: true, nodeline: true,
+                    ring: false, seasons: true, eclipses: true },
+        };
+
+        // Ansichten; earth und above folgen der Erde (relAz relativ zur Richtung Sonne–Erde: 90 = von außen)
+        const VIEWS = {
+            oblique: { cam: { az: 200, el: 24, dist: 3.0 } },
+            top:     { cam: { az: 180, el: 90, dist: 3.9 } },
+            edge:    { cam: { az: 200, el: 2, dist: 3.0 } },
+            earth:   { cam: { el: 10, dist: 0.9 }, relAz: 90 },
+            above:   { cam: { el: 90, dist: 0.9 }, relAz: 90 },
+        };
+
+        /**
+         * Ist eine Ebene sichtbar? Im Rundgang bestimmt der Schritt, mit layers aus der Adresse diese Liste,
+         * sonst die Häkchen. Ebenen: ecliptic, path, curtain, phases, nodes, nodeline, ring, seasons, eclipses
+         */
+        function visible(layer) {
+            const step = tour && tour.step;
+            if (step && step.layers) return step.layers.includes(layer);
+            if (fixedLayers) return fixedLayers.includes(layer);
+            return state.show[layer] ?? true;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Berechnung                             //
+    /////////////////////////////////////////////////////////////////
+
+        // Zeitzone der Anzeige: die des Browsers, im Rundgang die deutsche (MEZ/MESZ)
+        let displayZone = null;
+        const TOUR_ZONE = 'Europe/Berlin';
+
+        function zoneOption() {
+            return displayZone ? { timeZone: displayZone } : {};
+        }
+
+        /** JD des 1. Januar 0 Uhr in der Zeitzone der Anzeige */
+        function yearStartJd(year) {
+            return julianDayFromDate(zonedDate(year, 0, 1, 0, 0, displayZone));
+        }
+
+        function yearOfJd(jd) {
+            return zonedParts(julianDayToDate(jd), displayZone).year;
+        }
+
+        /** Geozentrischer Ort des Mondes [AE] */
+        function moonGeo(moon) {
+            const r = moon.distance / AU_KM, c = Math.cos(moon.latitude);
+            return [r * c * Math.cos(moon.longitude), r * c * Math.sin(moon.longitude), r * Math.sin(moon.latitude)];
+        }
+
+        /**
+         * Heliozentrischer Ort der Erde [AE]. Die Sonnenformel beschreibt die Bahn des Schwerpunkts Erde–Mond, die
+         * Erde steht um 1/82 des Mondabstands auf der Gegenseite (wie in mondbahn.html).
+         */
+        function earthHelio(sun, d) {
+            const r = sun.distance / AU_KM;
+            return [-r * Math.cos(sun.longitude) - d[0] / (1 + MASS_RATIO),
+                    -r * Math.sin(sun.longitude) - d[1] / (1 + MASS_RATIO), 0];
+        }
+
+        /** Ort im Bild: Erde plus Mond geozentrisch, in der Ebene k-fach, in der Höhe h-fach */
+        function display(E, d) {
+            return [E[0] + state.k * d[0], E[1] + state.k * d[1], state.h * d[2]];
+        }
+
+        /** Winkel zwischen Sonne und Knotenlinie, gefaltet auf (−90°, 90°] [rad] */
+        function sunNodeAngle(jd) {
+            const a = normalizeAngle(calculateSunPosition(jd).longitude - calculateMoonAscendingNode(jd)) % Math.PI;
+            return a > Math.PI / 2 ? a - Math.PI : a;
+        }
+
+        const yearCache = new Map();
+
+        /**
+         * Daten eines Jahres (Kalenderjahr in der Zeitzone der Anzeige): Bahnpunkte alle 2 Stunden (mit PAD Tagen
+         * davor und danach), Neu- und Vollmonde, Knotendurchgänge, Finsternisse, Finsternis-Saisons
+         */
+        function yearData(year) {
+            const key = year + '|' + (displayZone || '');
+            if (yearCache.has(key)) return yearCache.get(key);
+            const start = yearStartJd(year), end = yearStartJd(year + 1);
+            const t0 = start - PAD, n = Math.ceil((end - start + 2 * PAD) / STEP) + 1;
+            const ex = new Float64Array(n), ey = new Float64Array(n);
+            const dx = new Float64Array(n), dy = new Float64Array(n), dz = new Float64Array(n);
+            for (let i = 0; i < n; i++) {
+                const t = t0 + i * STEP;
+                const d = moonGeo(calculateMoonPosition(t));
+                const E = earthHelio(calculateSunPosition(t), d);
+                ex[i] = E[0]; ey[i] = E[1];
+                dx[i] = d[0]; dy[i] = d[1]; dz[i] = d[2];
+            }
+            const phases = [];
+            for (const [type, phase] of [['new', 0], ['full', Math.PI]]) {
+                let t = start - 1e-4;
+                for (;;) {
+                    t = nextMoonPhase(t, phase, false);
+                    if (t >= end) break;
+                    phases.push({ jd: t, type });
+                    t += 1;
+                }
+            }
+            phases.sort((a, b) => a.jd - b.jd);
+            const nodes = [];
+            for (let t = start - PAD; ;) {
+                const node = calculateNextMoonNode(t);
+                if (node.time > end + PAD) break;
+                nodes.push({ jd: node.time, ascending: node.ascending });
+                t = node.time + 1;
+            }
+            const eclipses = [];
+            for (const kind of ['solar', 'lunar']) {
+                let t = start;
+                for (;;) {
+                    const e = findEclipse(t, kind, false);
+                    if (!e || e.time >= end) break;
+                    eclipses.push(e);
+                    t = e.time + 1;
+                }
+            }
+            eclipses.sort((a, b) => a.time - b.time);
+            // Saisons: Zeiträume, in denen die Sonne nah an der Knotenlinie steht (alle 6 Stunden geprüft)
+            const seasons = [];
+            let open = null;
+            for (let t = start - 40; t <= end + 40; t += 0.25) {
+                const inside = Math.abs(sunNodeAngle(t)) < SEASON_LIMIT;
+                if (inside && !open) open = { start: t };
+                if (!inside && open) {
+                    open.end = t;
+                    if (open.end > start && open.start < end && open.start > start - 39) seasons.push(open);
+                    open = null;
+                }
+            }
+            const data = { year, start, end, t0, n, ex, ey, dx, dy, dz, phases, nodes, eclipses, seasons };
+            yearCache.set(key, data);
+            if (yearCache.size > 30) yearCache.delete(yearCache.keys().next().value);
+            return data;
+        }
+
+        /** Index (mit Bruchteil) eines Zeitpunkts in den Bahnpunkten */
+        function indexOf(Y, jd) {
+            return Math.min(Math.max((jd - Y.t0) / STEP, 0), Y.n - 1.001);
+        }
+
+        /** Erde und Mond (geozentrisch) zu einem Zeitpunkt, aus den Bahnpunkten interpoliert */
+        function sampleAt(Y, jd) {
+            const x = indexOf(Y, jd), i = Math.floor(x), f = x - i;
+            const lerp = a => a[i] + (a[i + 1] - a[i]) * f;
+            return { E: [lerp(Y.ex), lerp(Y.ey), 0], d: [lerp(Y.dx), lerp(Y.dy), lerp(Y.dz)] };
+        }
+
+        function displayAt(Y, jd) {
+            const s = sampleAt(Y, jd);
+            return display(s.E, s.d);
+        }
+
+        function computeScene() {
+            const jd = state.jd;
+            const Y = yearData(state.year);
+            const sun = calculateSunPosition(jd);
+            const moon = calculateMoonPosition(jd);
+            const d = moonGeo(moon);
+            const E = earthHelio(sun, d);
+            const node = calculateMoonAscendingNode(jd);
+            return {
+                jd, Y, sun, moon, d, E, M: display(E, d),
+                node, nodeDir: [Math.cos(node), Math.sin(node), 0],
+                sunNode: sunNodeAngle(jd),
+                heightKm: moon.distance * Math.sin(moon.latitude),
+            };
+        }
+
+        /** Nächstes Ereignis nach jd aus einer Liste (Feld key), auch über das Jahr hinaus */
+        function nextEvent(jd, list, key, filter = () => true) {
+            for (let y = yearOfJd(jd); y <= yearOfJd(jd) + 2; y++) {
+                const hit = yearData(y)[list].find(e => e[key] > jd + 1e-4 && filter(e));
+                if (hit) return hit;
+            }
+            return null;
+        }
+
+        function previousEvent(jd, list, key, filter = () => true) {
+            for (let y = yearOfJd(jd); y >= yearOfJd(jd) - 2; y--) {
+                const hits = yearData(y)[list].filter(e => e[key] < jd - 1e-4 && filter(e));
+                if (hits.length) return hits[hits.length - 1];
+            }
+            return null;
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Zeichnen                               //
+    /////////////////////////////////////////////////////////////////
+
+        let scene = null, colors = {};
+        const COLOR_NAMES = ['surface', 'surface-2', 'text', 'text-2', 'muted', 'sun', 'sun-glow', 'plane', 'plane-line',
+                             'earth', 'earth-day', 'earth-night', 'moon', 'moon-day', 'moon-night', 'curtain',
+                             'curtain-below', 'moon-plane', 'node', 'season', 'eclipse', 'new-moon', 'new-ring', 'full-moon'];
+
+        function circleZ(radius, steps = 120) {
+            const pts = [];
+            for (let i = 0; i <= steps; i++) {
+                const a = 2 * Math.PI * i / steps;
+                pts.push([radius * Math.cos(a), radius * Math.sin(a), 0]);
+            }
+            return pts;
+        }
+
+        function shortDate(jd, month = 'long', withYear = false) {
+            return julianDayToDate(jd).toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month,
+                                                                     ...(withYear ? { year: 'numeric' } : {}) });
+        }
+
+        // Datum mit Jahr, für Ereignisse, deren Jahr nicht schon im Satz steht
+        function fullDate(jd, month = 'long') {
+            return shortDate(jd, month, true);
+        }
+
+        // Zeitraum „10. Februar bis 17. März 2026“; über den Jahreswechsel mit beiden Jahren.
+        // year: Jahr, das schon im Satz steht – dann nur abweichende Jahre nennen
+        function dateRange(a, b, { month = 'long', sep = ' bis ', year = null } = {}) {
+            const ya = yearOfJd(a), yb = yearOfJd(b);
+            const startYear = ya !== yb || (year !== null && ya !== year);
+            const endYear = year === null || ya !== yb || yb !== year;
+            return shortDate(a, month, startYear) + sep + shortDate(b, month, endYear);
+        }
+
+        function drawPlane() {
+            if (!visible('ecliptic')) return;
+            const c = colors;
+            scene.fill(circleZ(PLANE_R), c.plane);
+            scene.stroke(circleZ(PLANE_R), { color: c['plane-line'], width: 1 });
+            scene.label([-PLANE_R * 0.72, -PLANE_R * 0.78, 0], 'Ekliptik (Ebene der Erdbahn)', c['text-2'],
+                        { size: 11, alpha: 0.85, halo: c['surface-2'] });
+        }
+
+        function drawEarthOrbit(S) {
+            const Y = S.Y, pts = [];
+            const i0 = Math.round((Y.start - Y.t0) / STEP), i1 = Math.round((Y.end - Y.t0) / STEP);
+            for (let i = i0; i <= i1; i += 6) pts.push([Y.ex[i], Y.ey[i], 0]);
+            scene.stroke(pts, { color: colors.earth, width: 1.5, alpha: 0.85 });
+        }
+
+        /** Abschnitte der Mondbahn auf einer Seite der Ekliptik (side = 1 darüber, −1 darunter) */
+        function sideRuns(points, heights, side) {
+            const runs = [];
+            let run = null;
+            for (let i = 0; i < points.length; i++) {
+                const on = heights[i] * side >= 0;
+                if (on) {
+                    if (!run) { run = []; if (i > 0) run.prev = i - 1; }
+                    run.push(i);
+                } else if (run) {
+                    runs.push(run);
+                    run = null;
+                }
+            }
+            if (run) runs.push(run);
+            return runs;
+        }
+
+        /**
+         * Mondbahn über das Jahr (path) mit „Vorhang“ zur Ekliptik (curtain) und Ring um die Erde (ring), jeweils
+         * nur die Teile auf einer Seite der Ebene; die abgewandte Seite wird vor der Ekliptik-Scheibe gezeichnet
+         */
+        function drawMoonLines(S, side) {
+            const c = colors, Y = S.Y;
+            const style = side > 0 ? { color: c.moon, width: 1.6 } : { color: c.moon, width: 1.3, dash: [4, 3], alpha: 0.75 };
+            const curtain = side > 0 ? c.curtain : c['curtain-below'];
+            const drawRuns = (points, bases, heights, withCurtain) => {
+                for (const run of sideRuns(points, heights, side)) {
+                    const idx = run.prev !== undefined ? [run.prev, ...run] : run;
+                    if (idx.length < 2) continue;
+                    const line = idx.map(i => points[i]);
+                    if (withCurtain) scene.fill(line.concat(idx.map(i => bases[i]).reverse()), curtain);
+                    scene.stroke(line, style);
+                }
+            };
+            if (visible('path')) {
+                const i0 = Math.round((Y.start - Y.t0) / STEP), i1 = Math.round((Y.end - Y.t0) / STEP);
+                const points = [], bases = [], heights = [];
+                for (let i = i0; i <= i1; i++) {
+                    const E = [Y.ex[i], Y.ey[i], 0], d = [Y.dx[i], Y.dy[i], Y.dz[i]];
+                    const p = display(E, d);
+                    points.push(p);
+                    bases.push([p[0], p[1], 0]);
+                    heights.push(d[2]);
+                }
+                drawRuns(points, bases, heights, visible('curtain'));
+            }
+            if (visible('ring')) {
+                // Mondbahn um die Erde: Erde zum Zeitpunkt festgehalten, Mond ±14 Tage
+                const i0 = Math.floor(indexOf(Y, S.jd - RING_DAYS)), i1 = Math.ceil(indexOf(Y, S.jd + RING_DAYS));
+                const points = [], bases = [], heights = [];
+                for (let i = i0; i <= i1; i++) {
+                    const p = display(S.E, [Y.dx[i], Y.dy[i], Y.dz[i]]);
+                    points.push(p);
+                    bases.push([p[0], p[1], 0]);
+                    heights.push(Y.dz[i]);
+                }
+                if (side > 0) scene.fill(points, c['moon-plane']);
+                drawRuns(points, bases, heights, false);
+            }
+        }
+
+        /**
+         * Ausrichtung einer Beschriftung neben der Erdbahn: dir = 1 nach außen, −1 zur Sonne hin; links der Sonne
+         * steht der Text dann links vom Punkt, rechts rechts davon (bzw. umgekehrt)
+         */
+        function alignFrom(p, dir) {
+            const dx = scene.project(p)[0] - scene.project([0, 0, 0])[0];
+            if (Math.abs(dx) < 40) return 'center';
+            return (dx > 0) === (dir > 0) ? 'left' : 'right';
+        }
+
+        /**
+         * Beschriftung, die am Bildrand nicht abgeschnitten wird (verschiebt sie waagerecht ins Bild); liegt der Punkt
+         * selbst außerhalb, entfällt sie
+         */
+        function edgeLabel(p, text, color, opts) {
+            const ctx = scene.ctx, size = opts.size || 12;
+            ctx.save();
+            ctx.font = `${opts.bold ? 'bold ' : ''}${size}px Arial, sans-serif`;
+            const w = ctx.measureText(text).width;
+            ctx.restore();
+            if (!state.follow && Math.abs(scene.cam.el) < 8) return;   // von der Kante: Beschriftungen lägen übereinander
+            const sp = scene.project(p);
+            if (sp[0] < 0 || sp[0] > scene.width || sp[1] < 0 || sp[1] > scene.height) return;   // Punkt außerhalb
+            const x = sp[0] + (opts.dx || 0);
+            const left = opts.align === 'left' ? x : opts.align === 'right' ? x - w : x - w / 2;
+            let dx = opts.dx || 0;
+            if (left < 4) dx += 4 - left;
+            else if (left + w > scene.width - 4) dx -= left + w - (scene.width - 4);
+            scene.label(p, text, color, { ...opts, dx });
+        }
+
+        function drawSeasons(S) {
+            if (!visible('seasons')) return;
+            const c = colors;
+            for (const s of S.Y.seasons) {
+                const pts = [];
+                for (let t = s.start; t <= s.end + 0.01; t += 1) {
+                    const sun = calculateSunPosition(Math.min(t, s.end));
+                    pts.push(earthHelio(sun, [0, 0, 0]));
+                }
+                scene.stroke(pts, { color: c.season, width: 10 });
+                const mid = earthHelio(calculateSunPosition((s.start + s.end) / 2), [0, 0, 0]);
+                edgeLabel(V.add(mid, V.scale(V.norm(mid), 0.12)), `Saison ${dateRange(s.start, s.end, { month: 'short', sep: ' – ' })}`,
+                            c.eclipse, { size: 11, bold: true, halo: c['surface-2'], align: alignFrom(mid, 1) });
+            }
+        }
+
+        function drawNodeLine(S) {
+            if (!visible('nodeline')) return;
+            const c = colors, E = S.E, n = S.nodeDir, L = 1.2;
+            const near = Math.abs(S.sunNode) < SEASON_LIMIT;
+            scene.stroke([V.add(E, V.scale(n, -L)), V.add(E, V.scale(n, L))], { color: c.node, width: near ? 1.6 : 1.2, dash: [6, 4] });
+            scene.stroke([V.add(E, V.scale(n, -0.2)), V.add(E, V.scale(n, 0.2))], { color: c.node, width: 2.2 });
+            // Zeichen etwa 70 Pixel (im Bild) von der Erde entfernt, damit sie nicht auf den Knoten der Bahn liegen
+            const a = scene.project(E), b = scene.project(V.add(E, V.scale(n, 0.01)));
+            const pxPerAu = Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.01;
+            const off = Math.min(70 / Math.max(pxPerAu, 1), 1);
+            scene.label(V.add(E, V.scale(n, off)), '☊', c.node, { size: 16, bold: true, halo: c['surface-2'] });
+            scene.label(V.add(E, V.scale(n, -off)), '☋', c.node, { size: 16, bold: true, halo: c['surface-2'] });
+        }
+
+        function drawMarkers(S) {
+            const c = colors, Y = S.Y;
+            const inYear = jd => jd >= Y.start && jd < Y.end;
+            if (visible('nodes') && visible('path')) {
+                for (const node of Y.nodes) {
+                    if (!inYear(node.jd)) continue;
+                    const p = displayAt(Y, node.jd);
+                    scene.dot(p, 3, c.node, { ring: c.surface });
+                    if (scene.cam.dist < 1.5 && Math.abs(node.jd - S.jd) < 16) {
+                        scene.label(p, node.ascending ? '☊' : '☋', c.node, { size: 14, bold: true, dy: -12, halo: c['surface-2'] });
+                    }
+                }
+            }
+            if (visible('phases') && (visible('path') || visible('ring'))) {
+                const ringOnly = !visible('path');
+                for (const ph of Y.phases) {
+                    if (ringOnly && Math.abs(ph.jd - S.jd) > RING_DAYS) continue;
+                    const s = sampleAt(Y, ph.jd);
+                    const p = display(ringOnly ? S.E : s.E, s.d);
+                    if (ph.type === 'new') scene.dot(p, 3.5, c['new-moon'], { ring: c['new-ring'] });
+                    else scene.dot(p, 3.5, c['full-moon'], { ring: c.moon });
+                }
+            }
+            if (visible('eclipses')) {
+                for (const e of Y.eclipses) {
+                    const p = visible('path') ? displayAt(Y, e.time) : earthHelio(calculateSunPosition(e.time), [0, 0, 0]);
+                    const lunar = e.kind === 'lunar';
+                    scene.dot(p, 7, lunar ? c['full-moon'] : c['new-moon'], { filled: true, ring: c.eclipse });
+                    scene.dot(p, 9.5, c.eclipse, { filled: false });
+                    // Beschriftung zur Sonne hin, Sonnenfinsternis oben, Mondfinsternis darunter
+                    const inward = V.scale(V.norm([p[0], p[1], 0]), -0.06 / Math.max(scene.cam.dist / 3, 0.3));
+                    edgeLabel(V.add([p[0], p[1], 0], inward), `${lunar ? 'Mond' : 'Sonnen'}finsternis ${fullDate(e.time, 'short')}`,
+                                c.eclipse, { size: 11, bold: true, halo: c['surface-2'], dy: lunar ? 8 : -8,
+                                             align: alignFrom(p, -1) });
+                }
+            }
+        }
+
+        function drawSun() {
+            const c = colors, ctx = scene.ctx;
+            const s = scene.project([0, 0, 0]), rho = bodyRadius([0, 0, 0], SUN_R, 26) * scene.pixelScale([0, 0, 0]);
+            const g = ctx.createRadialGradient(s[0], s[1], rho * 0.6, s[0], s[1], rho * 2.4);
+            g.addColorStop(0, c['sun-glow']);
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(s[0], s[1], rho * 2.4, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = c.sun;
+            ctx.beginPath();
+            ctx.arc(s[0], s[1], rho, 0, 2 * Math.PI);
+            ctx.fill();
+            scene.label([0, 0, 0], 'Sonne', c['text-2'], { size: 11, halo: c['surface-2'], dy: rho + 12 });
+        }
+
+        /** Radius eines Körpers: r in AE, im Bild höchstens maxPx Pixel (in der Nahansicht sonst riesig) */
+        function bodyRadius(p, r, maxPx) {
+            return Math.min(r, maxPx / scene.pixelScale(p));
+        }
+
+        function drawEarth(S) {
+            const c = colors;
+            scene.sphere(S.E, bodyRadius(S.E, EARTH_R, 9), V.norm(V.scale(S.E, -1)), c['earth-day'], c['earth-night'], c.earth);
+            // Sonne außerhalb des Bildes (Ansicht folgt der Erde): Richtung als Pfeil
+            const s = scene.project([0, 0, 0]);
+            if (s[0] < 0 || s[0] > scene.width || s[1] < 0 || s[1] > scene.height) {
+                const toSun = V.norm(V.scale(S.E, -1));
+                const a = V.add(S.E, V.scale(toSun, EARTH_R * 2)), b = V.add(S.E, V.scale(toSun, 0.09));
+                scene.stroke([a, b], { color: c.sun, width: 2, dash: [5, 4] });
+                scene.label(b, 'zur Sonne', c.sun, { size: 12, bold: true, dy: -12, halo: c['surface-2'] });
+            }
+        }
+
+        function drawMoon(S) {
+            if (!visible('path') && !visible('ring')) return;
+            scene.sphere(S.M, bodyRadius(S.M, MOON_R, 5), V.norm(V.scale(V.add(S.E, S.d), -1)), colors['moon-day'], colors['moon-night'], colors.moon);
+        }
+
+        function draw() {
+            if (!scene) return;
+            colors = canvas3d.readColors(COLOR_NAMES);
+            const S = computeScene();
+            if (state.follow && !scene.tween) {
+                scene.target = [...S.E];
+                const L = Math.atan2(S.E[1], S.E[0]) * RAD2DEG;
+                scene.cam.az = ((state.follow.relAz - L) % 360 + 360) % 360;
+            }
+            scene.begin();
+            const far = scene.cam.el >= 0 ? -1 : 1;     // Seite der Ekliptik, die von der Kamera abgewandt ist
+            drawMoonLines(S, far);
+            if (S.M[2] * far > 0) drawMoon(S);
+            drawPlane();
+            drawEarthOrbit(S);
+            drawSeasons(S);
+            drawNodeLine(S);
+            drawMoonLines(S, -far);
+            drawMarkers(S);
+            const bodies = [{ z: scene.project([0, 0, 0])[2], draw: drawSun }, { z: scene.project(S.E)[2], draw: () => drawEarth(S) }];
+            if (S.M[2] * far <= 0) bodies.push({ z: scene.project(S.M)[2], draw: () => drawMoon(S) });
+            bodies.sort((a, b) => b.z - a.z).forEach(b => b.draw());
+            updateInfo(S);
+            tour.render(tourValues(S));
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Anzeige                                //
+    /////////////////////////////////////////////////////////////////
+
+        function formatNumber(x, digits = 0) {
+            return x.toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        }
+
+        /** Rund auf 100 km, mit Tausenderpunkt */
+        function km(x) {
+            return formatNumber(Math.round(Math.abs(x) / 100) * 100).replace(/\./g, '\u00a0');
+        }
+
+        function scaleLabel(x) {
+            return '×' + (x < 9.95 ? formatNumber(x, 1) : formatNumber(Math.round(x)));
+        }
+
+        function zoneName(jd) {
+            try {
+                const part = new Intl.DateTimeFormat('de-DE', { timeZoneName: 'short', ...zoneOption() })
+                    .formatToParts(julianDayToDate(jd)).find(p => p.type === 'timeZoneName');
+                if (part) return part.value;
+            } catch (e) { /* ältere Browser */ }
+            return '';
+        }
+
+        function dateTime(jd) {
+            const d = julianDayToDate(jd);
+            return d.toLocaleDateString('de-DE', { ...zoneOption(), day: 'numeric', month: 'long', year: 'numeric' }) + ', '
+                + d.toLocaleTimeString('de-DE', { ...zoneOption(), hour: '2-digit', minute: '2-digit' }) + ' ' + zoneName(jd);
+        }
+
+        const ECLIPSE_NAMES = {
+            lunar: { penumbral: 'Halbschatten-Mondfinsternis', partial: 'partielle Mondfinsternis', total: 'totale Mondfinsternis' },
+            solar: { partial: 'partielle Sonnenfinsternis', annular: 'ringförmige Sonnenfinsternis', total: 'totale Sonnenfinsternis' },
+        };
+
+        function eclipseName(e) {
+            return ECLIPSE_NAMES[e.kind][e.type] || (e.kind === 'lunar' ? 'Mondfinsternis' : 'Sonnenfinsternis');
+        }
+
+        function heightText(hKm) {
+            return Math.abs(hKm) < 50 ? 'in der Ebene der Ekliptik' : `${km(hKm)} km ${hKm > 0 ? 'über' : 'unter'} der Ekliptik`;
+        }
+
+        function moonHeightAt(jd) {
+            const m = calculateMoonPosition(jd);
+            return m.distance * Math.sin(m.latitude);
+        }
+
+        function updateInfo(S) {
+            const rows = [];
+            const add = (k, v) => rows.push(`<tr><td>${k}</td><td>${v}</td></tr>`);
+            add('Zeitpunkt', dateTime(S.jd));
+            add('Mond', `${heightText(S.heightKm)} (ekliptikale Breite ${formatNumber(S.moon.latitude * RAD2DEG, 2)}°)`);
+            for (const [type, name] of [['full', 'Nächster Vollmond'], ['new', 'Nächster Neumond']]) {
+                const ph = nextEvent(S.jd, 'phases', 'jd', p => p.type === type);
+                if (ph) add(name, `${dateTime(ph.jd)}, Mond ${heightText(moonHeightAt(ph.jd))}`);
+            }
+            const node = nextEvent(S.jd, 'nodes', 'jd');
+            if (node) add('Nächster Knoten', `${node.ascending ? '☊ aufsteigend' : '☋ absteigend'}, ${dateTime(node.jd)}`);
+            const angle = Math.abs(S.sunNode) * RAD2DEG;
+            add('Knotenlinie', `${formatNumber(angle, 0)}° neben der Richtung zur Sonne`
+                + (Math.abs(S.sunNode) < SEASON_LIMIT ? ' – <b>Finsternis-Saison</b>' : ''));
+            const e = nextEvent(S.jd, 'eclipses', 'time');
+            if (e) add('Nächste Finsternis', `${eclipseName(e)}, ${dateTime(e.time)}`);
+            document.getElementById('info').innerHTML = `<table>${rows.join('')}</table>`;
+            document.getElementById('dateValue').textContent = dateTime(S.jd);
+            document.getElementById('kValue').textContent = scaleLabel(state.k);
+            document.getElementById('hValue').textContent = scaleLabel(state.h);
+            document.getElementById('kWarning').hidden = state.k < 9.5 || !visible('path');
+            for (const [name, b] of Object.entries(viewButtons)) b.classList.toggle('active', currentView === name);
+        }
+
+    /////////////////////////////////////////////////////////////////
+    //                      Rundgang                               //
+    /////////////////////////////////////////////////////////////////
+
+        // Alle Saisons, die in das Jahr hineinreichen (wie die Bögen im Bild); das Jahr steht im Satz,
+        // genannt werden nur abweichende Jahre
+        function seasonText(Y) {
+            const items = Y.seasons.filter(s => s.start < Y.end && s.end >= Y.start)
+                .map(s => dateRange(s.start, s.end, { year: Y.year }));
+            return items.length > 1 ? items.slice(0, -1).join(', ') + ' und ' + items[items.length - 1] : items[0] || '';
+        }
+
+        function eclipseList(list) {
+            const items = list.map(e => `eine ${eclipseName(e)} am ${fullDate(e.time)}`);
+            return items.length > 1 ? items.slice(0, -1).join(', ') + ' und ' + items[items.length - 1] : items[0] || 'keine Finsternis';
+        }
+
+        function tourValues(S) {
+            const Y = S.Y;
+            const shadow = eclipseAt(S.jd).lunar;
+            const node = nextEvent(S.jd, 'nodes', 'jd');
+            const align = Y.seasons.filter(s => (s.start + s.end) / 2 >= Y.start && (s.start + s.end) / 2 < Y.end)
+                .map(s => shortDate((s.start + s.end) / 2));
+            const nearby = [];
+            for (const y of [S.Y.year - 1, S.Y.year, S.Y.year + 1]) {
+                nearby.push(...yearData(y).eclipses.filter(e => Math.abs(e.time - S.jd) < 25));
+            }
+            const here = nearby.find(e => Math.abs(e.time - S.jd) < 0.5);
+            return {
+                date: fullDate(S.jd), year: Y.year,
+                k: scaleLabel(state.k), h: scaleLabel(state.h),
+                heightKm: km(S.heightKm), heightSide: S.heightKm >= 0 ? 'über' : 'unter',
+                umbraKm: km(2 * shadow.umbraRadius * EARTH_RADIUS),
+                nextNode: node ? `${node.ascending ? 'aufsteigend (☊)' : 'absteigend (☋)'} am ${fullDate(node.jd)}` : '',
+                align: align.join(' und '),
+                seasons: seasonText(Y),
+                here: here ? eclipseName(here) : 'keine Finsternis',
+                nearby: eclipseList(nearby.sort((a, b) => a.time - b.time)),
+                yearEclipses: eclipseList(Y.eclipses),
+            };
+        }
+
+        const TOUR_STEPS = [
+            {
+                title: 'Rückblick: die Welle in der Ebene',
+                layers: ['ecliptic', 'path', 'phases'], view: 'above', k: 10, h: 1, date: '2026-04-20', play: 'month',
+                text: v => `<p>Von Norden gesehen windet sich die Bahn des Mondes (orange) um die Erdbahn (blau): bei
+                    Vollmond (offener Punkt) außen, bei Neumond (gefüllter Punkt) innen, im Takt von 29,5 Tagen. Damit
+                    man das sieht, ist der Abstand Erde–Mond hier ${v.k} vergrößert; die Dellen kommen nur von dieser
+                    Vergrößerung.</p>
+                    <p>Bisher lag dabei alles in einer Ebene, der Ebene der Erdbahn (<b>Ekliptik</b>). Daran hält sich
+                    der Mond allerdings nicht ganz: Gestrichelt ist er unter dieser Ebene.</p>`,
+            },
+            {
+                title: 'Auf und ab',
+                layers: ['ecliptic', 'path', 'curtain', 'phases'], view: 'earth', k: 1, h: 300, date: '2026-04-20', play: 'month',
+                text: v => `<p>Von der Seite zeigt sich eine zweite Welle. Die Bahn des Mondes ist um gut 5° gegen die
+                    Ekliptik geneigt: Er steigt bis zu 37 000 km über ihre Ebene und sinkt ebenso weit darunter
+                    (gestrichelt). Neben 150 Millionen km bis zur Sonne ist das wenig, im Bild ist die Höhe deshalb
+                    ${v.h} überhöht. Der Abstand Erde–Mond ist jetzt maßstäblich.</p>
+                    <p>Gerade steht der Mond ${v.heightKm} km ${v.heightSide} der Ebene. Einmal hinauf und hinunter
+                    dauert 27,2 Tage.</p>`,
+            },
+            {
+                title: 'Die Knoten',
+                layers: ['ecliptic', 'path', 'curtain', 'phases', 'nodes'], view: 'earth', k: 1, h: 300, date: '2026-04-20',
+                play: 'month',
+                text: v => `<p>Zweimal pro Umlauf durchstößt der Mond die Ekliptik, an den <b>Knoten</b> (lila Punkte):
+                    aufwärts im aufsteigenden Knoten ☊, abwärts im absteigenden ☋. Von einem aufsteigenden Knoten zum
+                    nächsten vergehen 27,2 Tage, der <b>drakonitische Monat</b>.</p>
+                    <p>Der nächste Knoten: ${v.nextNode}.</p>`,
+            },
+            {
+                title: 'Zwei Takte',
+                layers: ['ecliptic', 'path', 'curtain', 'phases', 'nodes'], view: 'earth', k: 1, h: 300, date: '2026-05-25',
+                phase: 'full',
+                text: v => `<p>Vollmond gibt es alle 29,5 Tage, einen Knoten alle 13,6 Tage – zwei Takte, die nicht
+                    zusammenpassen. Meist steht der Vollmond deshalb über oder unter der Ekliptik, am ${v.date} zum
+                    Beispiel ${v.heightKm} km ${v.heightSide} ihr.</p>
+                    <p>Der Schatten der Erde zeigt aber genau von der Sonne weg, in der Ebene. In der Entfernung des
+                    Mondes ist sein Kern nur rund ${v.umbraKm} km breit, und der Mond zieht weit an ihm vorbei.
+                    Ebenso verfehlt bei Neumond der Schatten des Mondes die Erde.</p>`,
+            },
+            {
+                title: 'Die Knotenlinie',
+                layers: ['ecliptic', 'ring', 'phases', 'nodeline'], view: 'oblique', k: 50, h: 400, date: '2026-01-01',
+                play: 'year',
+                text: v => `<p>Von der Erde aus gesehen läuft der Mond auf einem fast geschlossenen Kreis in einer schrägen
+                    Ebene (Scheibe, ${v.k} vergrößert). Die Gerade durch die beiden Knoten ist die <b>Knotenlinie</b>.</p>
+                    <p>Wie die Erdachse behält sie ihre Richtung im Raum, während die Erde um die Sonne läuft. Zweimal im
+                    Jahr zeigt sie deshalb zur Sonne, im Jahr ${v.year} um den ${v.align}.</p>`,
+            },
+            {
+                title: 'Die Finsternis-Saison',
+                layers: ['ecliptic', 'path', 'curtain', 'phases', 'nodes', 'nodeline', 'eclipses'], view: 'earth', k: 1, h: 300,
+                date: '2026-02-25', eclipse: 'lunar',
+                text: v => `<p>Am ${v.date} zeigt die Knotenlinie fast zur Sonne. Jetzt fällt der Vollmond auf einen
+                    Knoten, und der Mond läuft durch den Schatten der Erde: ${v.here}.</p>
+                    <p>Für gut einen Monat liegen Neu- und Vollmond nah genug an den Knoten, dass es eine Finsternis geben
+                    kann, die <b>Finsternis-Saison</b>. In dieser gibt es ${v.nearby}.</p>`,
+            },
+            {
+                title: 'Ein halbes Jahr später',
+                layers: ['ecliptic', 'seasons', 'eclipses', 'nodeline'], view: 'top', k: 1, h: 300, date: '2026-08-01',
+                eclipse: 'solar',
+                text: v => `<p>Ein halbes Jahr später steht die Erde auf der anderen Seite der Sonne, und die Knotenlinie
+                    zeigt wieder zu ihr, diesmal mit dem anderen Ende. Am ${v.date} gibt es eine ${v.here}.</p>
+                    <p>Die roten Bögen markieren die beiden Saisons im Jahr ${v.year}: ${v.seasons}. Dazwischen gibt es keine
+                    Finsternis, obwohl jeden Monat Voll- und Neumond sind.</p>`,
+            },
+            {
+                title: 'Die Saisons wandern',
+                layers: ['ecliptic', 'seasons', 'eclipses', 'nodeline'], view: 'top', k: 1, h: 300, date: '2026-08-12',
+                play: 'years', years: [2026, 2045],
+                text: v => `<p>Ganz fest ist die Knotenlinie nicht. Die Sonne zerrt an der geneigten Mondbahn, und die
+                    Knotenlinie dreht sich langsam rückwärts, einmal in 18,6 Jahren. Die Saisons kommen deshalb jedes
+                    Jahr etwa 19 Tage früher.</p>
+                    <p>Saisons im Jahr ${v.year}: ${v.seasons}.</p>`,
+            },
+            {
+                title: 'Selbst ausprobieren',
+                layers: null, view: 'oblique', k: 1, h: 300,
+                text: v => `<p>Damit ist der Rundgang zu Ende. Mit dem Regler „Zeitpunkt“ und den Sprüngen zu Vollmond,
+                    Neumond, Knoten und Finsternis lässt sich jeder Monat ansehen; die Regler darunter verändern Höhe
+                    und Abstand im Bild. Ziehen dreht die Ansicht, das Mausrad zoomt.</p>
+                    <p>Mit „Fertig“ gilt wieder die eigene Uhrzeit.</p>`,
+            },
+        ];
+
+        // Rundgang: deutsche Uhrzeit; danach Zeitpunkt, Maßstab und Ansicht des Lesers zurück
+        let saved = null;
+        function fixPlace(on) {
+            if (on) {
+                saved = { jd: state.jd, k: state.k, h: state.h, view: currentView };
+                displayZone = TOUR_ZONE;
+                setJd(state.jd);
+            } else {
+                displayZone = null;
+                setPlay(null);
+                if (saved) {
+                    animateScale(saved.k, saved.h, 1);
+                    setJd(saved.jd);
+                    if (saved.view) setView(saved.view);
+                }
+                saved = null;
+            }
+            for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = on || !!fixedLayers;
+        }
+
+        function applyTourStep(step) {
+            setPlay(null);
+            if (step.date) setJd(julianDayFromDate(new Date(step.date + 'T12:00:00Z')));
+            if (step.phase) jumpPhase(step.phase, 1);
+            if (step.eclipse) {
+                const e = findEclipse(state.jd, step.eclipse, false);
+                if (e) setJd(e.time);
+            }
+            if (step.k !== undefined) animateScale(step.k, step.h ?? state.h);
+            if (step.view) setView(step.view);
+            if (step.play) setPlay(step.play, step.years);
+            requestDraw();
+        }
+
+        let tour = null;
+        let fixedLayers = null;     // Ebenen aus der Adresse (layers)
+
+    /////////////////////////////////////////////////////////////////
+    //                      Bedienung                              //
+    /////////////////////////////////////////////////////////////////
+
+        let frameRequested = false;
+        function requestDraw() {
+            if (frameRequested) return;
+            frameRequested = true;
+            requestAnimationFrame(() => { frameRequested = false; draw(); });
+        }
+
+        /** Zeitpunkt setzen; das Jahr folgt (Kalenderjahr in der Zeitzone der Anzeige) */
+        function setJd(jd) {
+            state.jd = jd;
+            const year = yearOfJd(jd);
+            const slider = document.getElementById('dateSlider');
+            if (year !== state.year || slider.dataset.zone !== String(displayZone)) {
+                state.year = year;
+                document.getElementById('year').value = year;
+                slider.max = Math.round((yearStartJd(year + 1) - yearStartJd(year)) * 24) - 1;
+                slider.dataset.zone = String(displayZone);
+            }
+            slider.value = Math.floor((jd - yearStartJd(year)) * 24);
+            requestDraw();
+        }
+
+        function setYear(year) {
+            setJd(yearStartJd(year) + (state.jd - yearStartJd(state.year)));
+        }
+
+        function showNow() {
+            setJd(julianDayFromDate(new Date()));
+        }
+
+        /** Zum nächsten (dir = 1) oder vorigen (−1) Neu- oder Vollmond */
+        function jumpPhase(type, dir) {
+            const f = p => p.type === type;
+            const e = dir > 0 ? nextEvent(state.jd, 'phases', 'jd', f) : previousEvent(state.jd, 'phases', 'jd', f);
+            if (e) setJd(e.jd);
+        }
+
+        function jumpNode(dir) {
+            const e = dir > 0 ? nextEvent(state.jd, 'nodes', 'jd') : previousEvent(state.jd, 'nodes', 'jd');
+            if (e) setJd(e.jd);
+        }
+
+        function jumpEclipse(dir) {
+            const e = dir > 0 ? nextEvent(state.jd, 'eclipses', 'time') : previousEvent(state.jd, 'eclipses', 'time');
+            if (e) setJd(e.time);
+        }
+
+        // Regler für k und h: logarithmisch, 0 … 1000
+        function toSlider(x, [lo, hi]) { return Math.round(1000 * Math.log(x / lo) / Math.log(hi / lo)); }
+        function fromSlider(v, [lo, hi]) {
+            const x = lo * Math.pow(hi / lo, v / 1000);
+            return x < 10 ? Math.round(x * 10) / 10 : Math.round(x);
+        }
+
+        function setScale(k, h) {
+            state.k = k;
+            state.h = h;
+            document.getElementById('kSlider').value = toSlider(k, SCALE_LIMITS.k);
+            document.getElementById('hSlider').value = toSlider(h, SCALE_LIMITS.h);
+            requestDraw();
+        }
+
+        /** Weicher Übergang von Abstand und Höhe (logarithmisch) */
+        function animateScale(k, h, ms = 1500) {
+            if (ms <= 1 || (k === state.k && h === state.h)) { state.scaleTween = null; setScale(k, h); return; }
+            state.scaleTween = { from: { k: state.k, h: state.h }, to: { k, h }, start: performance.now(), ms };
+            startLoop();
+        }
+
+        function stepScale(now) {
+            const t = state.scaleTween;
+            if (!t) return;
+            const x = Math.min((now - t.start) / t.ms, 1), e = x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+            const mix = (a, b) => Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * e);
+            setScale(mix(t.from.k, t.to.k), mix(t.from.h, t.to.h));
+            if (x >= 1) { state.scaleTween = null; setScale(t.to.k, t.to.h); }
+        }
+
+        let currentView = 'oblique';
+        const viewButtons = {};
+
+        function setView(name, instant = false) {
+            const v = VIEWS[name];
+            if (!v) return;
+            currentView = name;
+            let target = [0, 0, 0];
+            const cam = { ...v.cam };
+            if (v.relAz !== undefined) {
+                const E = computeScene().E;
+                target = [...E];
+                cam.az = ((v.relAz - Math.atan2(E[1], E[0]) * RAD2DEG) % 360 + 360) % 360;
+                state.follow = { relAz: v.relAz };
+            } else {
+                state.follow = null;
+            }
+            scene.animateTo({ cam, target }, instant ? 1 : 900);
+            if (instant) scene.finish();
+            startLoop();
+        }
+
+        // Abspielen, Kamerafahrt und Maßstab in einer gemeinsamen Schleife
+        let loopRunning = false, lastTime = 0, yearClock = 0;
+        function startLoop() {
+            if (loopRunning || !kmEmbed.visible) return;
+            loopRunning = true;
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function loop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+            if (state.play === 'month' || state.play === 'year') {
+                const Y = yearData(state.year);
+                let jd = state.jd + (state.play === 'month' ? 2 : 20) * dt;
+                if (jd >= Y.end) jd = Y.start + (jd - Y.end);       // im selben Jahr weiter
+                setJd(jd);
+            } else if (state.play === 'years') {
+                yearClock += dt;
+                if (yearClock >= 1.5) {
+                    yearClock = 0;
+                    const [from, to] = state.years || [state.year, state.year + 19];
+                    setYear(state.year + 1 > to ? from : state.year + 1);
+                }
+            }
+            stepScale(now);
+            if (scene.tween && state.follow) scene.tween.to.target = [...computeScene().E];
+            scene.step(now);
+            draw();
+            if (!kmEmbed.visible) {
+                loopRunning = false;        // außerhalb des Bildes: anhalten, onVisibility setzt fort
+            } else if (state.play || state.scaleTween || scene.tween) {
+                requestAnimationFrame(loop);
+            } else {
+                loopRunning = false;
+            }
+        }
+
+        function setPlay(which, years = null) {
+            state.play = which;
+            state.years = years;
+            yearClock = 0;
+            if (which === 'years' && years) setYear(years[0]);
+            document.getElementById('playMonth').textContent = which === 'month' ? '❚❚ Monat' : '▶ Monat';
+            document.getElementById('playYear').textContent = which === 'year' ? '❚❚ Jahr' : '▶ Jahr';
+            if (which) startLoop(); else requestDraw();
+        }
+
+        function togglePlay(which) {
+            setPlay(state.play === which ? null : which);
+        }
+
+        /**
+         * Startzustand aus der Adresse (embed.js): Rundgang knoten, Zeitpunkt t, Ansicht view (oblique, top, edge,
+         * earth, above), Ebenen layers (ecliptic, path, curtain, phases, nodes, nodeline, ring, seasons, eclipses) und
+         * Abspielen play (day/month = 2 Tage pro Sekunde, year = 20 Tage pro Sekunde)
+         */
+        function applyEmbedState(s) {
+            if (s.layers) {
+                fixedLayers = s.layers;
+                for (const key of Object.keys(state.show)) document.getElementById('show-' + key).disabled = true;
+            }
+            tour.fromEmbedState(s, kmEmbed.active);
+            if (s.t) setJd(julianDayFromDate(s.t));
+            if (s.view && VIEWS[s.view]) setView(s.view, true);
+            if (s.play) setPlay(s.play === 'year' ? 'year' : 'month');
+            scene.finish();
+            requestDraw();
+        }
+
+        window.onload = function () {
+            scene = new canvas3d.Scene(document.getElementById('view'),
+                { cam: { ...VIEWS.oblique.cam }, aspect: 0.66, minHeight: 360, maxHeight: 680, minDist: 0.15, maxDist: 8 });
+            scene.enableInteraction(() => {
+                if (state.follow) {
+                    const E = computeScene().E;
+                    state.follow.relAz = scene.cam.az + Math.atan2(E[1], E[0]) * RAD2DEG;
+                }
+                currentView = null;
+                requestDraw();
+            });
+            tour = new canvas3d.Tour({
+                tours: { knoten: { title: 'Warum gibt es nicht bei jedem Vollmond eine Finsternis?', steps: TOUR_STEPS } },
+                apply: applyTourStep, fixPlace, placeLabel: 'deutsche Uhrzeit', onChange: requestDraw,
+            });
+            for (const name of Object.keys(VIEWS)) viewButtons[name] = document.getElementById('view-' + name);
+
+            document.getElementById('year').addEventListener('change', ev => {
+                const y = parseInt(ev.target.value, 10);
+                if (Number.isFinite(y) && y >= 1000 && y <= 3000) setYear(y);
+            });
+            document.getElementById('dateSlider').addEventListener('input', ev => {
+                setJd(yearStartJd(state.year) + Number(ev.target.value) / 24);
+            });
+            document.getElementById('kSlider').addEventListener('input', ev => {
+                state.scaleTween = null;
+                setScale(fromSlider(Number(ev.target.value), SCALE_LIMITS.k), state.h);
+            });
+            document.getElementById('hSlider').addEventListener('input', ev => {
+                state.scaleTween = null;
+                setScale(state.k, fromSlider(Number(ev.target.value), SCALE_LIMITS.h));
+            });
+            for (const key of Object.keys(state.show)) {
+                const box = document.getElementById('show-' + key);
+                box.checked = state.show[key];
+                box.addEventListener('change', () => { state.show[key] = box.checked; requestDraw(); });
+            }
+
+            scene.resize();
+            setScale(state.k, state.h);
+            showNow();
+            setView('oblique', true);
+            applyEmbedState(kmEmbed.state);
+            new ResizeObserver(() => { scene.resize(); draw(); }).observe(document.getElementById('view'));
+            kmEmbed.onVisibility(isVisible => {
+                if (isVisible && (state.play || state.scaleTween || scene.tween)) startLoop();
+            });
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', requestDraw);
+            kmEmbed.ready();
+        };
+    </script>
+</head>
+<body>
+    <h1 data-embed="hide">Die geneigte Mondbahn</h1>
+    <p data-embed="hide">Die Bahn des Mondes ist um gut 5° gegen die Ebene der Erdbahn geneigt. Er steht deshalb bei
+    Neu- und Vollmond meist über oder unter dieser Ebene, und sein Schatten oder der Schatten der Erde gehen
+    aneinander vorbei. Nur wenn die Linie durch die beiden Schnittpunkte, die Knotenlinie, zur Sonne zeigt, sind
+    Finsternisse möglich – zweimal im Jahr.</p>
+    <p class="start-tour" id="tourStart" hidden>
+        <button data-tour="knoten" onclick="tour.start('knoten')">▶ Rundgang: Warum gibt es nicht bei jedem Vollmond eine Finsternis?</button>
+    </p>
+
+    <div class="controls" data-control="basic">
+        <div class="wide">
+            <label for="dateSlider">Zeitpunkt</label>
+            <input type="range" id="dateSlider" min="0" max="8759" step="1">
+            <span class="value date" id="dateValue"></span>
+        </div>
+        <div class="group">
+            <button id="playMonth" onclick="togglePlay('month')" title="2 Tage pro Sekunde">▶ Monat</button>
+            <button id="playYear" onclick="togglePlay('year')" title="20 Tage pro Sekunde">▶ Jahr</button>
+            <button onclick="showNow()">Jetzt</button>
+            <label data-control="extra">Jahr <input type="number" id="year" min="1000" max="3000" step="1"></label>
+        </div>
+    </div>
+    <div class="controls" data-control="extra">
+        <span class="jump"><span>Vollmond</span><button onclick="jumpPhase('full', -1)" title="voriger Vollmond">◀</button><button onclick="jumpPhase('full', 1)" title="nächster Vollmond">▶</button></span>
+        <span class="jump"><span>Neumond</span><button onclick="jumpPhase('new', -1)" title="voriger Neumond">◀</button><button onclick="jumpPhase('new', 1)" title="nächster Neumond">▶</button></span>
+        <span class="jump"><span>Knoten</span><button onclick="jumpNode(-1)" title="voriger Knoten">◀</button><button onclick="jumpNode(1)" title="nächster Knoten">▶</button></span>
+        <span class="jump"><span>Finsternis</span><button onclick="jumpEclipse(-1)" title="vorige Finsternis">◀</button><button onclick="jumpEclipse(1)" title="nächste Finsternis">▶</button></span>
+    </div>
+
+    <div class="tour" id="tour" hidden>
+        <div class="tour-head"><b id="tourTitle"></b><span id="tourCount"></span></div>
+        <div id="tourText"></div>
+        <div class="tour-nav">
+            <button id="tourBack">← Zurück</button>
+            <button id="tourNext">Weiter →</button>
+            <button class="end" onclick="tour.end()">Rundgang beenden</button>
+        </div>
+    </div>
+
+    <canvas id="view" role="img" aria-label="3D-Modell: die Bahn des Mondes über ein Jahr, mit überhöhter Höhe über der Ebene der Erdbahn, Knoten, Knotenlinie und Finsternissen; die Werte stehen in der Tabelle unter dem Bild"></canvas>
+    <div class="legend">
+        <span style="--c: var(--earth)">Erdbahn</span>
+        <span style="--c: var(--moon)">Mondbahn über der Ekliptik</span>
+        <span class="dashed" style="--c: var(--moon)">darunter</span>
+        <span class="dot" style="--c: var(--new-ring); --fill: var(--new-moon)">Neumond</span>
+        <span class="dot" style="--c: var(--moon); --fill: var(--full-moon)">Vollmond</span>
+        <span class="dot" style="--c: var(--surface); --fill: var(--node)">Knoten</span>
+        <span class="dashed" style="--c: var(--node)">Knotenlinie ☊–☋</span>
+        <span style="--c: var(--season)">Finsternis-Saison</span>
+        <span class="dot" style="--c: var(--eclipse); --fill: var(--surface)">Finsternis</span>
+    </div>
+
+    <div class="controls" data-control="extra">
+        <div class="wide">
+            <label for="hSlider">Höhe über der Ekliptik</label>
+            <input type="range" id="hSlider" min="0" max="1000" step="1">
+            <span class="value" id="hValue"></span>
+        </div>
+        <div class="wide">
+            <label for="kSlider">Abstand Erde–Mond</label>
+            <input type="range" id="kSlider" min="0" max="1000" step="1">
+            <span class="value" id="kValue"></span>
+        </div>
+        <span class="warning" id="kWarning" hidden>Dellen und ab etwa ×27 Schleifen entstehen nur durch die Vergrößerung;
+        maßstäblich (×1) ist die Bahn überall zur Sonne hin gekrümmt.</span>
+    </div>
+    <div class="controls" data-control="extra">
+        <span>Ansicht:</span>
+        <div class="group">
+            <button id="view-oblique" onclick="setView('oblique')">Schräg</button>
+            <button id="view-top" onclick="setView('top')">Von oben</button>
+            <button id="view-edge" onclick="setView('edge')">Von der Kante</button>
+            <button id="view-earth" onclick="setView('earth')">Zur Erde</button>
+            <button id="view-above" onclick="setView('above')">Zur Erde von oben</button>
+        </div>
+        <label><input type="checkbox" id="show-ecliptic"> Ekliptik</label>
+        <label><input type="checkbox" id="show-path"> Mondbahn im Jahr</label>
+        <label><input type="checkbox" id="show-curtain"> Höhe als Fläche</label>
+        <label><input type="checkbox" id="show-ring"> Mondbahn um die Erde</label>
+        <label><input type="checkbox" id="show-phases"> Neu- und Vollmond</label>
+        <label><input type="checkbox" id="show-nodes"> Knoten</label>
+        <label><input type="checkbox" id="show-nodeline"> Knotenlinie</label>
+        <label><input type="checkbox" id="show-seasons"> Saisons</label>
+        <label><input type="checkbox" id="show-eclipses"> Finsternisse</label>
+    </div>
+
+    <div id="info"></div>
+
+    <h2 data-embed="hide">Wie lese ich das?</h2>
+    <ul class="hint" data-embed="hide">
+        <li>Die Sonne steht in der Mitte, Erde und Mond laufen gegen den Uhrzeigersinn um sie herum (von Norden
+        gesehen). Die Körper sind stark vergrößert. Die <b>Mondbahn im Jahr</b> ist die Bahn des Mondes um die
+        Sonne über das eingestellte Jahr; über der Ekliptik durchgezogen, darunter gestrichelt.</li>
+        <li><b>Höhe über der Ekliptik:</b> Der Mond steht höchstens etwa 37 000 km über oder unter der Ebene der
+        Erdbahn. Damit man das sieht, ist die Höhe überhöht (Standard ×300). <b>Abstand Erde–Mond:</b> vergrößert den
+        Abstand in der Ebene; ab etwa ×10 entstehen Dellen, ab etwa ×27 Schleifen, die es in Wirklichkeit nicht gibt.</li>
+        <li><b>Mondbahn um die Erde:</b> der Weg des Mondes ±14 Tage um den Zeitpunkt, mit festgehaltener Erde; sichtbar
+        erst mit vergrößertem Abstand (etwa ×50). Die Scheibe ist die Ebene der Mondbahn.</li>
+        <li><b>Knoten</b> (☊ aufsteigend, ☋ absteigend): hier geht der Mond durch die Ekliptik. Die <b>Knotenlinie</b>
+        durch die Erde zeigt in die Richtung der Knoten (mittlerer Knoten). Steht die Sonne weniger als etwa 18° neben
+        ihr, ist <b>Finsternis-Saison</b> (rote Bögen auf der Erdbahn): Dann kann es bei Neumond eine Sonnen- und bei
+        Vollmond eine Mondfinsternis geben.</li>
+        <li><b>Ziehen</b> dreht die Ansicht, das <b>Mausrad</b> oder zwei Finger zoomen. „Zur Erde“ folgt der Erde und
+        schaut von außen auf die Bahn, Richtung Sonne.</li>
+        <li>Berechnung mit <code>astro.js</code> nach Meeus (Sonne, Mond, Knoten, Mondphasen) und
+        <code>orbit3d.js</code> (Finsternisse aus der Geometrie von Kern- und Halbschatten), Bahnpunkte alle zwei
+        Stunden.</li>
+    </ul>
+</body>
+</html>
