@@ -20,6 +20,10 @@ Das klingt nach wenig, und gemessen an den 150 Millionen km bis zur Sonne ist es
 zu 37 000 km über die Ekliptik und sinkt ebenso weit darunter. Das Modell überhöht diese Höhe deshalb
 300-fach. Von der Seite gesehen wird daraus eine zweite Welle, senkrecht zur ersten.
 
+An der Beleuchtung ändert die Neigung nichts. Die Sonne ist mit 1,4 Millionen km Durchmesser sogar fast doppelt
+so groß wie die ganze Bahn des Mondes (rund 770 000 km). Auch 37 000 km über oder unter der Ekliptik steht der
+Mond also noch vor der Sonnenscheibe.
+
 <div class="km-modell" id="knoten" data-modell="mondbahn3d" data-tour="knoten">
 <ul>
 <li>Von Norden gesehen windet sich die Bahn des Mondes um die Erdbahn, bei Vollmond außen, bei Neumond innen,
