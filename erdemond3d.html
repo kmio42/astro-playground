@@ -559,7 +559,7 @@
         const AIR_SHELL = 1.08;            // Radius der Atmosphärenschale [Erdradien]
         const EARTHSHINE = 0.035;          // Erdschein bei voller Erde (etwa 300-fach verstärkt, sonst unsichtbar)
         const PIN_LENGTH = 0.45;           // Standort-Nadel über der Oberfläche [Erdradien der Darstellung]
-        const ECLIPSE_SEASON = 17 * DEG2RAD;   // Sonne näher an der Knotenlinie → Finsternis möglich
+        const ECLIPSE_SEASON = 18 * DEG2RAD;   // Sonne näher an der Knotenlinie → Finsternis möglich
         // Datensparende Version (erdemond3d.html?klein): Erde 2k statt 4k, Mondrelief 1k statt 2k (1,7 statt 3,6 MB)
         const SMALL_TEXTURES = new URLSearchParams(location.search).has('klein');
 
@@ -1483,8 +1483,9 @@
                         camera: () => ({ focus: 'system', azimuth: scene.sun.longitude + deg(90), elevation: deg(4), distance: systemDistance(1.6) }),
                         text: () => `Der Vollmond steht der Sonne gegenüber. Im Dezember steht die Sonne 23,4° südlich des
                             Äquators, der Vollmond also etwa so weit nördlich. Er läuft hoch über den Himmel und ist die
-                            ganze lange Nacht zu sehen, so wie die Sonne im Sommer. Am 24.12.2026 kommt er sogar auf
-                            ${degText(declinationOf(scene.moon.position))}, weil wir noch nahe der großen Mondwende sind.<br><br>
+                            ganze lange Nacht zu sehen, so wie die Sonne im Sommer. Am 24. Dezember 2026 kommt er sogar auf
+                            ${degText(declinationOf(scene.moon.position))}, weil die große Mondwende erst knapp zwei Jahre
+                            zurückliegt.<br><br>
                             Kulmination am eingestellten Ort: ${altitudeText(culmination(declinationOf(scene.moon.position)))}.`,
                     },
                     {
@@ -1492,7 +1493,7 @@
                         time: () => fullMoonAfter(2027, 6, 10),
                         camera: () => ({ focus: 'system', azimuth: scene.sun.longitude + deg(90), elevation: deg(4), distance: systemDistance(1.6) }),
                         text: () => `Im Juni ist es umgekehrt: Die Sonne steht hoch im Norden, der Vollmond tief im Süden.
-                            Am 19.06.2027 erreicht er nur ${degText(declinationOf(scene.moon.position))} Deklination, Kulmination
+                            Am 19. Juni 2027 erreicht er nur ${degText(declinationOf(scene.moon.position))} Deklination, Kulmination
                             am eingestellten Ort ${altitudeText(culmination(declinationOf(scene.moon.position)))}. Nahe einer großen
                             Mondwende ist dieser Unterschied am größten, nahe einer kleinen am kleinsten. Auf der
                             Südhalbkugel ist alles umgekehrt.`,
@@ -1508,34 +1509,35 @@
                         title: 'Zwei Schnittpunkte mit der Ekliptik',
                         time: () => utcJd(2026, 11, 10),
                         view: 'edge',
-                        text: `Die Mondbahn ist um 5,1° gegen die Ekliptik geneigt. Auf der einen Hälfte des Umlaufs läuft der
-                            Mond nördlich der Ekliptik (helle Linie), auf der anderen südlich (gestrichelt). Die beiden
-                            Schnittpunkte heißen <b>Knoten</b>: Im aufsteigenden Knoten ☊ wechselt der Mond nach Norden,
-                            im absteigenden ☋ nach Süden. Ihre Verbindung ist die Knotenlinie (orange).<br><br>Die Ansicht
-                            „Kante“ schaut quer auf die Knotenlinie, dort ist die Neigung am besten zu sehen.`,
+                        text: `Die Bahn des Mondes ist um 5,1° gegen die Ekliptik geneigt, die Ebene der Erdbahn. Eine
+                            Hälfte des Umlaufs liegt nördlich davon (helle Linie), die andere südlich (gestrichelt). Wo der
+                            Mond die Ebene durchstößt, liegen die <b>Knoten</b>: aufwärts im aufsteigenden Knoten ☊, abwärts
+                            im absteigenden ☋. Die Gerade durch beide ist die <b>Knotenlinie</b> (orange).<br><br>Die Ansicht
+                            „Kante“ blickt quer zur Knotenlinie; so ist die Neigung am besten zu sehen.`,
                     },
                     {
-                        title: 'Drachenmonat: 27,21 Tage',
+                        title: 'Drakonitischer Monat: 27,21 Tage',
                         time: () => moonNodePassages(utcJd(2026, 11, 10)).ascending.next.time,
                         view: 'edge',
                         play: 1,
                         text: () => `Von einem aufsteigenden Knoten zum nächsten braucht der Mond im Mittel 27,21 Tage, den
-                            <b>Drachenmonat</b>. Er ist kürzer als ein Umlauf gegenüber den Sternen (27,32 Tage), weil die
-                            Knoten dem Mond entgegenlaufen. Am weitesten entfernt sich der Mond 5,1° von der Ekliptik, das
-                            sind rund 34 000 km.<br><br>Zeitraffer 1 Tag pro Sekunde. Jetzt: ekliptikale Breite
-                            ${degText(scene.moon.latitude, 2)}.`,
+                            <b>drakonitischen Monat</b>. Der Name erinnert an den Drachen, der nach alter Vorstellung bei
+                            einer Finsternis Sonne oder Mond verschlingt. Der Monat ist kürzer als ein Umlauf gegenüber den
+                            Sternen (27,32 Tage), weil die Knoten dem Mond entgegenlaufen. Bis zu 37 000 km steigt der Mond
+                            über die Ekliptik und sinkt ebenso weit darunter.<br><br>Zeitraffer 1 Tag pro Sekunde. Jetzt:
+                            ekliptikale Breite ${degText(scene.moon.latitude, 2)}.`,
                     },
                     {
                         title: 'Die Knotenlinie wandert rückwärts',
                         time: () => utcJd(2026, 11, 1),
                         view: 'top',
                         play: 365.25,
-                        text: () => `Die Sonne zerrt an der geneigten Mondbahn. Dadurch dreht sich die Knotenlinie
-                            <b>rückwärts</b>, also gegen die Bewegung des Mondes: 19,4° pro Jahr, einmal ganz herum in
-                            <b>18,61 Jahren</b>. Von oben gesehen läuft der Mond gegen den Uhrzeigersinn, die Knotenlinie
-                            im Uhrzeigersinn.<br><br>Zeitraffer 1 Jahr pro Sekunde, jetzt ${dateParts(scene.jd).y}, Knoten ☊ bei
-                            ${degText(scene.meanNode, 0)}. Derselbe Zyklus bestimmt, wie hoch der Mond steigt (Rundgang
-                            „Wie hoch steht der Mond?“).`,
+                        text: () => `Die Sonne zerrt an der geneigten Mondbahn, und die Knotenlinie dreht sich langsam
+                            <b>rückwärts</b>, gegen die Bewegung des Mondes: 19,4° pro Jahr, einmal ganz herum in
+                            <b>18,6 Jahren</b>. Von oben gesehen läuft der Mond gegen den Uhrzeigersinn, die Knotenlinie
+                            im Uhrzeigersinn.<br><br>Zeitraffer 1 Jahr pro Sekunde, jetzt ${dateParts(scene.jd).y},
+                            aufsteigender Knoten ☊ bei ${degText(scene.meanNode, 0)}. Derselbe Zyklus bestimmt auch, wie hoch
+                            der Mond am Himmel steigt (Rundgang „Wie hoch steht der Mond?“).`,
                     },
                     {
                         title: 'Finsternisse nur in Knotennähe',
@@ -1544,12 +1546,13 @@
                         layers: { cones: true },
                         text: () => {
                             const hours = Math.min(Math.abs(scene.jd - events.ascending.time), Math.abs(scene.jd - events.descending.time)) * 24;
-                            return `Neu- und Vollmond gibt es jeden Monat, Finsternisse nicht: Meist läuft der Mond über oder
-                                unter dem Schatten vorbei, weil seine Bahn geneigt ist. Nur wenn Neu- oder Vollmond nahe einem
-                                Knoten stattfinden, stehen Sonne, Erde und Mond genau in einer Linie.<br><br>Hier die totale
-                                Mondfinsternis vom 3.3.2026: Der Vollmond war nur ${Math.round(hours)} Stunden vom Knoten
-                                entfernt. Im Kernschatten leuchtet der Mond rötlich, weil die Erdatmosphäre etwas rotes
-                                Sonnenlicht hineinlenkt.`;
+                            return `Vollmond ist jeden Monat, eine Mondfinsternis nicht: Meist zieht der Mond über oder
+                                unter dem Schatten der Erde vorbei. Nur wenn der Vollmond nahe einem Knoten steht, liegen Sonne,
+                                Erde und Mond auch in der Höhe auf einer Linie.<br><br>So bei der totalen Mondfinsternis am
+                                3. März 2026: Der Vollmond war nur ${Math.round(hours)} Stunden vom Knoten entfernt. Ganz im
+                                Kernschatten leuchtet der Mond kupferrot. Die Lufthülle der Erde lenkt etwas Sonnenlicht in
+                                den Schatten, rot wie bei Sonnenauf- und -untergang. In Deutschland war davon nichts zu sehen:
+                                Um 12:35 Uhr MEZ stand der Mond unter dem Horizont.`;
                         },
                     },
                     {
@@ -1558,33 +1561,36 @@
                         scale: [1, 1],
                         layers: { cones: true },
                         camera: () => ({ focus: 'moon', azimuth: scene.sun.longitude + deg(90), elevation: deg(0), distance: 22 }),
-                        text: () => `Zum Vergleich der Vollmond vom 26.10.2026, hier maßstäblich: Er steht
+                        text: () => `Zum Vergleich der Vollmond vom 26. Oktober 2026, hier maßstäblich: Er steht
                             ${formatNumber(eclipse.lunar.axisDistance, 1)} Erdradien neben der Achse des Erdschattens und
-                            läuft am Schatten vorbei (rot: Kernschatten, grau: Halbschatten). Am Ort des Mondes hat der
-                            Kernschatten etwa ${formatNumber(eclipse.lunar.umbraRadius, 2)} Erdradien Radius, der Mond selbst
-                            0,27.`,
+                            zieht weit daran vorbei (rot: Kernschatten, grau: Halbschatten). In der Entfernung des Mondes
+                            hat der Kernschatten etwa ${formatNumber(eclipse.lunar.umbraRadius, 2)} Erdradien Radius, der
+                            Mond selbst 0,27.`,
                     },
                     {
                         title: 'Finsternis-Saisons',
                         time: () => findEclipse(utcJd(2026, 7, 1), 'solar').time,
                         camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
                         layers: { axes: false },
-                        text: () => `Zweimal im Jahr zeigt die Sonnenrichtung fast entlang der Knotenlinie. In diesen gut fünf
-                            Wochen (Winkel Sonne – Knotenlinie unter etwa 17°, jetzt ${degText(sunNodeAngle())}) gibt es
-                            mindestens eine Sonnenfinsternis und meist auch eine Mondfinsternis. Weil die Knotenlinie
-                            zurückwandert, kommen die Saisons jedes Jahr etwa 19 Tage früher (Finsternisjahr 346,6 Tage):
-                            2026 im Februar/März und August, 2027 im Februar und Juli/August.<br><br>Hier die totale
-                            Sonnenfinsternis vom 12.8.2026: Der dunkle Fleck ist der Mondschatten bei Island.`,
+                        text: () => `Zweimal im Jahr zeigt die Knotenlinie fast zur Sonne. Gut fünf Wochen lang (Winkel
+                            Sonne – Knotenlinie unter etwa 18°, jetzt ${degText(sunNodeAngle())}) stehen Neu- und Vollmond
+                            dann nahe genug an den Knoten: die <b>Finsternis-Saison</b>, mit mindestens einer
+                            Sonnenfinsternis und oft auch einer Mondfinsternis. Weil die Knotenlinie rückwärts wandert,
+                            kommen die Saisons jedes Jahr knapp 19 Tage früher (<b>Finsternisjahr</b>, 346,6 Tage): 2026 im
+                            Februar/März und August, 2027 im Januar/Februar und Juli/August.<br><br>Hier die totale
+                            Sonnenfinsternis am 12. August 2026: Der dunkle Fleck ist der Schatten des Mondes bei Island; kurz
+                            vor Sonnenuntergang erreicht er Spanien.`,
                     },
                     {
                         title: 'Saros: 18 Jahre und 11 Tage',
                         time: () => findEclipse(utcJd(2044, 8, 1), 'solar').time,
                         camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
-                        text: `223 Neumonde (18 Jahre, 11 Tage, 8 Stunden) sind fast genau 242 Drachenmonate und 239
-                            anomalistische Monate. Nach dieser Zeit, dem <b>Saros</b>, stehen Sonne, Mond, Knoten und
-                            Perigäum fast wieder gleich, und eine Finsternis wiederholt sich sehr ähnlich, um 8 Stunden
-                            später, also ein Drittel der Erde weiter westlich.<br><br>Die Finsternis vom 12.8.2026 folgt auf
-                            die vom 1.8.2008 und kehrt am 23.8.2044 wieder: hier, über Kanada und den USA.`,
+                        text: `Für Vorhersagen genügte schon den Babyloniern ein Rhythmus: 223 Neumonde (18 Jahre, 11 Tage,
+                            8 Stunden) sind fast genau 242 drakonitische Monate und 239 anomalistische (von Perigäum zu
+                            Perigäum). Nach dieser Zeit, dem <b>Saros</b>, stehen Sonne, Mond, Knoten und Perigäum fast
+                            wieder gleich, und eine Finsternis kehrt sehr ähnlich wieder, 8 Stunden später und damit ein
+                            Drittel der Erde weiter westlich.<br><br>Die Finsternis vom 12. August 2026 folgt auf die vom
+                            1. August 2008 und kehrt am 23. August 2044 wieder: hier, über Kanada und den USA.`,
                     },
                 ],
             },
@@ -1597,11 +1603,11 @@
                         title: 'Eine Ellipse mit der Erde im Brennpunkt',
                         time: () => utcJd(2026, 11, 1),
                         view: 'top',
-                        text: `Die Mondbahn ist eine Ellipse, die Erde steht in einem Brennpunkt (Exzentrizität im Mittel
-                            0,055). Der erdnächste Punkt heißt <b>Perigäum</b>, der erdfernste <b>Apogäum</b> (grün), ihre
-                            Verbindung Apsidenlinie. Im Mittel ist der Mond im Perigäum 363 300 km entfernt, im Apogäum
+                        text: `Die Bahn des Mondes ist eine Ellipse, die Erde steht in einem Brennpunkt (Exzentrizität im
+                            Mittel 0,055). Der erdnächste Punkt heißt <b>Perigäum</b>, der erdfernste <b>Apogäum</b> (grün),
+                            die Gerade durch beide <b>Apsidenlinie</b>. Im Mittel ist der Mond im Perigäum 363 300 km entfernt, im Apogäum
                             405 500 km; die Extremwerte liegen bei 356 400 und 406 700 km.<br><br>Grau gestrichelt: die
-                            mittlere Ellipse. Die wahre Bahn (hellblau) weicht davon ab, weil die Sonne mitzieht.`,
+                            mittlere Ellipse. Die wahre Bahn (hellblau) weicht davon ab, weil die Sonne am Mond zerrt.`,
                     },
                     {
                         title: 'Anomalistischer Monat: 27,55 Tage',
@@ -1631,8 +1637,9 @@
                         time: () => fullMoonAfter(2026, 12, 15),
                         view: 'top',
                         text: () => `Fällt der Vollmond in die Nähe des Perigäums, erscheint er etwa 14 % größer und rund
-                            30 % heller als im Apogäum. Am 24.12.2026 ist er nur ${kmText(scene.moon.distance)} entfernt,
-                            scheinbarer Durchmesser ${apparentDiameterText()}. Besonders nahe kommt der Mond, wenn die
+                            30 % heller als im Apogäum: ein <b>Supermond</b>. Am 24. Dezember 2026 ist er nur
+                            ${kmText(scene.moon.distance)} entfernt, scheinbarer Durchmesser ${apparentDiameterText()}; das
+                            Perigäum folgt sieben Stunden später. Besonders nahe kommt der Mond, wenn die
                             Apsidenlinie zur Sonne zeigt: Dann zieht die Sonne die Ellipse in die Länge, und Perigäum und
                             Neu- oder Vollmond fallen zusammen.`,
                     },
@@ -1640,10 +1647,10 @@
                         title: 'Minimond und der Rhythmus von 13,9 Monaten',
                         time: () => fullMoonAfter(2027, 7, 10),
                         view: 'top',
-                        text: () => `Sieben Monate später, am 18.7.2027, steht der Vollmond nahe dem Apogäum:
+                        text: () => `Sieben Monate später, am 18. Juli 2027, steht der Vollmond nahe dem Apogäum:
                             ${kmText(scene.moon.distance)}, scheinbarer Durchmesser nur ${apparentDiameterText()}.<br><br>Weil die
                             Apsidenlinie mitwandert, kommt der nächste Supermond nicht nach einem Jahr, sondern nach etwa
-                            13,9 Monaten (411,8 Tage): am 10.2.2028.`,
+                            13,9 Monaten (411,8 Tage): am 10. Februar 2028.`,
                     },
                     {
                         title: 'Total oder ringförmig',
@@ -1651,7 +1658,7 @@
                         camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
                         layers: { meanOrbit: false },
                         text: () => `Auch bei Sonnenfinsternissen zählt die Entfernung. Die Sonne erscheint 31,6′ bis 32,7′
-                            groß, der Mond 29,4′ bis 33,5′. Nahe dem Perigäum deckt er die Sonne ganz ab: Am 2.8.2027
+                            groß, der Mond 29,4′ bis 33,5′. Nahe dem Perigäum deckt er die Sonne ganz ab: Am 2. August 2027
                             (${kmText(scene.moon.distance)}) dauert die totale Finsternis über Ägypten bis zu 6 Minuten
                             23 Sekunden. Der dunkle Fleck ist der Kernschatten.`,
                     },
@@ -1660,7 +1667,7 @@
                         time: () => findEclipse(utcJd(2027, 1, 20), 'solar').time,
                         camera: () => cameraToward(shadowDirection(), 'earth', earthRadius() * 3.2),
                         layers: { meanOrbit: false },
-                        text: () => `Am 6.2.2027 ist der Mond ${kmText(scene.moon.distance)} entfernt und erscheint kleiner
+                        text: () => `Am 6. Februar 2027 ist der Mond ${kmText(scene.moon.distance)} entfernt und erscheint kleiner
                             als die Sonne. Sein Kernschatten endet vor der Erde; wer in der Mitte steht, sieht einen hellen
                             Ring um den Mond (ringförmige Finsternis). Auf der Erde bleibt es deshalb heller als bei
                             einer totalen Finsternis.`,
@@ -2206,7 +2213,7 @@
             rückwärts herum.</td></tr>
         <tr><td>Mondwende</td><td>Die größte Deklination des Mondes schwankt in 18,6 Jahren zwischen 28,6° (große
             Mondwende, zuletzt 2025) und 18,3° (kleine Mondwende, 2034). Grund ist die wandernde Knotenlinie.</td></tr>
-        <tr><td>Drachenmonat</td><td>Die Zeit von einem aufsteigenden Knoten zum nächsten, im Mittel 27,21 Tage.</td></tr>
+        <tr><td>Drakonitischer Monat</td><td>Die Zeit von einem aufsteigenden Knoten zum nächsten, im Mittel 27,21 Tage.</td></tr>
         <tr><td>Apsiden</td><td>Der erdnächste (Perigäum) und der erdfernste Punkt (Apogäum) der Mondbahn. Die Entfernung
             schwankt zwischen etwa 356 000 und 407 000 km. Die Apsidenlinie dreht sich in 8,85 Jahren einmal vorwärts.</td></tr>
         <tr><td>Anomalistischer Monat</td><td>Die Zeit von einem Perigäum zum nächsten, im Mittel 27,55 Tage.</td></tr>
@@ -2225,7 +2232,7 @@
             die Erdatmosphäre etwas rotes Sonnenlicht hineinlenkt. Der Kernschatten des Mondes reicht gerade bis zur Erde;
             ist der Mond weit weg, endet er vorher und die Sonnenfinsternis wird ringförmig.</td></tr>
         <tr><td>Finsternis-Saison</td><td>Zeitraum von gut einem Monat, in dem die Sonne nahe der Knotenlinie steht (Winkel
-            unter etwa 17°). Nur dann stehen Neu- oder Vollmond nahe genug an der Ekliptik für eine Sonnen- oder
+            unter etwa 18°). Nur dann stehen Neu- oder Vollmond nahe genug an der Ekliptik für eine Sonnen- oder
             Mondfinsternis. Das kommt etwa zweimal im Jahr vor.</td></tr>
     </table>
 

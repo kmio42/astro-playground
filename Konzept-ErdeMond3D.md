@@ -14,7 +14,7 @@ Danach ergänzt: Abschnitt „Einstellungen“ mit der Erklärung aller Bedienel
 Kulminationshöhe am Beobachtungsort in der Tabelle), Ränder der Ebenen zusätzlich als Linien (auch genau von der
 Kante sichtbar) und drei geführte Rundgänge mit je 7 Schritten: „Wie hoch steht der Mond?“ (Deklination,
 Monatsgang, große/kleine Mondwende, 18,6 Jahre, Vollmond im Winter/Sommer), „Knoten und Finsternisse“
-(Drachenmonat, Rückwanderung, Finsternis-Saisons, Saros) und „Apsiden“ (anomalistischer Monat, Vorwanderung in
+(drakonitischer Monat, Rückwanderung, Finsternis-Saisons, Saros) und „Apsiden“ (anomalistischer Monat, Vorwanderung in
 8,85 Jahren, Supermond/Minimond, totale/ringförmige Finsternis). Jeder Schritt setzt Zeitpunkt, Anzeigen, Maßstab,
 Kamera und Zeitraffer; am Ende kommen Anzeigen und Maßstab wieder wie vorher.
 Datensparende Version `erdemond3d.html?klein`: Erde 2048 statt 4096 Pixel (`earth_day_2k.jpg`, 0,34 MB), Mondrelief
@@ -331,11 +331,11 @@ Achsen, Äquatorebene, Standort, Beschriftungen, (Stufe 3) Schattenkegel.
 
 **Infotabelle** (Seitenleiste, wie die Tabellen der anderen Seiten): Mondlänge/-breite, Entfernung,
 Elongation, beleuchteter Anteil und Phasenname, Libration, Länge des mittleren Knotens Ω, **Winkel Sonne –
-Knotenlinie** (unter etwa 17° → Finsternis möglich), Zeit bis zum nächsten Knoten, Perigäum und Apogäum mit
+Knotenlinie** (unter etwa 18° → Finsternis möglich), Zeit bis zum nächsten Knoten, Perigäum und Apogäum mit
 Entfernung.
 
 **Erklärungen**: Glossar unter der Szene, kurz wie ein Lexikon-Eintrag (Ekliptik, Knoten, Apsiden,
-Libration, Erdschein, Drachenmonat, anomalistischer Monat, Finsternis-Saison).
+Libration, Erdschein, drakonitischer Monat, anomalistischer Monat, Finsternis-Saison).
 
 ## Aufbau der Dateien
 
