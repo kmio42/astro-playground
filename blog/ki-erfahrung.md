@@ -186,7 +186,7 @@ Technisch gab es wenig Probleme, eher normales Debugging. Und nicht jeder Fehler
 
 Damals musste ich die Dinge wirklich zuerst verstehen, bevor sie mir ein Modell richtig zeigen
 konnte. Würde ich heute mit dem Thema anfangen, müsste ich mich auf die Modelle verlassen, könnte
-aber vielleicht schneller meine Fragen klären. Ob das tiefe Verständnis dabei auf der Strecke geblieben wären: Wer weiß.
+aber vielleicht schneller meine Fragen klären. Ob das tiefe Verständnis dabei auf der Strecke geblieben wäre: Wer weiß.
 
 ## Stichwörter
 
